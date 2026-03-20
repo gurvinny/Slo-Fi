@@ -1,0 +1,185 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#08080f"/>
+      <stop offset="50%" stop-color="#0c0c1a"/>
+      <stop offset="100%" stop-color="#080810"/>
+    </linearGradient>
+
+    <!-- Purple glow radial -->
+    <radialGradient id="glowLeft" cx="280" cy="150" r="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9b6dff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#9b6dff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Teal glow radial -->
+    <radialGradient id="glowRight" cx="960" cy="150" r="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00d4aa" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#00d4aa" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Waveform gradient -->
+    <linearGradient id="waveGrad" x1="700" y1="0" x2="1150" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9b6dff" stop-opacity="0"/>
+      <stop offset="20%" stop-color="#9b6dff" stop-opacity="0.8"/>
+      <stop offset="70%" stop-color="#00d4aa" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#00d4aa" stop-opacity="0"/>
+    </linearGradient>
+
+    <filter id="blur4">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+    <filter id="blur8">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <filter id="blur2">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" fill="url(#bg)"/>
+
+  <!-- Glow layers -->
+  <rect width="1200" height="300" fill="url(#glowLeft)"/>
+  <rect width="1200" height="300" fill="url(#glowRight)"/>
+
+  <!-- Subtle grid lines -->
+  <g stroke="#1e1e32" stroke-width="0.5" opacity="0.6">
+    <line x1="0" y1="60" x2="1200" y2="60"/>
+    <line x1="0" y1="120" x2="1200" y2="120"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/>
+    <line x1="0" y1="240" x2="1200" y2="240"/>
+    <line x1="200" y1="0" x2="200" y2="300"/>
+    <line x1="400" y1="0" x2="400" y2="300"/>
+    <line x1="600" y1="0" x2="600" y2="300"/>
+    <line x1="800" y1="0" x2="800" y2="300"/>
+    <line x1="1000" y1="0" x2="1000" y2="300"/>
+  </g>
+
+  <!-- ── Hexagon logo (left side) ── -->
+  <!-- Outer hex glow -->
+  <polygon points="140,60 200,93 200,159 140,192 80,159 80,93"
+    fill="none" stroke="#9b6dff" stroke-width="1.5" opacity="0.2" filter="url(#blur8)"/>
+  <!-- Outer hex -->
+  <polygon points="140,62 198,95 198,161 140,194 82,161 82,95"
+    fill="none" stroke="#9b6dff" stroke-width="1.5" opacity="0.6"/>
+  <!-- Middle hex -->
+  <polygon points="140,82 178,103 178,145 140,166 102,145 102,103"
+    fill="none" stroke="#9b6dff" stroke-width="1" opacity="0.35"/>
+  <!-- Inner hex -->
+  <polygon points="140,100 162,112 162,136 140,148 118,136 118,112"
+    fill="none" stroke="#9b6dff" stroke-width="0.8" opacity="0.2"/>
+  <!-- Center dot -->
+  <circle cx="140" cy="128" r="8" fill="#9b6dff" opacity="0.9"/>
+  <circle cx="140" cy="128" r="8" fill="#9b6dff" filter="url(#blur4)" opacity="0.6"/>
+  <!-- Connector lines from center -->
+  <line x1="140" y1="128" x2="198" y2="95" stroke="#9b6dff" stroke-width="0.5" opacity="0.2"/>
+  <line x1="140" y1="128" x2="198" y2="161" stroke="#9b6dff" stroke-width="0.5" opacity="0.2"/>
+  <line x1="140" y1="128" x2="82" y2="95" stroke="#9b6dff" stroke-width="0.5" opacity="0.2"/>
+  <line x1="140" y1="128" x2="82" y2="161" stroke="#9b6dff" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- ── Title text ── -->
+  <text x="232" y="108" font-family="'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace"
+    font-size="72" font-weight="700" fill="#e2e2f0" letter-spacing="-2">Slo-Fi</text>
+
+  <!-- Purple underline accent -->
+  <rect x="232" y="118" width="320" height="2" rx="1" fill="url(#waveGrad)" opacity="0.5"/>
+
+  <!-- Tagline -->
+  <text x="234" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+    font-size="16" fill="#8888a8" letter-spacing="0.1em" text-transform="uppercase">YOUR BROWSER IS THE STUDIO</text>
+
+  <!-- Feature pills -->
+  <!-- Pill 1 -->
+  <rect x="234" y="170" width="118" height="26" rx="13" fill="#9b6dff" fill-opacity="0.12" stroke="#9b6dff" stroke-width="0.8" stroke-opacity="0.4"/>
+  <text x="293" y="187" font-family="-apple-system, sans-serif" font-size="11" fill="#9b6dff" text-anchor="middle" letter-spacing="0.04em">Time-Stretch</text>
+
+  <!-- Pill 2 -->
+  <rect x="362" y="170" width="128" height="26" rx="13" fill="#00d4aa" fill-opacity="0.1" stroke="#00d4aa" stroke-width="0.8" stroke-opacity="0.4"/>
+  <text x="426" y="187" font-family="-apple-system, sans-serif" font-size="11" fill="#00d4aa" text-anchor="middle" letter-spacing="0.04em">Conv. Reverb</text>
+
+  <!-- Pill 3 -->
+  <rect x="500" y="170" width="110" height="26" rx="13" fill="#9b6dff" fill-opacity="0.08" stroke="#9b6dff" stroke-width="0.8" stroke-opacity="0.3"/>
+  <text x="555" y="187" font-family="-apple-system, sans-serif" font-size="11" fill="#9b6dff" text-anchor="middle" letter-spacing="0.04em">Local-First</text>
+
+  <!-- ── Waveform visualization (right side) ── -->
+  <!-- Waveform bars — drawn as a pseudo-audio waveform -->
+  <g fill="url(#waveGrad)" opacity="0.85">
+    <!-- Each bar: x, y(top), width, height. Centered at y=150 -->
+    <!-- Bars drawn from x=700 to x=1140, width=6, gap=3 -->
+    <rect x="700" y="126" width="5" height="48"/>
+    <rect x="709" y="136" width="5" height="28"/>
+    <rect x="718" y="118" width="5" height="64"/>
+    <rect x="727" y="130" width="5" height="40"/>
+    <rect x="736" y="108" width="5" height="84"/>
+    <rect x="745" y="122" width="5" height="56"/>
+    <rect x="754" y="132" width="5" height="36"/>
+    <rect x="763" y="112" width="5" height="76"/>
+    <rect x="772" y="124" width="5" height="52"/>
+    <rect x="781" y="138" width="5" height="24"/>
+    <rect x="790" y="105" width="5" height="90"/>
+    <rect x="799" y="118" width="5" height="64"/>
+    <rect x="808" y="128" width="5" height="44"/>
+    <rect x="817" y="102" width="5" height="96"/>
+    <rect x="826" y="120" width="5" height="60"/>
+    <rect x="835" y="134" width="5" height="32"/>
+    <rect x="844" y="110" width="5" height="80"/>
+    <rect x="853" y="125" width="5" height="50"/>
+    <rect x="862" y="140" width="5" height="20"/>
+    <rect x="871" y="108" width="5" height="84"/>
+    <rect x="880" y="118" width="5" height="64"/>
+    <rect x="889" y="130" width="5" height="40"/>
+    <rect x="898" y="100" width="5" height="100"/>
+    <rect x="907" y="115" width="5" height="70"/>
+    <rect x="916" y="128" width="5" height="44"/>
+    <rect x="925" y="106" width="5" height="88"/>
+    <rect x="934" y="122" width="5" height="56"/>
+    <rect x="943" y="136" width="5" height="28"/>
+    <rect x="952" y="112" width="5" height="76"/>
+    <rect x="961" y="124" width="5" height="52"/>
+    <rect x="970" y="142" width="5" height="16"/>
+    <rect x="979" y="116" width="5" height="68"/>
+    <rect x="988" y="128" width="5" height="44"/>
+    <rect x="997" y="104" width="5" height="92"/>
+    <rect x="1006" y="119" width="5" height="62"/>
+    <rect x="1015" y="132" width="5" height="36"/>
+    <rect x="1024" y="110" width="5" height="80"/>
+    <rect x="1033" y="126" width="5" height="48"/>
+    <rect x="1042" y="138" width="5" height="24"/>
+    <rect x="1051" y="114" width="5" height="72"/>
+    <rect x="1060" y="124" width="5" height="52"/>
+    <rect x="1069" y="136" width="5" height="28"/>
+    <rect x="1078" y="108" width="5" height="84"/>
+    <rect x="1087" y="120" width="5" height="60"/>
+    <rect x="1096" y="130" width="5" height="40"/>
+    <rect x="1105" y="116" width="5" height="68"/>
+    <rect x="1114" y="128" width="5" height="44"/>
+    <rect x="1123" y="140" width="5" height="20"/>
+    <rect x="1132" y="120" width="5" height="60"/>
+  </g>
+
+  <!-- Playhead line on waveform -->
+  <line x1="870" y1="90" x2="870" y2="210" stroke="#9b6dff" stroke-width="2" opacity="0.9"/>
+  <circle cx="870" cy="150" r="5" fill="#9b6dff"/>
+  <circle cx="870" cy="150" r="5" fill="#9b6dff" filter="url(#blur4)" opacity="0.7"/>
+
+  <!-- Waveform played portion overlay (dim the left of playhead) -->
+  <rect x="700" y="90" width="170" height="120" fill="#9b6dff" opacity="0.06"/>
+
+  <!-- Bottom privacy note -->
+  <text x="600" y="268" font-family="-apple-system, sans-serif" font-size="11"
+    fill="#44445a" text-anchor="middle" letter-spacing="0.06em">
+    🔒  ALL AUDIO STAYS ON YOUR DEVICE  ·  ZERO UPLOADS  ·  ZERO TRACKING
+  </text>
+
+  <!-- Bottom border line -->
+  <line x1="0" y1="280" x2="1200" y2="280" stroke="#1e1e32" stroke-width="0.5"/>
+
+  <!-- Corner accent marks -->
+  <path d="M 0 0 L 40 0 L 0 40" fill="none" stroke="#9b6dff" stroke-width="1" opacity="0.3"/>
+  <path d="M 1200 0 L 1160 0 L 1200 40" fill="none" stroke="#00d4aa" stroke-width="1" opacity="0.3"/>
+  <path d="M 0 300 L 40 300 L 0 260" fill="none" stroke="#9b6dff" stroke-width="1" opacity="0.3"/>
+  <path d="M 1200 300 L 1160 300 L 1200 260" fill="none" stroke="#00d4aa" stroke-width="1" opacity="0.3"/>
+</svg>

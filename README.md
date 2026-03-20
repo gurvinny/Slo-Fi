@@ -5,7 +5,7 @@
 <!--                        HERO SECTION                        -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 
-<img src="docs/assets/slo-fi-banner.png" alt="Slo-Fi Banner" width="100%"/>
+<img src="docs/assets/slo-fi-banner.svg" alt="Slo-Fi Banner" width="100%"/>
 
 <br/>
 
@@ -40,10 +40,6 @@
 
 <br/>
 
-<!-- Replace with an actual GIF/screenshot of Slo-Fi in action -->
-<img src="docs/assets/slo-fi-demo.gif" alt="Slo-Fi Demo" width="720" style="border-radius: 12px;"/>
-
-<br/>
 <sub>↑ Real-time slowing + reverb applied to a local audio file — entirely in the browser.</sub>
 
 </div>

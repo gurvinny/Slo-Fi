@@ -269,6 +269,7 @@ A major visual and experiential overhaul. The audio engine stays — everything 
 | 🚀 | **OfflineAudioContext Export** | Faster-than-realtime export using `OfflineAudioContext` — large files export in seconds, not minutes. |
 | 🎵 | **Multi-File Session** | Load multiple audio files simultaneously. Switch between tracks instantly, queue them, or layer stems in a single session. |
 | ⚡ | **Hyperpop Preset** | A dedicated preset tuned for hyperpop production — pitched-up playback, heavy distortion, tight gated reverb, and maxed chorus for that chaotic hyper-compressed sound. |
+| 🎧 | **8D Audio Effect** | Binaural panning engine that rotates audio around the listener's head using a PannerNode automation curve. Designed for headphone listening — creates the illusion of sound moving in 3D space. |
 
 <br/>
 

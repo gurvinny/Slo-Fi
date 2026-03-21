@@ -437,6 +437,14 @@ body.is-playing #iconPause    { opacity: 1; }
   text-overflow: ellipsis;
 }
 
+.track-bpm {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* ── Waveform ───────────────────────────────────────────────────────────── */
 .waveform-wrap {
   background: var(--glass-bg);

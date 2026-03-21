@@ -1,4 +1,5 @@
 import { AudioEngine } from '../audio/AudioEngine'
+import { detectBpm } from '../audio/BpmDetector'
 import { Waveform } from './Waveform'
 import { AnomalySphere } from './AnomalySphere'
 import { StarOverlay } from './StarOverlay'
@@ -40,7 +41,10 @@ export class App {
   private fileInput = document.getElementById('fileInput') as HTMLInputElement
   private player = document.getElementById('player')!
   private trackName = document.getElementById('trackName')!
+  private trackBpm  = document.getElementById('trackBpm')!
   private trackMeta = document.getElementById('trackMeta')!
+
+  private _baseBpm = 0
   private currentTimeEl = document.getElementById('currentTime')!
   private durationEl = document.getElementById('duration')!
   private playPauseBtn = document.getElementById('playPauseBtn')!
@@ -177,6 +181,7 @@ export class App {
       this.speedValue.textContent = `${rate.toFixed(2)}x`
       this.sphere?.setSpeed(rate)
       this.presets.clearActive()
+      this.updateBpmDisplay()
       this.notifyParamChange()
     })
     this.midi.bindCC(91, (v) => {
@@ -255,6 +260,7 @@ export class App {
       this.speedValue.textContent = `${rate.toFixed(2)}x`
       this.sphere?.setSpeed(rate)
       this.presets.clearActive()
+      this.updateBpmDisplay()
       this.notifyParamChange()
     })
 
@@ -403,6 +409,9 @@ export class App {
       this.trackName.textContent = baseName
       this.exporter.trackName = baseName
 
+      this._baseBpm = detectBpm(this.engine.getBuffer()!)
+      this.updateBpmDisplay()
+
       this.trackMeta.textContent = `${formatTime(this.engine.duration)} · ${formatBytes(file.size)} · ${file.type || 'audio'}`
       this.durationEl.textContent = formatTime(this.engine.duration)
       this.currentTimeEl.textContent = '0:00'
@@ -437,6 +446,7 @@ export class App {
   private syncSlidersToParams(params: AudioParams): void {
     this.speedSlider.value = String(Math.round(params.playbackRate * 100))
     this.speedValue.textContent = `${params.playbackRate.toFixed(2)}x`
+    this.updateBpmDisplay()
 
     this.reverbSlider.value = String(Math.round(params.reverbMix * 100))
     this.reverbValue.textContent = `${Math.round(params.reverbMix * 100)}%`
@@ -451,6 +461,12 @@ export class App {
     this.volumeValue.textContent = `${Math.round(params.volume * 100)}%`
 
     this.notifyParamChange()
+  }
+
+  private updateBpmDisplay(): void {
+    if (!this._baseBpm) { this.trackBpm.textContent = ''; return }
+    const displayed = Math.round(this._baseBpm * this.engine.getParams().playbackRate)
+    this.trackBpm.textContent = `${displayed} BPM`
   }
 
   private togglePlayPause(): void {

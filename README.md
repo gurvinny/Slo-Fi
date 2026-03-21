@@ -10,29 +10,28 @@
 
 ### ✦ Your Browser Is the Studio ✦
 
-> *Drop a track. Slow it down. Drown it in reverb.*
-> *No installs. No uploads. No limits.*
-> *Just you, your music, and a late-night vibe.*
+> *Drop a track. Watch it come alive.*
+> *A living orb pulses with every beat. Reverb fills the room.*
+> *No installs. No uploads. Just music.*
 
 <br/>
 
-[![Version](https://img.shields.io/badge/Version-1.0.0-A855F7.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases/tag/v1.0.0)
+[![Version](https://img.shields.io/badge/Version-2.0.0-A855F7.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases)
 [![License](https://img.shields.io/badge/License-MIT-A855F7.svg?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.x-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Three.js](https://img.shields.io/badge/Three.js-r183-black.svg?style=flat-square&logo=threedotjs&logoColor=white)](https://threejs.org/)
 [![Privacy First](https://img.shields.io/badge/Privacy-First-10B981.svg?style=flat-square&logo=lock&logoColor=white)](#-privacy--security)
 [![Contributing](https://img.shields.io/badge/PRs-Welcome-10B981.svg?style=flat-square&logo=github&logoColor=white)](CONTRIBUTING.md)
-[![Code of Conduct](https://img.shields.io/badge/Code_of_Conduct-Contributor_Covenant-ff69b4.svg?style=flat-square)](CODE_OF_CONDUCT.md)
-[![Security](https://img.shields.io/badge/Security-Responsible_Disclosure-06B6D4.svg?style=flat-square&logo=shield&logoColor=white)](SECURITY.md)
 
 <br/>
 
 <p>
+  <a href="#-the-orb">The Orb</a> •
   <a href="#-what-is-slo-fi">What is Slo-Fi?</a> •
   <a href="#-features">Features</a> •
   <a href="#-privacy--security">Privacy</a> •
   <a href="#-get-started">Get Started</a> •
-  <a href="#-whats-next">What's Next</a> •
   <a href="#-contributing--community">Contributing</a>
 </p>
 
@@ -44,11 +43,42 @@
 
 <br/>
 
+## ✦ The Orb
+
+At the center of Slo-Fi lives a **3D audio-reactive orb** — a breathing, pulsing sphere built with Three.js and driven entirely by your music in real time.
+
+It is not a visualizer bolted on after the fact. It is the interface. Drop a track and watch it morph.
+
+- **Bass hits** push the orb outward, swelling its geometry with every kick and sub
+- **Mid frequencies** ripple across the surface in waves of simplex noise
+- **Treble energy** lights up the star field behind it, making the whole scene crackle
+- **Aurora gradients** bleed across the background, shifting color as the frequency balance changes
+
+The orb is fully customizable from the Visual Settings panel:
+
+| Setting | What it does |
+|:---|:---|
+| Reactivity | How aggressively the audio displaces the geometry |
+| Glow | The intensity of the bloom and light bleed |
+| Size | Scale the orb from compact to room-filling |
+| Rotation | Speed of the idle spin |
+| Particles | Number of floating particles orbiting the surface |
+| Bass Pulse | Toggle the beat-synced size pump |
+| Wireframe | Swap the solid surface for a geometric wire mesh |
+
+Six color themes change the entire palette at once: **Prism** (hue shifts with the music), **Void**, **Neon**, **Ember**, **Frost**, and **Mono**.
+
+<br/>
+
+---
+
+<br/>
+
 ## ✦ What is Slo-Fi?
 
 Slo-Fi is a **professional-grade audio processing tool that lives entirely in your browser.** No app to download, no account to create, no files uploaded anywhere. Open the page, drop a track, and start shaping sound.
 
-It was built for the producers, the late-night listeners, the slow-reverb obsessives — anyone who wants to hear music differently. Whether you're crafting a slowed + reverb edit, building an ambient texture, or just chilling with a vaporwave vibe, Slo-Fi gives you the tools to do it in seconds.
+It was built for producers, late-night listeners, and slow-reverb obsessives. Whether you are crafting a slowed + reverb edit, building an ambient texture, or just chilling with a vaporwave vibe, Slo-Fi gives you the tools to do it in seconds.
 
 The engine is powered by the **Web Audio API** — the same technology used in professional browser-based DAWs — so everything you hear is processed at native audio quality with sub-10ms latency. No compromises.
 
@@ -62,15 +92,21 @@ The engine is powered by the **Web Audio API** — the same technology used in p
 
 ## ✦ Features
 
+### A living visual experience.
+
+The orb is the heart of v2. The glassmorphism UI wraps around it — frosted panels, aurora gradients, a star field that pulses with the highs. Everything reacts to the music. See [The Orb](#-the-orb) above for the full breakdown.
+
+---
+
 ### Slow it down. Keep it perfect.
 
-Dial your track anywhere from **full speed down to 25%** without a single pitch artifact. The tempo changes — the key stays exactly where it should. No chipmunks. No demons. Just the music, stretched into something new.
+Dial your track anywhere from **full speed down to 25%** without a single pitch artifact. The tempo changes, the key stays exactly where it should. No chipmunks. No demons. Just the music, stretched into something new.
 
 ---
 
 ### Reverb that actually breathes.
 
-Slo-Fi doesn't use cheap delay-line reverb. It uses **true convolution reverb** — the same algorithm in professional studio plugins — to produce reverb tails that feel physically real. Crank the Room Size and Decay and disappear into a cathedral. Dial it tight for a warm studio booth. The space is yours to sculpt.
+Slo-Fi uses **true convolution reverb** — the same algorithm in professional studio plugins — to produce reverb tails that feel physically real. Crank the Room Size and Decay and disappear into a cathedral. Dial it tight for a warm studio booth. The space is yours to sculpt.
 
 ---
 
@@ -81,7 +117,8 @@ Four built-in presets get you there instantly:
 - **Lo-Fi** — warm, slow, intimate. Coffee-shop at 2am.
 - **Vaporwave** — saturated, dreamy, nostalgic. Mallsoft forever.
 - **Ambient** — open, spacious, endless. Just breathe.
-- **Custom** — your settings, saved your way.
+- **Hyperpop** — bright, fast, distorted. Maximum chaos.
+- **Custom** — your settings, your way.
 
 ---
 
@@ -97,13 +134,13 @@ Go deeper with a built-in studio-grade effects stack:
 
 ### See the music.
 
-An interactive **seekable waveform** and a live **FFT spectrum analyzer** let you watch the frequency content move in real time. Click anywhere on the waveform to jump to that moment. Understanding your audio has never looked this good.
+An interactive **seekable waveform** and a live **FFT spectrum analyzer** let you watch the frequency content move in real time. Click anywhere on the waveform to jump to that moment. The spectrum bars spark particles at peak energy. Understanding your audio has never looked this good.
 
 ---
 
 ### Play it live with MIDI.
 
-Plug in any MIDI controller and map hardware knobs and faders to speed, reverb, volume, or any effect parameter. Automate a slowdown. Sweep the reverb mix in real time. **Perform your edit, don't just set it.**
+Plug in any MIDI controller and map hardware knobs to speed, reverb, volume, or any effect parameter. Automate a slowdown. Sweep the reverb mix in real time. **Perform your edit, don't just set it.**
 
 ---
 
@@ -121,7 +158,7 @@ Share a session link and sync with another person over **WebRTC**. Same playback
 
 ### Install it. Take it offline.
 
-Slo-Fi is a **Progressive Web App**. Install it to your home screen on any device and use it with no internet connection. It works the same whether you're online or not.
+Slo-Fi is a **Progressive Web App**. Install it to your home screen and use it with no internet connection. It works the same whether you're online or not.
 
 <br/>
 
@@ -133,9 +170,7 @@ Slo-Fi is a **Progressive Web App**. Install it to your home screen on any devic
 
 **Your audio never leaves your device. Full stop.**
 
-Everything in Slo-Fi is processed inside your browser using the Web Audio API. There is no server receiving your files, no analytics watching your session, no third-party scripts. Close the tab and every byte of audio is gone — nothing is stored anywhere.
-
-This makes Slo-Fi safe to use with sensitive, unreleased, or proprietary material. Your files are your files.
+Everything in Slo-Fi is processed inside your browser using the Web Audio API. There is no server receiving your files, no analytics watching your session, no third-party scripts. Close the tab and every byte of audio is gone.
 
 | Guarantee | |
 |:---|:---:|
@@ -168,7 +203,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`, drop a track, and you're in.
+Open `http://localhost:5173`, drop a track, and the orb comes to life.
 
 ```bash
 npm run build    # production build
@@ -178,24 +213,10 @@ npm run preview  # preview the build locally
 ### How to use it
 
 1. Drop any `.mp3`, `.wav`, `.flac`, `.ogg`, or `.aac` file onto the interface
-2. Pick a preset — or start from scratch
-3. Adjust speed, reverb, and effects to taste
-4. Hit play
+2. Watch the orb wake up and sync to the music
+3. Pick a preset — or dial in your own speed, reverb, and effects
+4. Open Visual Settings to customize the orb, theme, and star field
 5. Export your track as a WAV when you're done
-
-<br/>
-
----
-
-<br/>
-
-## 🗺️ What's Next
-
-**v1.0 is complete** — every feature is shipped and the engine is solid.
-
-**v2.0 is in planning** — a full dark glassmorphism redesign, mobile-first layout, beat detection, 8D audio, multi-file sessions, a Hyperpop preset, and much more.
-
-See the full roadmap, including all v1 features and every v2.0 item: **[ROADMAP.md](ROADMAP.md)**
 
 <br/>
 
@@ -213,7 +234,7 @@ Contributions are welcome — whether that's a bug fix, a new feature, or just i
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards |
 | [SECURITY.md](SECURITY.md) | Responsible disclosure policy |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the audio engine works |
-| [ROADMAP.md](ROADMAP.md) | v1 complete + full v2.0 plans |
+| [ROADMAP.md](ROADMAP.md) | Full feature roadmap |
 
 <br/>
 

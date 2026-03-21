@@ -39,7 +39,6 @@ All features shipped. The core engine and full feature set are live in the [v1.0
 | ✅ | **Waveform + spectrum analyzer** | Seekable time-domain waveform and live FFT frequency display |
 | ✅ | **MIDI CC controller mapping** | Map any hardware knob or fader to any parameter |
 | ✅ | **Effects chain** | 3-band EQ, Chorus (rate + depth), Tape Saturation |
-| ✅ | **Collaborative sessions** | WebRTC-based real-time session sharing with synced playback |
 
 <br/>
 
@@ -95,12 +94,11 @@ Track progress on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi/milest
 
 <br/>
 
-### MIDI & Collab
+### MIDI
 
 | Issue | Feature | Description |
 |:---:|:---|:---|
 | [#15](https://github.com/gurvinny/Slo-Fi/issues/15) | **Visual MIDI Mapping UI** | Overlay showing all assignable parameters with a visual piano/pad layout. Click a parameter to enter assign mode — no manual CC number entry. |
-| [#16](https://github.com/gurvinny/Slo-Fi/issues/16) | **Enhanced Collab — Presence + Chat** | Collab panel overhaul with live cursors on the shared waveform, typing indicators, and a minimal text chat. |
 
 <br/>
 

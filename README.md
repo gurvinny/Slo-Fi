@@ -150,12 +150,6 @@ When the vibe is right, hit export and get a **WAV download** of your fully proc
 
 ---
 
-### Collaborate in real time.
-
-Share a session link and sync with another person over **WebRTC**. Same playback position, same controls, two sets of ears. Build the vibe together.
-
----
-
 ### Install it. Take it offline.
 
 Slo-Fi is a **Progressive Web App**. Install it to your home screen and use it with no internet connection. It works the same whether you're online or not.

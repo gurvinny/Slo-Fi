@@ -313,23 +313,6 @@
 
       </main>
 
-      <!-- Collaboration panel (below viewport, accessible via scroll) -->
-      <section id="collabPanel" class="collab-panel" aria-label="Collaborative session">
-        <div class="collab-inner">
-          <h2 class="collab-title">Collaborate</h2>
-          <p class="collab-desc">Sync parameters with another person in real time. You each load your own audio file.</p>
-          <div class="collab-actions">
-            <button id="collabStartBtn" class="btn-collab">Start Session</button>
-            <div class="collab-join">
-              <input type="text" id="collabRoomInput" class="collab-input" placeholder="Room ID" aria-label="Room ID to join" maxlength="32" pattern="[a-zA-Z0-9]+" />
-              <button id="collabJoinBtn" class="btn-collab">Join</button>
-            </div>
-          </div>
-          <div id="collabStatus" class="collab-status" aria-live="polite"></div>
-          <p class="collab-note">Requires the signaling server: <code>node server/signaling.js</code></p>
-        </div>
-      </section>
-
     </div><!-- /#app -->
 
     <script type="module" src="/src/main.ts"></script>

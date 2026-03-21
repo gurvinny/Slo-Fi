@@ -284,7 +284,7 @@ export class AudioEngine {
     this._effectsChain?.setSaturationDrive(this._saturationDrive)
   }
 
-  // Applies a full preset in one shot. Used by PresetController and collab sync.
+  // Applies a full preset in one shot. Used by PresetController.
   applyPreset(params: AudioParams): void {
     this.setPlaybackRate(params.playbackRate)
     this.setReverbMix(params.reverbMix)

@@ -175,7 +175,6 @@ The project uses **TypeScript in strict mode**. The compiler enforces:
 ```
 src/audio/    Web Audio API engine (AudioEngine, EffectsChain, Exporter, etc.)
 src/ui/       DOM controllers (App, Waveform, SpectrumAnalyzer, etc.)
-src/collab/   WebRTC collaboration layer
 ```
 
 **Web Audio API** — prefer native nodes over manual DSP. The `AudioContext` instance is owned by `AudioEngine` and passed down — never create a second context.

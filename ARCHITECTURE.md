@@ -118,14 +118,6 @@ Both run on `requestAnimationFrame` and only redraw while audio is playing.
 
 ---
 
-### WebRTC Collaboration
-
-The collaboration layer (`src/collab/CollabSession.ts`) uses WebRTC data channels to sync playback state between two peers. Only control messages (play, pause, seek position, parameter values) are transmitted — audio is never sent over the wire. Each participant plays their own locally loaded file.
-
-A lightweight signaling server (`server/`) handles the initial peer connection handshake via WebSocket. Once connected, the signaling server is out of the loop entirely.
-
----
-
 ### MIDI
 
 `MidiController.ts` uses the Web MIDI API (`navigator.requestMIDIAccess()`) to listen for MIDI CC messages. Each CC number maps to a named parameter (speed, reverb mix, volume, EQ bands, etc.). Mappings are stored in memory and can be reassigned at any time without restarting playback.
@@ -158,14 +150,10 @@ src/
 │   ├── EffectsController.ts Effects panel DOM bindings
 │   ├── PresetController.ts  Preset selection UI
 │   ├── ExportController.ts  Export button and progress
-│   ├── CollabController.ts  Collab session UI
 │   └── MidiStatusIndicator.ts MIDI connection status display
-│
-└── collab/
-    └── CollabSession.ts     WebRTC peer connection and data channel sync
 ```
 
-The three top-level modules (`audio/`, `ui/`, `collab/`) have a strict dependency direction — `ui/` depends on `audio/`, `collab/` depends on `audio/`, and neither `audio/` nor `collab/` imports from `ui/`. This keeps the audio engine independently testable.
+The two top-level modules (`audio/`, `ui/`) have a strict dependency direction — `ui/` depends on `audio/`, and `audio/` never imports from `ui/`. This keeps the audio engine independently testable.
 
 <br/>
 
@@ -218,7 +206,6 @@ Audio processing is entirely client-side. The browser is the only runtime — th
 | No persistent storage | `AudioBuffer` lives in memory only; cleared on tab close |
 | No third-party scripts | All dependencies bundled at build time; no CDN calls at runtime |
 | Strict CSP | Content Security Policy headers block inline scripts and restrict origins |
-| WebRTC scope | Collab data channel carries control messages only — never audio bytes |
 
 For reporting a vulnerability, see [SECURITY.md](SECURITY.md).
 

@@ -6,7 +6,6 @@ import { StarOverlay } from './StarOverlay'
 import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
-import { CollabController } from './CollabController'
 import { MidiController } from '../audio/MidiController'
 import { MidiStatusIndicator } from './MidiStatusIndicator'
 import type { AudioParams } from '../types'
@@ -32,7 +31,6 @@ export class App {
   private presets: PresetController
   private effects: EffectsController
   private exporter: ExportController
-  private collab: CollabController
   private midi = new MidiController()
   private midiIndicator = new MidiStatusIndicator()
 
@@ -94,7 +92,6 @@ export class App {
     this.presets = new PresetController(this.engine)
     this.effects = new EffectsController(this.engine)
     this.exporter = new ExportController(this.engine)
-    this.collab = new CollabController(this.engine)
 
     this.wireEngineCallbacks()
     this.wireUI()
@@ -155,12 +152,7 @@ export class App {
     }
     this.effects.onChanged = () => {
       this.presets.clearActive()
-      this.notifyParamChange()
     }
-  }
-
-  private notifyParamChange(): void {
-    this.collab.broadcast(this.engine.getParams())
   }
 
   private async initMidi(): Promise<void> {
@@ -172,7 +164,6 @@ export class App {
       this.engine.setVolume(v)
       this.volumeSlider.value = String(Math.round(v * 100))
       this.volumeValue.textContent = `${Math.round(v * 100)}%`
-      this.notifyParamChange()
     })
     this.midi.bindCC(74, (v) => {
       const rate = 0.50 + v * 1.20
@@ -182,18 +173,15 @@ export class App {
       this.sphere?.setSpeed(rate)
       this.presets.clearActive()
       this.updateBpmDisplay()
-      this.notifyParamChange()
     })
     this.midi.bindCC(91, (v) => {
       this.engine.setReverbMix(v)
       this.reverbSlider.value = String(Math.round(v * 100))
       this.reverbValue.textContent = `${Math.round(v * 100)}%`
       this.sphere?.setReverb(v)
-      this.notifyParamChange()
     })
     this.midi.bindCC(93, (v) => {
       this.engine.setChorusDepth(v)
-      this.notifyParamChange()
     })
   }
 
@@ -261,7 +249,6 @@ export class App {
       this.sphere?.setSpeed(rate)
       this.presets.clearActive()
       this.updateBpmDisplay()
-      this.notifyParamChange()
     })
 
     // Reverb mix
@@ -271,7 +258,6 @@ export class App {
       this.reverbValue.textContent = `${this.reverbSlider.value}%`
       this.sphere?.setReverb(mix)
       this.presets.clearActive()
-      this.notifyParamChange()
     })
 
     // Decay
@@ -280,7 +266,6 @@ export class App {
       this.engine.setReverbDecay(decay)
       this.decayValue.textContent = `${decay.toFixed(1)}s`
       this.presets.clearActive()
-      this.notifyParamChange()
     })
 
     // Room size
@@ -289,7 +274,6 @@ export class App {
       this.engine.setReverbRoomSize(size)
       this.roomValue.textContent = `${this.roomSlider.value}%`
       this.presets.clearActive()
-      this.notifyParamChange()
     })
 
     // Volume
@@ -297,7 +281,6 @@ export class App {
       const vol = parseInt(this.volumeSlider.value) / 100
       this.engine.setVolume(vol)
       this.volumeValue.textContent = `${this.volumeSlider.value}%`
-      this.notifyParamChange()
     })
 
     // Visual settings — particle count

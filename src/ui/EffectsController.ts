@@ -21,7 +21,7 @@ export class EffectsController {
   private satDriveSlider = document.getElementById('satDriveSlider') as HTMLInputElement
   private satDriveValue = document.getElementById('satDriveValue')!
 
-  // Fired after any slider change so App.ts can notify collab and clear preset
+  // Fired after any slider change so App.ts can clear the active preset
   public onChanged: (() => void) | null = null
 
   constructor(engine: AudioEngine) {

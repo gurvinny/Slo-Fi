@@ -55,7 +55,6 @@ Slo-Fi's security posture is built into the architecture itself. Audio is proces
 | **No persistent audio storage** | `AudioBuffer` instances live only in memory. No writes to `localStorage`, `IndexedDB`, or the Cache API for audio content. Closing the tab frees all audio memory. |
 | **No third-party scripts** | Zero analytics, zero tracking pixels, zero CDN-loaded runtime libraries. All dependencies are bundled and reviewed at build time. |
 | **Content Security Policy** | Strict CSP headers restrict resource origins and block inline script injection. |
-| **WebRTC collab scope** | The collaborative session feature uses WebRTC for control signal sync only. Audio is never transmitted over the data channel — each participant plays their own local file. |
 
 This architecture makes Slo-Fi safe to use with sensitive, unreleased, or proprietary audio material.
 

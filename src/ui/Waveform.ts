@@ -33,7 +33,7 @@ export class Waveform {
     this.draw()
   }
 
-  private resize(): void {
+  resize(): void {
     const dpr = window.devicePixelRatio || 1
     const rect = this.canvas.getBoundingClientRect()
     this.canvas.width = rect.width * dpr

@@ -57,6 +57,12 @@ export class App {
   private volumeSlider = document.getElementById('volumeSlider') as HTMLInputElement
   private volumeValue = document.getElementById('volumeValue')!
 
+  // Controls drawer refs (issue #12 - floating panel)
+  private controlsDrawer = document.getElementById('controlsDrawer')!
+  private controlsFloatBtn = document.getElementById('controlsFloatBtn')!
+  private controlsCloseBtn = document.getElementById('controlsCloseBtn')!
+  private controlsShowBtn = document.getElementById('controlsShowBtn')!
+
   constructor() {
     this.waveform = new Waveform(document.getElementById('waveform') as HTMLCanvasElement)
 
@@ -70,7 +76,31 @@ export class App {
     this.wireUI()
     this.wireKeyboard()
     this.wireCrossController()
+    this.wireControlsPanel()
     this.initMidi()
+  }
+
+  // Wires the floating controls drawer toggle, pin, and close buttons
+  private wireControlsPanel(): void {
+    // Toggle between floating and pinned (in-flow) modes
+    this.controlsFloatBtn.addEventListener('click', () => {
+      const isNowFloating = this.controlsDrawer.classList.toggle('controls-drawer--floating')
+      this.controlsFloatBtn.setAttribute('title', isNowFloating ? 'Pin panel' : 'Float panel')
+      this.controlsFloatBtn.setAttribute('aria-label', isNowFloating ? 'Pin panel' : 'Float panel')
+    })
+
+    // Dismiss the drawer and show the re-open button
+    this.controlsCloseBtn.addEventListener('click', () => {
+      this.controlsDrawer.classList.add('controls-drawer--hidden')
+      this.controlsDrawer.classList.remove('controls-drawer--floating')
+      this.controlsShowBtn.style.display = ''
+    })
+
+    // Re-open the drawer from the show button
+    this.controlsShowBtn.addEventListener('click', () => {
+      this.controlsDrawer.classList.remove('controls-drawer--hidden')
+      this.controlsShowBtn.style.display = 'none'
+    })
   }
 
   // Cross-controller wiring (presets syncing sliders, etc.)
@@ -285,6 +315,14 @@ export class App {
     try {
       await this.engine.loadFile(file)
 
+      // Show the player first so the canvases have real CSS dimensions before
+      // we resize and draw into them. getBoundingClientRect() returns 0x0 on
+      // elements inside a display:none parent.
+      this.showPlayer()
+      this.setPlayingState(false)
+
+      // Resize waveform now that it is visible, then load data
+      this.waveform.resize()
       const waveData = this.engine.getWaveform(400)
       this.waveform.setData(waveData)
       this.waveform.setProgress(0)
@@ -298,16 +336,21 @@ export class App {
       this.durationEl.textContent = formatTime(this.engine.duration)
       this.currentTimeEl.textContent = '0:00'
 
-      // Set up spectrum analyzer now that the audio context exists
+      // Create spectrum analyzer after the player is visible so the canvas has
+      // real dimensions when SpectrumAnalyzer calls resize() in its constructor
       if (!this.spectrum && this.engine.analyserNode) {
         this.spectrum = new SpectrumAnalyzer(
           document.getElementById('spectrum') as HTMLCanvasElement,
           this.engine.analyserNode,
         )
+        // Feed live energy values into CSS variables so the aurora reacts to the audio
+        this.spectrum.onEnergyUpdate = (bass, mid, treble) => {
+          const root = document.documentElement.style
+          root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
+          root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
+          root.setProperty('--aurora-treble', String(treble.toFixed(3)))
+        }
       }
-
-      this.showPlayer()
-      this.setPlayingState(false)
     } catch (err) {
       console.error('Failed to decode audio:', err)
       alert('Could not decode this audio file. Please try a different format.')

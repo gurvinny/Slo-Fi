@@ -12,7 +12,7 @@ export class PresetController {
 
   constructor(engine: AudioEngine) {
     this.engine = engine
-    this.buttons = document.querySelectorAll<HTMLButtonElement>('.preset-btn')
+    this.buttons = document.querySelectorAll<HTMLButtonElement>('.preset-card')
     this.wire()
   }
 
@@ -41,12 +41,12 @@ export class PresetController {
 
   // Marks the given button active and clears the rest
   private setActive(active: HTMLButtonElement): void {
-    this.buttons.forEach((btn) => btn.classList.remove('preset-btn--active'))
-    active.classList.add('preset-btn--active')
+    this.buttons.forEach((btn) => btn.classList.remove('preset-card--active'))
+    active.classList.add('preset-card--active')
   }
 
   // Called when the user manually moves a slider - clears the active preset
   clearActive(): void {
-    this.buttons.forEach((btn) => btn.classList.remove('preset-btn--active'))
+    this.buttons.forEach((btn) => btn.classList.remove('preset-card--active'))
   }
 }

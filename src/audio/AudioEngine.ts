@@ -38,6 +38,11 @@ export class AudioEngine {
   // Analyser tapped from effects chain output for the spectrum visualizer
   private _analyserNode: AnalyserNode | null = null
 
+  // Incremented each time a new source node is started. Lets the 'ended'
+  // handler distinguish "this source finished naturally" from "this source was
+  // stopped early because we seeked or restarted."
+  private _sourceGeneration = 0
+
   // State
   private _playbackRate = 1.0
   private _reverbMix = 0.2
@@ -161,8 +166,12 @@ export class AudioEngine {
     this.sourceNode.connect(this.dryGainNode!)
     this.sourceNode.connect(this.convolverNode!)
 
+    // Capture generation so that if this source is stopped early (seek,
+    // pause, stop) the 'ended' event that fires from sourceNode.stop() does
+    // not mistakenly trigger the track-finished callback.
+    const myGen = ++this._sourceGeneration
     this.sourceNode.addEventListener('ended', () => {
-      if (this._isPlaying) {
+      if (this._isPlaying && this._sourceGeneration === myGen) {
         this._isPlaying = false
         this._startOffset = 0
         this.stopTimer()

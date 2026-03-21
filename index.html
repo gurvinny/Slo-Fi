@@ -49,12 +49,24 @@
             <div class="track-meta" id="trackMeta">—</div>
           </div>
 
-          <!-- Preset strip -->
+          <!-- Preset cards - each shows the preset name and its key parameters -->
           <div class="preset-strip" role="group" aria-label="Presets">
-            <button class="preset-btn" data-preset="lofi">Lo-Fi</button>
-            <button class="preset-btn" data-preset="vaporwave">Vaporwave</button>
-            <button class="preset-btn" data-preset="ambient">Ambient</button>
-            <button class="preset-btn preset-btn--dim" data-preset="custom">Custom</button>
+            <button class="preset-card" data-preset="lofi">
+              <span class="preset-card-name">Lo-Fi</span>
+              <span class="preset-card-hint">0.75x · 30% verb · warm</span>
+            </button>
+            <button class="preset-card" data-preset="vaporwave">
+              <span class="preset-card-name">Vaporwave</span>
+              <span class="preset-card-hint">0.50x · 55% verb · chorus</span>
+            </button>
+            <button class="preset-card" data-preset="ambient">
+              <span class="preset-card-name">Ambient</span>
+              <span class="preset-card-hint">0.65x · 75% verb · hall</span>
+            </button>
+            <button class="preset-card preset-card--dim" data-preset="custom">
+              <span class="preset-card-name">Custom</span>
+              <span class="preset-card-hint">your settings</span>
+            </button>
           </div>
 
           <!-- Waveform -->
@@ -94,116 +106,130 @@
             <span id="exportStatus" class="export-status" aria-live="polite"></span>
           </div>
 
-          <!-- Core controls grid -->
-          <div class="controls">
-            <div class="control-group">
-              <div class="control-header">
-                <label for="speedSlider">Speed</label>
-                <span class="value-badge" id="speedValue">1.00×</span>
-              </div>
-              <input type="range" id="speedSlider" class="slider" min="25" max="100" value="100" step="1" aria-label="Playback speed" />
-              <div class="slider-ticks">
-                <span>0.25×</span>
-                <span>0.50×</span>
-                <span>0.75×</span>
-                <span>1.00×</span>
-              </div>
+          <!-- Controls drawer - inline on mobile, dismissible/pinnable overlay on desktop -->
+          <div id="controlsDrawer" class="controls-drawer">
+
+            <!-- Drawer header: only visible on desktop (hidden via CSS on mobile) -->
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Controls</span>
+              <button id="controlsFloatBtn" class="controls-drawer-btn" title="Float panel" aria-label="Float panel">&#8862;</button>
+              <button id="controlsCloseBtn" class="controls-drawer-btn" title="Close panel" aria-label="Close panel">&times;</button>
             </div>
 
-            <div class="control-group">
-              <div class="control-header">
-                <label for="reverbSlider">Reverb Mix</label>
-                <span class="value-badge" id="reverbValue">20%</span>
-              </div>
-              <input type="range" id="reverbSlider" class="slider slider--teal" min="0" max="100" value="20" step="1" aria-label="Reverb wet/dry mix" />
-            </div>
-
-            <div class="control-group">
-              <div class="control-header">
-                <label for="decaySlider">Decay</label>
-                <span class="value-badge" id="decayValue">2.5s</span>
-              </div>
-              <input type="range" id="decaySlider" class="slider slider--teal" min="5" max="80" value="25" step="1" aria-label="Reverb decay time" />
-            </div>
-
-            <div class="control-group">
-              <div class="control-header">
-                <label for="roomSlider">Room Size</label>
-                <span class="value-badge" id="roomValue">50%</span>
-              </div>
-              <input type="range" id="roomSlider" class="slider slider--teal" min="1" max="100" value="50" step="1" aria-label="Reverb room size" />
-            </div>
-
-            <div class="control-group">
-              <div class="control-header">
-                <label for="volumeSlider">Volume</label>
-                <span class="value-badge" id="volumeValue">80%</span>
-              </div>
-              <input type="range" id="volumeSlider" class="slider slider--dim" min="0" max="100" value="80" step="1" aria-label="Master volume" />
-            </div>
-          </div>
-
-          <!-- Effects chain (collapsible) -->
-          <details class="controls-section" id="effectsSection">
-            <summary class="controls-section-header">
-              <span>Effects Chain</span>
-              <span class="controls-section-hint">EQ · Chorus · Saturation</span>
-            </summary>
+            <!-- Core controls grid -->
             <div class="controls">
               <div class="control-group">
                 <div class="control-header">
-                  <label for="eqLowSlider">EQ Low</label>
-                  <span class="value-badge value-badge--green" id="eqLowValue">0 dB</span>
+                  <label for="speedSlider">Speed</label>
+                  <span class="value-badge" id="speedValue">1.00×</span>
                 </div>
-                <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf gain" />
-                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                <input type="range" id="speedSlider" class="slider" min="25" max="100" value="100" step="1" aria-label="Playback speed" />
+                <div class="slider-ticks">
+                  <span>0.25×</span>
+                  <span>0.50×</span>
+                  <span>0.75×</span>
+                  <span>1.00×</span>
+                </div>
               </div>
 
               <div class="control-group">
                 <div class="control-header">
-                  <label for="eqMidSlider">EQ Mid</label>
-                  <span class="value-badge value-badge--green" id="eqMidValue">0 dB</span>
+                  <label for="reverbSlider">Reverb Mix</label>
+                  <span class="value-badge" id="reverbValue">20%</span>
                 </div>
-                <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak gain" />
-                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                <input type="range" id="reverbSlider" class="slider slider--teal" min="0" max="100" value="20" step="1" aria-label="Reverb wet/dry mix" />
               </div>
 
               <div class="control-group">
                 <div class="control-header">
-                  <label for="eqHighSlider">EQ High</label>
-                  <span class="value-badge value-badge--green" id="eqHighValue">0 dB</span>
+                  <label for="decaySlider">Decay</label>
+                  <span class="value-badge" id="decayValue">2.5s</span>
                 </div>
-                <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf gain" />
-                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                <input type="range" id="decaySlider" class="slider slider--teal" min="5" max="80" value="25" step="1" aria-label="Reverb decay time" />
               </div>
 
               <div class="control-group">
                 <div class="control-header">
-                  <label for="chorusRateSlider">Chorus Rate</label>
-                  <span class="value-badge value-badge--orange" id="chorusRateValue">0.8 Hz</span>
+                  <label for="roomSlider">Room Size</label>
+                  <span class="value-badge" id="roomValue">50%</span>
                 </div>
-                <input type="range" id="chorusRateSlider" class="slider slider--orange" min="0.1" max="5" value="0.8" step="0.1" aria-label="Chorus LFO rate" />
-                <div class="slider-ticks"><span>0.1 Hz</span><span>2.5 Hz</span><span>5 Hz</span></div>
+                <input type="range" id="roomSlider" class="slider slider--teal" min="1" max="100" value="50" step="1" aria-label="Reverb room size" />
               </div>
 
               <div class="control-group">
                 <div class="control-header">
-                  <label for="chorusDepthSlider">Chorus Depth</label>
-                  <span class="value-badge value-badge--orange" id="chorusDepthValue">0%</span>
+                  <label for="volumeSlider">Volume</label>
+                  <span class="value-badge" id="volumeValue">80%</span>
                 </div>
-                <input type="range" id="chorusDepthSlider" class="slider slider--orange" min="0" max="100" value="0" step="1" aria-label="Chorus depth" />
-              </div>
-
-              <div class="control-group">
-                <div class="control-header">
-                  <label for="satDriveSlider">Tape Drive</label>
-                  <span class="value-badge value-badge--red" id="satDriveValue">0%</span>
-                </div>
-                <input type="range" id="satDriveSlider" class="slider slider--red" min="0" max="100" value="0" step="1" aria-label="Tape saturation drive" />
-                <div class="slider-ticks"><span>Clean</span><span>Warm</span><span>Driven</span></div>
+                <input type="range" id="volumeSlider" class="slider slider--dim" min="0" max="100" value="80" step="1" aria-label="Master volume" />
               </div>
             </div>
-          </details>
+
+            <!-- Effects chain (collapsible) -->
+            <details class="controls-section" id="effectsSection">
+              <summary class="controls-section-header">
+                <span>Effects Chain</span>
+                <span class="controls-section-hint">EQ · Chorus · Saturation</span>
+              </summary>
+              <div class="controls">
+                <div class="control-group">
+                  <div class="control-header">
+                    <label for="eqLowSlider">EQ Low</label>
+                    <span class="value-badge value-badge--green" id="eqLowValue">0 dB</span>
+                  </div>
+                  <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf gain" />
+                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                </div>
+
+                <div class="control-group">
+                  <div class="control-header">
+                    <label for="eqMidSlider">EQ Mid</label>
+                    <span class="value-badge value-badge--green" id="eqMidValue">0 dB</span>
+                  </div>
+                  <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak gain" />
+                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                </div>
+
+                <div class="control-group">
+                  <div class="control-header">
+                    <label for="eqHighSlider">EQ High</label>
+                    <span class="value-badge value-badge--green" id="eqHighValue">0 dB</span>
+                  </div>
+                  <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf gain" />
+                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                </div>
+
+                <div class="control-group">
+                  <div class="control-header">
+                    <label for="chorusRateSlider">Chorus Rate</label>
+                    <span class="value-badge value-badge--orange" id="chorusRateValue">0.8 Hz</span>
+                  </div>
+                  <input type="range" id="chorusRateSlider" class="slider slider--orange" min="0.1" max="5" value="0.8" step="0.1" aria-label="Chorus LFO rate" />
+                  <div class="slider-ticks"><span>0.1 Hz</span><span>2.5 Hz</span><span>5 Hz</span></div>
+                </div>
+
+                <div class="control-group">
+                  <div class="control-header">
+                    <label for="chorusDepthSlider">Chorus Depth</label>
+                    <span class="value-badge value-badge--orange" id="chorusDepthValue">0%</span>
+                  </div>
+                  <input type="range" id="chorusDepthSlider" class="slider slider--orange" min="0" max="100" value="0" step="1" aria-label="Chorus depth" />
+                </div>
+
+                <div class="control-group">
+                  <div class="control-header">
+                    <label for="satDriveSlider">Tape Drive</label>
+                    <span class="value-badge value-badge--red" id="satDriveValue">0%</span>
+                  </div>
+                  <input type="range" id="satDriveSlider" class="slider slider--red" min="0" max="100" value="0" step="1" aria-label="Tape saturation drive" />
+                  <div class="slider-ticks"><span>Clean</span><span>Warm</span><span>Driven</span></div>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <!-- Re-open button shown on desktop after the drawer is dismissed -->
+          <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls" style="display:none">Controls</button>
         </div>
       </main>
 

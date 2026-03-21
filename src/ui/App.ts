@@ -171,7 +171,7 @@ export class App {
       this.notifyParamChange()
     })
     this.midi.bindCC(74, (v) => {
-      const rate = 0.25 + v * 1.75
+      const rate = 0.50 + v * 1.20
       this.engine.setPlaybackRate(rate)
       this.speedSlider.value = String(Math.round(rate * 100))
       this.speedValue.textContent = `${rate.toFixed(2)}x`

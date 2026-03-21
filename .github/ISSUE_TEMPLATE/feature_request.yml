@@ -1,0 +1,95 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for Slo-Fi
+title: "feat: "
+labels:
+  - "type: feature"
+  - "status: planned"
+assignees:
+  - gurvinny
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request
+        Got an idea that would make Slo-Fi better? Lay it out here.
+
+        Before submitting, check the [v2.0 roadmap](https://github.com/gurvinny/Slo-Fi/blob/main/ROADMAP.md) — your idea might already be planned.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What do you want to see?
+      description: A clear, concise description of the feature.
+      placeholder: I want to be able to load multiple audio files in a single session and switch between them without losing my effects settings.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case or frustration driving this request.
+      placeholder: |
+        Right now I have to reload the page to switch tracks, which resets all my speed and reverb settings.
+        I want to quickly A/B compare two tracks with the same effects dialled in.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area does this touch?
+      options:
+        - Audio engine (time-stretch, reverb, effects)
+        - UI / design / layout
+        - Mobile / PWA
+        - Preset system
+        - MIDI support
+        - Visualisers (waveform / spectrum)
+        - Collaborative sessions
+        - Audio export
+        - Accessibility
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Which version feels right for this?
+      options:
+        - v2.0 — fits the planned redesign cycle
+        - Future — bigger lift, no specific version yet
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: detail
+    attributes:
+      label: Detailed description
+      description: How should it work? Describe the UX, any edge cases, and anything the implementation needs to get right.
+      placeholder: |
+        - A file list panel on the left showing all loaded tracks
+        - Clicking a track name switches playback without resetting effects
+        - A close button removes a track from the session
+        - All files stay in-memory — nothing is uploaded
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints this must respect
+      description: Check all that apply to keep Slo-Fi true to its core principles.
+      options:
+        - label: Audio must never leave the browser
+        - label: No new runtime dependencies
+        - label: Must work on mobile
+        - label: Must be accessible (keyboard navigable, ARIA)
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: References or inspiration
+      description: Links, screenshots, or examples from other tools that show what you have in mind.

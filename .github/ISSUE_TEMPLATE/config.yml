@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/gurvinny/Slo-Fi/security/advisories/new
+    about: Do not open a public issue for security vulnerabilities. Use a private Security Advisory instead — see SECURITY.md for details.
+
+  - name: v2.0 Roadmap
+    url: https://github.com/gurvinny/Slo-Fi/blob/main/ROADMAP.md
+    about: Check the full v2.0 roadmap before opening a feature request — your idea may already be tracked.
+
+  - name: Architecture Docs
+    url: https://github.com/gurvinny/Slo-Fi/blob/main/ARCHITECTURE.md
+    about: Read the technical deep-dive before asking how something works.

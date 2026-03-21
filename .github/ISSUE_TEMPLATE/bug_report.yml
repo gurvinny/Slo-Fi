@@ -1,0 +1,85 @@
+name: Bug Report
+description: Something is broken or behaving incorrectly
+title: "fix: "
+labels:
+  - "type: bug"
+  - "status: planned"
+assignees:
+  - gurvinny
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        Thanks for taking the time to report an issue. Fill in as much detail as you can — it helps us fix things faster.
+
+        > **Privacy note:** Slo-Fi processes all audio locally. Please do not paste audio file contents or personal data into this form.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug. What did you expect to happen, and what actually happened?
+      placeholder: |
+        Expected: The reverb mix slider updates the wet signal in real time.
+        Actual: Moving the slider has no effect until the track is restarted.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Walk us through the exact steps that trigger the bug.
+      placeholder: |
+        1. Open Slo-Fi in Chrome
+        2. Drop an MP3 file onto the interface
+        3. Press Play
+        4. Move the Reverb Mix slider
+        5. No change in output is heard
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, OS, and any relevant device info.
+      placeholder: |
+        Browser: Chrome 122 / Firefox 123 / Safari 17
+        OS: Windows 11 / macOS Sonoma / Android 14
+        Device: Desktop / iPhone 15 / etc.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area of Slo-Fi is affected?
+      options:
+        - Audio playback / time-stretching
+        - Reverb / effects chain
+        - Waveform or spectrum visualiser
+        - Preset system
+        - MIDI controller
+        - Audio export
+        - Collaborative session
+        - UI / layout / styling
+        - PWA / install / offline
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: Open DevTools (F12 → Console) and paste any errors shown. Leave blank if none.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, screen recordings, or extra context that might help.

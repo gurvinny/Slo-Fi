@@ -1,0 +1,62 @@
+name: Docs Improvement
+description: Fix or improve the README, ARCHITECTURE, ROADMAP, or any other documentation
+title: "docs: "
+labels:
+  - "type: docs"
+  - "status: planned"
+assignees:
+  - gurvinny
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Docs Improvement
+        Good documentation makes Slo-Fi easier to use and contribute to. If something is wrong, unclear, or missing — let us know.
+
+  - type: dropdown
+    id: doc
+    attributes:
+      label: Which document needs attention?
+      options:
+        - README.md
+        - ARCHITECTURE.md
+        - ROADMAP.md
+        - CONTRIBUTING.md
+        - CODE_OF_CONDUCT.md
+        - SECURITY.md
+        - Inline code comments
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: What kind of change is needed?
+      options:
+        - Fix a factual error
+        - Clarify confusing wording
+        - Add missing information
+        - Improve formatting
+        - Update outdated content
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to change and why?
+      description: Describe what is wrong or missing and what it should say instead.
+      placeholder: |
+        The ARCHITECTURE.md signal flow diagram does not include the 8D audio PannerNode.
+        It should show: ... → Effects Chain → PannerNode → Convolver → ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording or content
+      description: If you have a specific fix in mind, paste it here. A rough draft is fine.

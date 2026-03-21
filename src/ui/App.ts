@@ -57,7 +57,7 @@ export class App {
   private volumeSlider = document.getElementById('volumeSlider') as HTMLInputElement
   private volumeValue = document.getElementById('volumeValue')!
 
-  // Controls drawer refs (issue #12 - floating panel)
+  // Controls drawer refs
   private controlsDrawer = document.getElementById('controlsDrawer')!
   private controlsFloatBtn = document.getElementById('controlsFloatBtn')!
   private controlsCloseBtn = document.getElementById('controlsCloseBtn')!
@@ -87,7 +87,6 @@ export class App {
   constructor() {
     this.waveform = new Waveform(document.getElementById('waveform') as HTMLCanvasElement)
 
-    // Controllers are instantiated here; DOM elements must exist before this runs
     this.presets = new PresetController(this.engine)
     this.effects = new EffectsController(this.engine)
     this.exporter = new ExportController(this.engine)
@@ -102,48 +101,37 @@ export class App {
     this.initMidi()
   }
 
-  // Wires the floating controls drawer toggle, pin, and close buttons
   private wireControlsPanel(): void {
-    // Toggle between floating and pinned (in-flow) modes
     this.controlsFloatBtn.addEventListener('click', () => {
       const isNowFloating = this.controlsDrawer.classList.toggle('controls-drawer--floating')
-      this.controlsFloatBtn.setAttribute('title', isNowFloating ? 'Pin panel' : 'Float panel')
-      this.controlsFloatBtn.setAttribute('aria-label', isNowFloating ? 'Pin panel' : 'Float panel')
+      this.controlsFloatBtn.setAttribute('title',      isNowFloating ? 'Pin panel'   : 'Float panel')
+      this.controlsFloatBtn.setAttribute('aria-label', isNowFloating ? 'Pin panel'   : 'Float panel')
     })
-
-    // Dismiss the drawer and show the re-open button
     this.controlsCloseBtn.addEventListener('click', () => {
       this.controlsDrawer.classList.add('controls-drawer--hidden')
       this.controlsDrawer.classList.remove('controls-drawer--floating')
       this.controlsShowBtn.style.display = ''
     })
-
-    // Re-open the drawer from the show button
     this.controlsShowBtn.addEventListener('click', () => {
       this.controlsDrawer.classList.remove('controls-drawer--hidden')
       this.controlsShowBtn.style.display = 'none'
     })
   }
 
-  // Wires the visual settings drawer (left-side panel)
   private wireSettingsPanel(): void {
     this.settingsCloseBtn.addEventListener('click', () => {
       this.settingsDrawer.classList.add('settings-drawer--hidden')
       this.settingsShowBtn.classList.remove('btn-settings-show--active')
     })
-
     this.settingsShowBtn.addEventListener('click', () => {
       const isHidden = this.settingsDrawer.classList.toggle('settings-drawer--hidden')
       this.settingsShowBtn.classList.toggle('btn-settings-show--active', !isHidden)
     })
-
-    // Theme chip clicks — update CSS custom properties (whole page) + orb
     this.settingsDrawer.querySelectorAll<HTMLButtonElement>('.theme-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
         this.settingsDrawer.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('theme-chip--active'))
         chip.classList.add('theme-chip--active')
         const theme = chip.dataset.theme ?? 'prism'
-        // Setting data-theme on <html> triggers the per-theme CSS variable overrides
         if (theme === 'prism') {
           document.documentElement.removeAttribute('data-theme')
         } else {
@@ -154,7 +142,6 @@ export class App {
     })
   }
 
-  // Cross-controller wiring (presets syncing sliders, etc.)
   private wireCrossController(): void {
     this.presets.onPresetApplied = (params: AudioParams) => {
       this.syncSlidersToParams(params)
@@ -162,36 +149,28 @@ export class App {
       this.sphere?.setSpeed(params.playbackRate)
       this.sphere?.setReverb(params.reverbMix)
     }
-
     this.effects.onChanged = () => {
       this.presets.clearActive()
       this.notifyParamChange()
     }
   }
 
-  // Broadcasts current params to the collab session if one is active
   private notifyParamChange(): void {
     this.collab.broadcast(this.engine.getParams())
   }
 
   private async initMidi(): Promise<void> {
     this.midi.onStatusChange = (status) => this.midiIndicator.update(status)
-
     const available = await this.midi.init()
     if (!available) return
 
-    // Wire default CC mappings (0-127 normalized to 0-1 by MidiController)
     this.midi.bindCC(7, (v) => {
-      // CC 7 = Volume
-      const vol = v
-      this.engine.setVolume(vol)
-      this.volumeSlider.value = String(Math.round(vol * 100))
-      this.volumeValue.textContent = `${Math.round(vol * 100)}%`
+      this.engine.setVolume(v)
+      this.volumeSlider.value = String(Math.round(v * 100))
+      this.volumeValue.textContent = `${Math.round(v * 100)}%`
       this.notifyParamChange()
     })
-
     this.midi.bindCC(74, (v) => {
-      // CC 74 = Playback rate (maps 0-1 to 0.25-2.0)
       const rate = 0.25 + v * 1.75
       this.engine.setPlaybackRate(rate)
       this.speedSlider.value = String(Math.round(rate * 100))
@@ -200,24 +179,18 @@ export class App {
       this.presets.clearActive()
       this.notifyParamChange()
     })
-
     this.midi.bindCC(91, (v) => {
-      // CC 91 = Reverb send
       this.engine.setReverbMix(v)
       this.reverbSlider.value = String(Math.round(v * 100))
       this.reverbValue.textContent = `${Math.round(v * 100)}%`
       this.sphere?.setReverb(v)
       this.notifyParamChange()
     })
-
     this.midi.bindCC(93, (v) => {
-      // CC 93 = Chorus depth
       this.engine.setChorusDepth(v)
       this.notifyParamChange()
     })
   }
-
-  // Engine callbacks
 
   private wireEngineCallbacks(): void {
     this.engine.onEnded = () => {
@@ -225,7 +198,6 @@ export class App {
       this.waveform.setProgress(0)
       this.sphere?.stop()
     }
-
     this.engine.onTimeUpdate = (current, duration) => {
       this.currentTimeEl.textContent = formatTime(current)
       if (duration > 0) {
@@ -233,8 +205,6 @@ export class App {
       }
     }
   }
-
-  // Core UI wiring
 
   private wireUI(): void {
     // Drop zone
@@ -377,8 +347,6 @@ export class App {
     })
   }
 
-  // Keyboard shortcuts
-
   private wireKeyboard(): void {
     document.addEventListener('keydown', (e) => {
       if (!this.engine.hasBuffer) return
@@ -409,10 +377,7 @@ export class App {
     })
   }
 
-  // File loading
-
   private async loadFile(file: File): Promise<void> {
-    // Validate MIME type before decoding
     if (file.type && !file.type.startsWith('audio/')) {
       alert('Please drop an audio file.')
       return
@@ -425,18 +390,15 @@ export class App {
       await this.engine.loadFile(file)
 
       // Show the player first so the canvases have real CSS dimensions before
-      // we resize and draw into them. getBoundingClientRect() returns 0x0 on
-      // elements inside a display:none parent.
+      // we resize and draw into them.
       this.showPlayer()
       this.setPlayingState(false)
 
-      // Resize waveform now that it is visible, then load data
       this.waveform.resize()
       const waveData = this.engine.getWaveform(400)
       this.waveform.setData(waveData)
       this.waveform.setProgress(0)
 
-      // Strip extension for display and export filename
       const baseName = file.name.replace(/\.[^.]+$/, '')
       this.trackName.textContent = baseName
       this.exporter.trackName = baseName
@@ -453,15 +415,12 @@ export class App {
       this.dropzone.classList.remove('loading')
     }
 
-    // Sphere init is intentionally outside the audio try-catch so that a
-    // WebGL or shader error here never surfaces as a "could not decode" alert.
     if (!this.sphere && this.engine.analyserNode) {
       try {
         this.sphere = new AnomalySphere(
           document.getElementById('anomaly') as HTMLElement,
           this.engine.analyserNode,
         )
-        // Feed live energy values into CSS variables so the aurora reacts to the audio
         this.sphere.onEnergyUpdate = (bass, mid, treble) => {
           const root = document.documentElement.style
           root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
@@ -475,7 +434,6 @@ export class App {
     }
   }
 
-  // Syncs the core slider positions and badges after a preset is applied
   private syncSlidersToParams(params: AudioParams): void {
     this.speedSlider.value = String(Math.round(params.playbackRate * 100))
     this.speedValue.textContent = `${params.playbackRate.toFixed(2)}x`
@@ -494,8 +452,6 @@ export class App {
 
     this.notifyParamChange()
   }
-
-  // State helpers
 
   private togglePlayPause(): void {
     if (this.engine.isPlaying) {

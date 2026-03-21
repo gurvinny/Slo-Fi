@@ -267,6 +267,8 @@ A major visual and experiential overhaul. The audio engine stays — everything 
 | 🌐 | **Enhanced Collab — Presence + Chat** | Collab panel overhaul with live cursors on the waveform, typing indicators, and a minimal text chat. |
 | ♿ | **WCAG 2.1 AA Accessibility** | Full keyboard navigation, ARIA roles, focus rings, and contrast ratios meeting AA standard across all themes. |
 | 🚀 | **OfflineAudioContext Export** | Faster-than-realtime export using `OfflineAudioContext` — large files export in seconds, not minutes. |
+| 🎵 | **Multi-File Session** | Load multiple audio files simultaneously. Switch between tracks instantly, queue them, or layer stems in a single session. |
+| ⚡ | **Hyperpop Preset** | A dedicated preset tuned for hyperpop production — pitched-up playback, heavy distortion, tight gated reverb, and maxed chorus for that chaotic hyper-compressed sound. |
 
 <br/>
 

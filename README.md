@@ -2,10 +2,6 @@
 
 <div align="center">
 
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!--                        HERO SECTION                        -->
-<!-- ═══════════════════════════════════════════════════════════ -->
-
 <img src="docs/assets/slo-fi-banner.svg" alt="Slo-Fi Banner" width="100%"/>
 
 <br/>
@@ -14,18 +10,17 @@
 
 ### ✦ Your Browser Is the Studio ✦
 
-> *Slo-Fi turns your browser into a late-night studio.*
-> *Experience your favorite tracks in a new dimension with professional-grade slowing*
-> *and deep, ethereal reverb. No downloads, no lag — just pure atmospheric bliss.*
+> *Drop a track. Slow it down. Drown it in reverb.*
+> *No installs. No uploads. No limits.*
+> *Just you, your music, and a late-night vibe.*
 
 <br/>
 
-[![Version](https://img.shields.io/badge/Version-1.0.0-A855F7.svg?style=flat-square&logo=semanticversioning&logoColor=white)](#-roadmap)
+[![Version](https://img.shields.io/badge/Version-1.0.0-A855F7.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/License-MIT-A855F7.svg?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.x-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Web Audio API](https://img.shields.io/badge/Web_Audio_API-4A154B.svg?style=flat-square&logo=audiomack&logoColor=white)](#-architecture--technical-deep-dive)
-[![Privacy First](https://img.shields.io/badge/Privacy-First-10B981.svg?style=flat-square&logo=lock&logoColor=white)](#-security--privacy)
+[![Privacy First](https://img.shields.io/badge/Privacy-First-10B981.svg?style=flat-square&logo=lock&logoColor=white)](#-privacy--security)
 [![Contributing](https://img.shields.io/badge/PRs-Welcome-10B981.svg?style=flat-square&logo=github&logoColor=white)](CONTRIBUTING.md)
 [![Code of Conduct](https://img.shields.io/badge/Code_of_Conduct-Contributor_Covenant-ff69b4.svg?style=flat-square)](CODE_OF_CONDUCT.md)
 [![Security](https://img.shields.io/badge/Security-Responsible_Disclosure-06B6D4.svg?style=flat-square&logo=shield&logoColor=white)](SECURITY.md)
@@ -33,19 +28,31 @@
 <br/>
 
 <p>
+  <a href="#-what-is-slo-fi">What is Slo-Fi?</a> •
   <a href="#-features">Features</a> •
-  <a href="#-architecture--technical-deep-dive">Architecture</a> •
-  <a href="#-security--privacy">Security</a> •
-  <a href="#-getting-started">Get Started</a> •
-  <a href="#-roadmap">Roadmap</a> •
+  <a href="#-privacy--security">Privacy</a> •
+  <a href="#-get-started">Get Started</a> •
+  <a href="#-whats-next">What's Next</a> •
   <a href="#-contributing--community">Contributing</a>
 </p>
 
 <br/>
 
-<sub>Real-time slowing + reverb applied to a local audio file — entirely in the browser.</sub>
-
 </div>
+
+---
+
+<br/>
+
+## ✦ What is Slo-Fi?
+
+Slo-Fi is a **professional-grade audio processing tool that lives entirely in your browser.** No app to download, no account to create, no files uploaded anywhere. Open the page, drop a track, and start shaping sound.
+
+It was built for the producers, the late-night listeners, the slow-reverb obsessives — anyone who wants to hear music differently. Whether you're crafting a slowed + reverb edit, building an ambient texture, or just chilling with a vaporwave vibe, Slo-Fi gives you the tools to do it in seconds.
+
+The engine is powered by the **Web Audio API** — the same technology used in professional browser-based DAWs — so everything you hear is processed at native audio quality with sub-10ms latency. No compromises.
+
+> Want to understand exactly how it works under the hood? See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 <br/>
 
@@ -55,21 +62,66 @@
 
 ## ✦ Features
 
-| | Feature | Description |
-|:---:|:---|:---|
-| 🎚️ | **Real-Time Time-Stretching** | Slow tracks from 0.25× to 1.0× without pitch artifacts. Powered by the native `AudioContext.playbackRate` and custom grain-based stretching. |
-| 🏛️ | **Convolution Reverb Engine** | Load impulse responses or generate synthetic ones. Tweak **Decay** and **Room Size** to sculpt spaces from tight booths to infinite cathedrals. |
-| 🎵 | **Pitch-Perfect Playback** | Maintain original pitch integrity while manipulating tempo — no chipmunks, no demons, just the music. |
-| ⚡ | **Low-Latency Processing** | Sub-10ms signal chain built on the Web Audio API's real-time audio graph. No perceptible lag between control input and output. |
-| 🎛️ | **Preset System** | One-click Lo-Fi, Vaporwave, Ambient, and Custom presets. Each dialing in speed, reverb, EQ, and chorus for an instant vibe. |
-| 📊 | **Waveform + Spectrum Analyzer** | Interactive seekable waveform and live FFT spectrum visualizer. See the music while you hear it. |
-| 🎹 | **MIDI Controller Support** | Map any hardware MIDI CC to speed, reverb, volume, or effects parameters. Perform your mix live. |
-| 🔊 | **Effects Chain** | 3-band EQ, chorus (rate + depth), and tape saturation in a collapsible effects panel. |
-| 📤 | **Audio Export** | Export your slowed + processed audio as a WAV file directly from the browser. |
-| 🌐 | **Collaborative Sessions** | Share a real-time session via WebRTC. Two people, one vibe, synced playback and controls. |
-| 🔒 | **Local-First & Zero Upload** | Audio never leaves your machine. Every byte is processed client-side via `AudioContext`. Zero network requests for audio. Zero telemetry. |
-| 📱 | **Fully Responsive PWA** | Installable on any device. Designed for late-night sessions on desktop, tablet, or phone — offline-capable with a registered Service Worker. |
-| 🎨 | **Late-Night Interface** | Dark-first UI with soft neon accents. Designed to feel like a professional DAW plugin, not a web toy. |
+### Slow it down. Keep it perfect.
+
+Dial your track anywhere from **full speed down to 25%** without a single pitch artifact. The tempo changes — the key stays exactly where it should. No chipmunks. No demons. Just the music, stretched into something new.
+
+---
+
+### Reverb that actually breathes.
+
+Slo-Fi doesn't use cheap delay-line reverb. It uses **true convolution reverb** — the same algorithm in professional studio plugins — to produce reverb tails that feel physically real. Crank the Room Size and Decay and disappear into a cathedral. Dial it tight for a warm studio booth. The space is yours to sculpt.
+
+---
+
+### One click to a vibe.
+
+Four built-in presets get you there instantly:
+
+- **Lo-Fi** — warm, slow, intimate. Coffee-shop at 2am.
+- **Vaporwave** — saturated, dreamy, nostalgic. Mallsoft forever.
+- **Ambient** — open, spacious, endless. Just breathe.
+- **Custom** — your settings, saved your way.
+
+---
+
+### A full effects chain, not just sliders.
+
+Go deeper with a built-in studio-grade effects stack:
+
+- **3-Band EQ** — shape your tone from sub to air
+- **Chorus** — shimmer, widen, float
+- **Tape Saturation** — warmth, grit, and that analog edge
+
+---
+
+### See the music.
+
+An interactive **seekable waveform** and a live **FFT spectrum analyzer** let you watch the frequency content move in real time. Click anywhere on the waveform to jump to that moment. Understanding your audio has never looked this good.
+
+---
+
+### Play it live with MIDI.
+
+Plug in any MIDI controller and map hardware knobs and faders to speed, reverb, volume, or any effect parameter. Automate a slowdown. Sweep the reverb mix in real time. **Perform your edit, don't just set it.**
+
+---
+
+### Export what you made.
+
+When the vibe is right, hit export and get a **WAV download** of your fully processed, slowed, reverbed track — ready to post, sample, or keep.
+
+---
+
+### Collaborate in real time.
+
+Share a session link and sync with another person over **WebRTC**. Same playback position, same controls, two sets of ears. Build the vibe together.
+
+---
+
+### Install it. Take it offline.
+
+Slo-Fi is a **Progressive Web App**. Install it to your home screen on any device and use it with no internet connection. It works the same whether you're online or not.
 
 <br/>
 
@@ -77,60 +129,23 @@
 
 <br/>
 
-## 🔬 Architecture & Technical Deep-Dive
+## 🔒 Privacy & Security
 
-Slo-Fi is built entirely on the [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API), creating a zero-dependency audio processing pipeline that runs at native speed inside the browser's audio thread.
+**Your audio never leaves your device. Full stop.**
 
-### Signal Flow
+Everything in Slo-Fi is processed inside your browser using the Web Audio API. There is no server receiving your files, no analytics watching your session, no third-party scripts. Close the tab and every byte of audio is gone — nothing is stored anywhere.
 
-```
-┌──────────┐    ┌──────────────┐    ┌──────────────┐    ┌───────────────┐    ┌──────────────┐    ┌─────────┐
-│  Source   │───▶│  Playback    │───▶│  Effects     │───▶│  Convolver    │───▶│  Gain /      │───▶│  Audio  │
-│  Buffer   │    │  Rate Node   │    │  Chain       │    │  Node         │    │  Master Out  │    │  Output │
-└──────────┘    └──────────────┘    └──────────────┘    └───────────────┘    └──────────────┘    └─────────┘
-   File I/O       Time-Stretch        EQ · Chorus ·        Reverb Engine         Volume Ctrl       destination
-                                       Saturation
-```
+This makes Slo-Fi safe to use with sensitive, unreleased, or proprietary material. Your files are your files.
 
-### Core Components
+| Guarantee | |
+|:---|:---:|
+| Audio processed entirely on-device | ✅ |
+| Zero network requests for audio data | ✅ |
+| No accounts, no tracking, no telemetry | ✅ |
+| All dependencies bundled — no CDN calls | ✅ |
+| Audio cleared from memory on tab close | ✅ |
 
-#### `AudioContext` — The Runtime
-
-The entire processing graph lives inside a single `AudioContext` instance. Audio is decoded from the user's local file into an `AudioBuffer`, then routed through a chain of connected nodes. The context's sample rate is locked to the device's native rate (typically 44.1kHz or 48kHz) for zero-resampling overhead.
-
-```typescript
-const ctx = new AudioContext({ latencyHint: 'interactive' });
-const source = ctx.createBufferSource();
-source.buffer = decodedAudio;
-source.playbackRate.value = 0.85; // 85% speed — the sweet spot
-```
-
-#### `ConvolverNode` — Reverb That Breathes
-
-Rather than relying on basic delay-line reverbs, Slo-Fi uses the `ConvolverNode` for true **convolution reverb** — the same algorithm used in professional studio plugins. The node convolves the input signal with an impulse response (IR), producing reverb tails that are physically accurate.
-
-```typescript
-const convolver = ctx.createConvolver();
-convolver.buffer = impulseResponseBuffer; // Pre-computed or loaded IR
-
-// Dry/Wet mixing via parallel gain nodes
-const dryGain = ctx.createGain();
-const wetGain = ctx.createGain();
-
-source.connect(dryGain).connect(ctx.destination);
-source.connect(convolver).connect(wetGain).connect(ctx.destination);
-```
-
-**Synthetic IR Generation:** When no external impulse response is loaded, Slo-Fi generates one algorithmically — computing an exponential decay curve at the configured room size and decay time, then filling a stereo `AudioBuffer` with shaped noise. This runs once on parameter change and feeds directly into the `ConvolverNode`.
-
-#### Performance Characteristics
-
-| Metric | Value |
-|:---|:---|
-| Audio Thread Latency | < 10ms (`latencyHint: 'interactive'`) |
-| Memory Footprint | ~10 MB per minute of stereo 44.1kHz audio |
-| CPU Usage | Minimal — native Web Audio nodes run in compiled C++ behind the API |
-| Node Graph Complexity | 7–10 nodes (source → rate → effects chain → convolver → gains → destination) |
+For the full security architecture and responsible disclosure policy, see [SECURITY.md](SECURITY.md).
 
 <br/>
 
@@ -138,90 +153,35 @@ source.connect(convolver).connect(wetGain).connect(ctx.destination);
 
 <br/>
 
-## 🔒 Security & Privacy
+## 🚀 Get Started
 
-> **Built by a security-minded engineer.** Slo-Fi was designed with the same rigor expected of privacy-sensitive applications.
+### Use it in the browser
 
-### Zero-Trust Audio Pipeline
+Supports **Chrome 35+, Firefox 25+, Safari 14.1+, Edge 79+**. No install required.
 
-| Principle | Implementation |
-|:---|:---|
-| **No Server Uploads** | Audio files are read via the `FileReader` API and decoded locally with `AudioContext.decodeAudioData()`. No `fetch()`, no `XMLHttpRequest`, no WebSocket — the network stack is never invoked for audio data. |
-| **No Third-Party Scripts** | Zero analytics, zero tracking pixels, zero CDN-loaded libraries at runtime. Every dependency is bundled and auditable. |
-| **No Persistent Storage of Audio** | Audio buffers exist only in memory for the duration of playback. Closing or refreshing the tab deallocates all `AudioBuffer` instances. Nothing is written to `localStorage`, `IndexedDB`, or the filesystem. |
-| **Content Security Policy** | Strict CSP headers prevent inline script injection and restrict resource origins. |
-| **Subresource Integrity** | All external resources (if any) are loaded with SRI hashes to prevent tampering. |
-
-### Threat Model Summary
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    CLIENT BROWSER                        │
-│                                                         │
-│   ┌──────────┐     ┌──────────────┐     ┌──────────┐   │
-│   │  Local    │────▶│  AudioContext │────▶│  Speaker │   │
-│   │  File     │     │  (in-memory) │     │  Output  │   │
-│   └──────────┘     └──────────────┘     └──────────┘   │
-│                                                         │
-│   ██████████████  NO DATA EXITS THIS BOX  ████████████  │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-                           ✕
-                    ┌──────────────┐
-                    │   Internet   │  ← No connection made
-                    └──────────────┘
-```
-
-*This architecture makes Slo-Fi suitable for processing sensitive or unreleased audio material. Your files are your files.*
-
-To report a security issue, see [SECURITY.md](SECURITY.md).
-
-<br/>
-
----
-
-<br/>
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- A modern browser with Web Audio API support (Chrome 35+, Firefox 25+, Safari 14.1+, Edge 79+)
-- Node.js ≥ 18 (for local development only)
-
-### Installation
+### Run it locally
 
 ```bash
-# Clone the repository
-git clone https://github.com/gurvinny/slo-fi.git
-cd slo-fi
-
-# Install dependencies
+git clone https://github.com/gurvinny/Slo-Fi.git
+cd Slo-Fi
 npm install
-
-# Start the development server
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
-
-### Production Build
+Open `http://localhost:5173`, drop a track, and you're in.
 
 ```bash
-npm run build
-npm run preview   # Preview the production build locally
+npm run build    # production build
+npm run preview  # preview the build locally
 ```
 
-### Usage
+### How to use it
 
-1. **Open Slo-Fi** in your browser.
-2. **Drop an audio file** onto the interface (or click to browse). Supports `.mp3`, `.wav`, `.flac`, `.ogg`, and `.aac`.
-3. **Pick a preset** — Lo-Fi, Vaporwave, or Ambient — for an instant vibe, or build your own with Custom.
-4. **Adjust the speed** using the rate slider — dial it down to 0.85× for classic slowed, or go deeper.
-5. **Shape the reverb** — increase Decay for longer tails, expand Room Size for that infinite-hall feel.
-6. **Dial in the effects chain** — sculpt tone with the 3-band EQ, add shimmer with Chorus, add warmth with Tape Drive.
-7. **Export** your processed track as a WAV download when you're done.
-8. **Press play.** Welcome to the late-night studio.
+1. Drop any `.mp3`, `.wav`, `.flac`, `.ogg`, or `.aac` file onto the interface
+2. Pick a preset — or start from scratch
+3. Adjust speed, reverb, and effects to taste
+4. Hit play
+5. Export your track as a WAV when you're done
 
 <br/>
 
@@ -229,47 +189,13 @@ npm run preview   # Preview the production build locally
 
 <br/>
 
-## 🗺️ Roadmap
+## 🗺️ What's Next
 
-### v1.0 — Complete
+**v1.0 is complete** — every feature is shipped and the engine is solid.
 
-All features shipped. The core engine and full feature set are live.
+**v2.0 is in planning** — a full dark glassmorphism redesign, mobile-first layout, beat detection, 8D audio, multi-file sessions, a Hyperpop preset, and much more.
 
-| Status | Feature |
-|:---:|:---|
-| ✅ | Core time-stretching engine (0.25× – 1.0×) |
-| ✅ | Convolution reverb with synthetic IR generation |
-| ✅ | Responsive dark-mode UI |
-| ✅ | Preset system (Lo-Fi, Vaporwave, Ambient, Custom) |
-| ✅ | Audio export as WAV download |
-| ✅ | Waveform + real-time spectrum analyzer |
-| ✅ | MIDI CC controller mapping |
-| ✅ | Effects chain (3-band EQ, Chorus, Tape Saturation) |
-| ✅ | Collaborative sessions via WebRTC |
-
-<br/>
-
-### v2.0 — Dark Glass Redesign
-
-A major visual and experiential overhaul. The audio engine stays — everything the user sees and touches gets rebuilt with a modern dark glassmorphism aesthetic, beautiful on both mobile and desktop.
-
-| Area | Feature | Description |
-|:---:|:---|:---|
-| 🎨 | **Dark Glassmorphism Design System** | Full UI rebuild: frosted panels, `backdrop-filter: blur(24px)`, neon border glow, unified glass design language. |
-| 🎨 | **Aurora Animated Background** | Subtle CSS keyframe aurora gradient — deep purples and teals breathing behind the glass UI. Zero JS cost. |
-| 📱 | **Mobile-First Responsive Layout** | Rebuilt grid for phones and tablets. Touch-sized targets, swipe-to-scrub waveform, pinch-to-zoom. |
-| 📱 | **PWA Full-Screen + Haptic Feedback** | Full-screen mode on mobile. Vibration API on play/pause/scrub for tactile feedback. |
-| ✨ | **Animated Glassmorphic Preset Cards** | Preset buttons replaced with rich glass cards — animated on hover, glow on active. |
-| 🎚️ | **Floating Glass Control Panels** | Controls stack vertically on mobile, float as overlay panels on desktop for a DAW-like feel. |
-| 🔊 | **Beat Detection + BPM Display** | Onset detection via `AnalyserNode`. Real-time BPM readout in the player header. |
-| 🔁 | **Loop Region Selection** | Drag handles on the waveform to set in/out loop points. Seamless looping for practice or production. |
-| 🎹 | **Visual MIDI Mapping UI** | Overlay showing assignable parameters with visual piano/pad — click to assign, no manual CC entry. |
-| 🌐 | **Enhanced Collab — Presence + Chat** | Collab panel overhaul with live cursors on the waveform, typing indicators, and a minimal text chat. |
-| ♿ | **WCAG 2.1 AA Accessibility** | Full keyboard navigation, ARIA roles, focus rings, and contrast ratios meeting AA standard across all themes. |
-| 🚀 | **OfflineAudioContext Export** | Faster-than-realtime export using `OfflineAudioContext` — large files export in seconds, not minutes. |
-| 🎵 | **Multi-File Session** | Load multiple audio files simultaneously. Switch between tracks instantly, queue them, or layer stems in a single session. |
-| ⚡ | **Hyperpop Preset** | A dedicated preset tuned for hyperpop production — pitched-up playback, heavy distortion, tight gated reverb, and maxed chorus for that chaotic hyper-compressed sound. |
-| 🎧 | **8D Audio Effect** | Binaural panning engine that rotates audio around the listener's head using a PannerNode automation curve. Designed for headphone listening — creates the illusion of sound moving in 3D space. |
+See the full roadmap, including all v1 features and every v2.0 item: **[ROADMAP.md](ROADMAP.md)**
 
 <br/>
 
@@ -279,22 +205,15 @@ A major visual and experiential overhaul. The audio engine stays — everything 
 
 ## 🤝 Contributing & Community
 
-Contributions, bug reports, and feature ideas are all welcome. Before opening a PR, please read the relevant doc:
+Contributions are welcome — whether that's a bug fix, a new feature, or just improving the docs.
 
-| Document | Purpose |
+| Document | |
 |:---|:---|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, branch conventions, PR checklist, code style |
-| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards and enforcement policy |
-| [SECURITY.md](SECURITY.md) | How to report a vulnerability responsibly |
-
-```bash
-# Quick contribution flow
-git checkout -b feat/your-feature
-npm run lint
-git commit -m "feat: add your feature"
-git push origin feat/your-feature
-# then open a Pull Request
-```
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, branch conventions, PR checklist, code style |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards |
+| [SECURITY.md](SECURITY.md) | Responsible disclosure policy |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How the audio engine works |
+| [ROADMAP.md](ROADMAP.md) | v1 complete + full v2.0 plans |
 
 <br/>
 
@@ -322,8 +241,8 @@ Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
 
 <br/><br/>
 
-[![GitHub Stars](https://img.shields.io/github/stars/gurvinny/slo-fi?style=flat-square&color=A855F7&label=Stars)](https://github.com/gurvinny/slo-fi/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/gurvinny/slo-fi?style=flat-square&color=06B6D4&label=Forks)](https://github.com/gurvinny/slo-fi/network/members)
-[![GitHub Issues](https://img.shields.io/github/issues/gurvinny/slo-fi?style=flat-square&color=A855F7&label=Issues)](https://github.com/gurvinny/slo-fi/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/gurvinny/Slo-Fi?style=flat-square&color=A855F7&label=Stars)](https://github.com/gurvinny/Slo-Fi/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/gurvinny/Slo-Fi?style=flat-square&color=06B6D4&label=Forks)](https://github.com/gurvinny/Slo-Fi/network/members)
+[![GitHub Issues](https://img.shields.io/github/issues/gurvinny/Slo-Fi?style=flat-square&color=A855F7&label=Issues)](https://github.com/gurvinny/Slo-Fi/issues)
 
 </div>

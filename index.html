@@ -11,13 +11,18 @@
   </head>
   <body>
     <div id="app">
+
+      <!-- Full-page orb canvas — fixed behind all UI, fades to transparent at edges -->
+      <div id="anomaly" class="anomaly-bg" aria-hidden="true"></div>
+
+      <!-- Header: minimal fixed top bar -->
       <header class="header">
         <div class="header-inner">
           <div class="logo">
-            <svg class="logo-icon" width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="#9b6dff" stroke-width="1.5"/>
-              <polygon points="14,7 21,11 21,17 14,21 7,17 7,11" fill="none" stroke="#9b6dff" stroke-width="1" opacity="0.5"/>
-              <circle cx="14" cy="14" r="2.5" fill="#9b6dff"/>
+            <svg class="logo-icon" width="26" height="26" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <polygon points="14,7 21,11 21,17 14,21 7,17 7,11" fill="none" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+              <circle cx="14" cy="14" r="2.5" fill="currentColor"/>
             </svg>
             <span class="logo-text">Slo‑Fi</span>
           </div>
@@ -27,7 +32,8 @@
       </header>
 
       <main class="main">
-        <!-- Drop Zone -->
+
+        <!-- Drop zone: full-page overlay shown before a file is loaded -->
         <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio file or click to browse">
           <div class="dropzone-content">
             <svg class="dropzone-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -41,131 +47,88 @@
           <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,audio/*" aria-hidden="true" tabindex="-1" />
         </div>
 
-        <!-- Player (hidden until file loaded) -->
+        <!-- Player HUD — shown after file loads, children use fixed positioning -->
         <div id="player" class="player" aria-hidden="true">
-          <!-- Track info -->
-          <div class="track-info">
-            <div class="track-name" id="trackName">—</div>
-            <div class="track-meta" id="trackMeta">—</div>
+
+          <!-- Top HUD: track info + preset strip -->
+          <div class="player-top">
+            <div class="track-info">
+              <div class="track-name" id="trackName">—</div>
+              <div class="track-meta" id="trackMeta">—</div>
+            </div>
+            <div class="preset-strip" role="group" aria-label="Presets">
+              <button class="preset-card" data-preset="lofi">
+                <span class="preset-card-name">Lo-Fi</span>
+                <span class="preset-card-hint">0.75x · 30% verb · warm</span>
+              </button>
+              <button class="preset-card" data-preset="vaporwave">
+                <span class="preset-card-name">Vaporwave</span>
+                <span class="preset-card-hint">0.50x · 55% verb · chorus</span>
+              </button>
+              <button class="preset-card" data-preset="ambient">
+                <span class="preset-card-name">Ambient</span>
+                <span class="preset-card-hint">0.65x · 75% verb · hall</span>
+              </button>
+              <button class="preset-card preset-card--hyperpop" data-preset="hyperpop">
+                <span class="preset-card-name">Hyperpop</span>
+                <span class="preset-card-hint">1.15x · hard chorus · bright</span>
+              </button>
+              <button class="preset-card preset-card--dim" data-preset="custom">
+                <span class="preset-card-name">Custom</span>
+                <span class="preset-card-hint">your settings</span>
+              </button>
+            </div>
           </div>
 
-          <!-- Preset cards - each shows the preset name and its key parameters -->
-          <div class="preset-strip" role="group" aria-label="Presets">
-            <button class="preset-card" data-preset="lofi">
-              <span class="preset-card-name">Lo-Fi</span>
-              <span class="preset-card-hint">0.75x · 30% verb · warm</span>
-            </button>
-            <button class="preset-card" data-preset="vaporwave">
-              <span class="preset-card-name">Vaporwave</span>
-              <span class="preset-card-hint">0.50x · 55% verb · chorus</span>
-            </button>
-            <button class="preset-card" data-preset="ambient">
-              <span class="preset-card-name">Ambient</span>
-              <span class="preset-card-hint">0.65x · 75% verb · hall</span>
-            </button>
-            <button class="preset-card preset-card--dim" data-preset="custom">
-              <span class="preset-card-name">Custom</span>
-              <span class="preset-card-hint">your settings</span>
-            </button>
-          </div>
-
-          <!-- Waveform -->
-          <div class="waveform-wrap">
-            <canvas id="waveform" class="waveform" role="slider" aria-label="Seek position" tabindex="0"></canvas>
-          </div>
-
-          <!-- Spectrum analyzer -->
-          <div class="spectrum-wrap">
-            <canvas id="spectrum" class="spectrum" aria-hidden="true"></canvas>
-          </div>
-
-          <!-- Time -->
-          <div class="time-row">
-            <span class="time-current" id="currentTime">0:00</span>
-            <span class="time-total" id="duration">0:00</span>
-          </div>
-
-          <!-- Transport -->
-          <div class="transport">
-            <button id="stopBtn" class="btn btn-icon" title="Stop (s)" aria-label="Stop">
-              <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="currentColor" rx="1"/></svg>
-            </button>
-            <button id="playPauseBtn" class="btn btn-play" title="Play / Pause (Space)" aria-label="Play">
-              <svg id="iconPlay" width="22" height="22" viewBox="0 0 22 22"><polygon points="6,3 19,11 6,19" fill="currentColor"/></svg>
-              <svg id="iconPause" width="22" height="22" viewBox="0 0 22 22" style="display:none"><rect x="4" y="3" width="5" height="16" fill="currentColor" rx="1"/><rect x="13" y="3" width="5" height="16" fill="currentColor" rx="1"/></svg>
-            </button>
-            <button id="rewindBtn" class="btn btn-icon" title="Rewind 5s (←)" aria-label="Rewind 5 seconds">
-              <svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 2 A7 7 0 1 0 4 5.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><polygon points="1,3 7,3 4,7" fill="currentColor"/><text x="6" y="12" font-size="5" fill="currentColor" font-family="system-ui">5s</text></svg>
-            </button>
-            <button id="exportBtn" class="btn btn-icon btn-export" title="Export as WAV" aria-label="Export processed audio as WAV">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2 L8 10 M5 7 L8 10 L11 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M3 12 L13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              </svg>
-            </button>
-            <span id="exportStatus" class="export-status" aria-live="polite"></span>
-          </div>
-
-          <!-- Controls drawer - inline on mobile, dismissible/pinnable overlay on desktop -->
-          <div id="controlsDrawer" class="controls-drawer">
-
-            <!-- Drawer header: only visible on desktop (hidden via CSS on mobile) -->
+          <!-- Audio Controls drawer — right side, opens with "Controls" button -->
+          <div id="controlsDrawer" class="controls-drawer controls-drawer--hidden">
             <div class="controls-drawer-header">
               <span class="controls-drawer-title">Controls</span>
               <button id="controlsFloatBtn" class="controls-drawer-btn" title="Float panel" aria-label="Float panel">&#8862;</button>
               <button id="controlsCloseBtn" class="controls-drawer-btn" title="Close panel" aria-label="Close panel">&times;</button>
             </div>
 
-            <!-- Core controls grid -->
             <div class="controls">
               <div class="control-group">
                 <div class="control-header">
                   <label for="speedSlider">Speed</label>
                   <span class="value-badge" id="speedValue">1.00×</span>
                 </div>
-                <input type="range" id="speedSlider" class="slider" min="25" max="100" value="100" step="1" aria-label="Playback speed" />
+                <input type="range" id="speedSlider" class="slider" min="25" max="200" value="100" step="1" aria-label="Playback speed" />
                 <div class="slider-ticks">
-                  <span>0.25×</span>
-                  <span>0.50×</span>
-                  <span>0.75×</span>
-                  <span>1.00×</span>
+                  <span>0.25×</span><span>1.00×</span><span>2.00×</span>
                 </div>
               </div>
-
               <div class="control-group">
                 <div class="control-header">
                   <label for="reverbSlider">Reverb Mix</label>
                   <span class="value-badge" id="reverbValue">20%</span>
                 </div>
-                <input type="range" id="reverbSlider" class="slider slider--teal" min="0" max="100" value="20" step="1" aria-label="Reverb wet/dry mix" />
+                <input type="range" id="reverbSlider" class="slider slider--teal" min="0" max="100" value="20" step="1" aria-label="Reverb mix" />
               </div>
-
               <div class="control-group">
                 <div class="control-header">
                   <label for="decaySlider">Decay</label>
                   <span class="value-badge" id="decayValue">2.5s</span>
                 </div>
-                <input type="range" id="decaySlider" class="slider slider--teal" min="5" max="80" value="25" step="1" aria-label="Reverb decay time" />
+                <input type="range" id="decaySlider" class="slider slider--teal" min="5" max="80" value="25" step="1" aria-label="Reverb decay" />
               </div>
-
               <div class="control-group">
                 <div class="control-header">
                   <label for="roomSlider">Room Size</label>
                   <span class="value-badge" id="roomValue">50%</span>
                 </div>
-                <input type="range" id="roomSlider" class="slider slider--teal" min="1" max="100" value="50" step="1" aria-label="Reverb room size" />
+                <input type="range" id="roomSlider" class="slider slider--teal" min="1" max="100" value="50" step="1" aria-label="Room size" />
               </div>
-
               <div class="control-group">
                 <div class="control-header">
                   <label for="volumeSlider">Volume</label>
                   <span class="value-badge" id="volumeValue">80%</span>
                 </div>
-                <input type="range" id="volumeSlider" class="slider slider--dim" min="0" max="100" value="80" step="1" aria-label="Master volume" />
+                <input type="range" id="volumeSlider" class="slider slider--dim" min="0" max="100" value="80" step="1" aria-label="Volume" />
               </div>
             </div>
 
-            <!-- Effects chain (collapsible) -->
             <details class="controls-section" id="effectsSection">
               <summary class="controls-section-header">
                 <span>Effects Chain</span>
@@ -173,67 +136,183 @@
               </summary>
               <div class="controls">
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="eqLowSlider">EQ Low</label>
-                    <span class="value-badge value-badge--green" id="eqLowValue">0 dB</span>
-                  </div>
-                  <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf gain" />
+                  <div class="control-header"><label for="eqLowSlider">EQ Low</label><span class="value-badge value-badge--green" id="eqLowValue">0 dB</span></div>
+                  <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf" />
                   <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="eqMidSlider">EQ Mid</label>
-                    <span class="value-badge value-badge--green" id="eqMidValue">0 dB</span>
-                  </div>
-                  <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak gain" />
+                  <div class="control-header"><label for="eqMidSlider">EQ Mid</label><span class="value-badge value-badge--green" id="eqMidValue">0 dB</span></div>
+                  <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak" />
                   <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="eqHighSlider">EQ High</label>
-                    <span class="value-badge value-badge--green" id="eqHighValue">0 dB</span>
-                  </div>
-                  <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf gain" />
+                  <div class="control-header"><label for="eqHighSlider">EQ High</label><span class="value-badge value-badge--green" id="eqHighValue">0 dB</span></div>
+                  <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf" />
                   <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="chorusRateSlider">Chorus Rate</label>
-                    <span class="value-badge value-badge--orange" id="chorusRateValue">0.8 Hz</span>
-                  </div>
-                  <input type="range" id="chorusRateSlider" class="slider slider--orange" min="0.1" max="5" value="0.8" step="0.1" aria-label="Chorus LFO rate" />
+                  <div class="control-header"><label for="chorusRateSlider">Chorus Rate</label><span class="value-badge value-badge--orange" id="chorusRateValue">0.8 Hz</span></div>
+                  <input type="range" id="chorusRateSlider" class="slider slider--orange" min="0.1" max="5" value="0.8" step="0.1" aria-label="Chorus rate" />
                   <div class="slider-ticks"><span>0.1 Hz</span><span>2.5 Hz</span><span>5 Hz</span></div>
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="chorusDepthSlider">Chorus Depth</label>
-                    <span class="value-badge value-badge--orange" id="chorusDepthValue">0%</span>
-                  </div>
+                  <div class="control-header"><label for="chorusDepthSlider">Chorus Depth</label><span class="value-badge value-badge--orange" id="chorusDepthValue">0%</span></div>
                   <input type="range" id="chorusDepthSlider" class="slider slider--orange" min="0" max="100" value="0" step="1" aria-label="Chorus depth" />
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="satDriveSlider">Tape Drive</label>
-                    <span class="value-badge value-badge--red" id="satDriveValue">0%</span>
-                  </div>
-                  <input type="range" id="satDriveSlider" class="slider slider--red" min="0" max="100" value="0" step="1" aria-label="Tape saturation drive" />
+                  <div class="control-header"><label for="satDriveSlider">Tape Drive</label><span class="value-badge value-badge--red" id="satDriveValue">0%</span></div>
+                  <input type="range" id="satDriveSlider" class="slider slider--red" min="0" max="100" value="0" step="1" aria-label="Tape drive" />
                   <div class="slider-ticks"><span>Clean</span><span>Warm</span><span>Driven</span></div>
                 </div>
               </div>
             </details>
           </div>
 
-          <!-- Re-open button shown on desktop after the drawer is dismissed -->
-          <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls" style="display:none">Controls</button>
-        </div>
+          <!-- Visual Settings drawer — left side, opens with gear button -->
+          <div id="settingsDrawer" class="settings-drawer settings-drawer--hidden">
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Visual Settings</span>
+              <button id="settingsCloseBtn" class="controls-drawer-btn" title="Close" aria-label="Close">&times;</button>
+            </div>
+
+            <!-- Color Themes -->
+            <div class="settings-themes">
+              <div class="settings-label">Color Theme</div>
+              <div class="theme-chips" role="group" aria-label="Color theme">
+                <button class="theme-chip theme-chip--active" data-theme="prism" title="Hue reacts to music">
+                  <span class="theme-swatch theme-swatch--prism"></span>Prism
+                </button>
+                <button class="theme-chip" data-theme="void" title="Deep violet-indigo">
+                  <span class="theme-swatch theme-swatch--void"></span>Void
+                </button>
+                <button class="theme-chip" data-theme="neon" title="Cyan & electric blue">
+                  <span class="theme-swatch theme-swatch--neon"></span>Neon
+                </button>
+                <button class="theme-chip" data-theme="ember" title="Red, orange & gold">
+                  <span class="theme-swatch theme-swatch--ember"></span>Ember
+                </button>
+                <button class="theme-chip" data-theme="frost" title="Ice blue & white">
+                  <span class="theme-swatch theme-swatch--frost"></span>Frost
+                </button>
+                <button class="theme-chip" data-theme="mono" title="Grayscale">
+                  <span class="theme-swatch theme-swatch--mono"></span>Mono
+                </button>
+              </div>
+            </div>
+
+            <!-- Orb options -->
+            <details class="controls-section" open>
+              <summary class="controls-section-header">
+                <span>Orb</span>
+                <span class="controls-section-hint">Shape · Motion · Effects</span>
+              </summary>
+              <div class="controls">
+                <div class="control-group">
+                  <div class="control-header"><label for="orbReactivitySlider">Reactivity</label><span class="value-badge" id="orbReactivityValue">80%</span></div>
+                  <input type="range" id="orbReactivitySlider" class="slider" min="0" max="100" value="80" step="1" aria-label="Orb reactivity" />
+                  <div class="slider-ticks"><span>Calm</span><span>Normal</span><span>Wild</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="orbGlowSlider">Glow</label><span class="value-badge" id="orbGlowValue">100%</span></div>
+                  <input type="range" id="orbGlowSlider" class="slider" min="0" max="150" value="100" step="1" aria-label="Orb glow intensity" />
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="orbSizeSlider">Size</label><span class="value-badge" id="orbSizeValue">100%</span></div>
+                  <input type="range" id="orbSizeSlider" class="slider" min="40" max="180" value="100" step="1" aria-label="Orb size" />
+                  <div class="slider-ticks"><span>Small</span><span>Normal</span><span>Large</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="rotationSpeedSlider">Rotation</label><span class="value-badge" id="rotationSpeedValue">1.0×</span></div>
+                  <input type="range" id="rotationSpeedSlider" class="slider" min="0" max="200" value="100" step="1" aria-label="Orb rotation speed" />
+                  <div class="slider-ticks"><span>Still</span><span>1×</span><span>Fast</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="particleCountSlider">Particles</label><span class="value-badge" id="particleCountValue">500</span></div>
+                  <input type="range" id="particleCountSlider" class="slider" min="0" max="2000" value="500" step="50" aria-label="Particle count" />
+                  <div class="slider-ticks"><span>None</span><span>500</span><span>2000</span></div>
+                </div>
+                <div class="control-group">
+                  <label class="toggle-row">
+                    <span class="toggle-label">Bass Pulse</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="bassPulseToggle" class="toggle-input" checked aria-label="Bass pulse" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                  <label class="toggle-row">
+                    <span class="toggle-label">Wireframe</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="wireframeToggle" class="toggle-input" checked aria-label="Wireframe mode" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </details>
+
+            <!-- Stars -->
+            <details class="controls-section">
+              <summary class="controls-section-header">
+                <span>Stars</span>
+                <span class="controls-section-hint">Brightness · Twinkle</span>
+              </summary>
+              <div class="controls">
+                <div class="control-group">
+                  <div class="control-header"><label for="starsSlider">Brightness</label><span class="value-badge" id="starsValue">70%</span></div>
+                  <input type="range" id="starsSlider" class="slider" min="0" max="100" value="70" step="1" aria-label="Star brightness" />
+                  <div class="slider-ticks"><span>Off</span><span>Normal</span><span>Bright</span></div>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <!-- Bottom HUD: waveform + transport -->
+          <div class="player-bottom">
+            <div class="waveform-wrap">
+              <canvas id="waveform" class="waveform" role="slider" aria-label="Seek position" tabindex="0"></canvas>
+            </div>
+            <div class="transport-row">
+              <span class="time-current" id="currentTime">0:00</span>
+              <div class="transport">
+                <button id="stopBtn" class="btn btn-icon" title="Stop (s)" aria-label="Stop">
+                  <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="currentColor" rx="1"/></svg>
+                </button>
+                <button id="playPauseBtn" class="btn btn-play" title="Play / Pause (Space)" aria-label="Play">
+                  <svg id="iconPlay" width="22" height="22" viewBox="0 0 22 22"><polygon points="6,3 19,11 6,19" fill="currentColor"/></svg>
+                  <svg id="iconPause" width="22" height="22" viewBox="0 0 22 22"><rect x="4" y="3" width="5" height="16" fill="currentColor" rx="1"/><rect x="13" y="3" width="5" height="16" fill="currentColor" rx="1"/></svg>
+                </button>
+                <button id="rewindBtn" class="btn btn-icon" title="Rewind 5s (←)" aria-label="Rewind 5 seconds">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 5 A8 8 0 1 0 6.5 8.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <polygon points="3,4 9,4 6,9.5" fill="currentColor"/>
+                    <text x="12" y="18.5" font-size="8.5" fill="currentColor" font-family="system-ui,sans-serif" text-anchor="middle" font-weight="700">5s</text>
+                  </svg>
+                </button>
+                <button id="exportBtn" class="btn btn-icon btn-export" title="Export as WAV" aria-label="Export processed audio as WAV">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 2 L8 10 M5 7 L8 10 L11 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3 12 L13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <span id="exportStatus" class="export-status" aria-live="polite"></span>
+              </div>
+              <div class="transport-right">
+                <span class="time-total" id="duration">0:00</span>
+                <button id="settingsShowBtn" class="btn-settings-show" aria-label="Visual settings" title="Visual settings">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                  </svg>
+                </button>
+                <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls">Controls</button>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /#player -->
+
       </main>
 
-      <!-- Collaborative sessions panel -->
+      <!-- Collaboration panel (below viewport, accessible via scroll) -->
       <section id="collabPanel" class="collab-panel" aria-label="Collaborative session">
         <div class="collab-inner">
           <h2 class="collab-title">Collaborate</h2>
@@ -250,10 +329,7 @@
         </div>
       </section>
 
-      <footer class="footer">
-        <p>All audio stays on your device &nbsp;·&nbsp; zero uploads &nbsp;·&nbsp; zero tracking</p>
-      </footer>
-    </div>
+    </div><!-- /#app -->
 
     <script type="module" src="/src/main.ts"></script>
   </body>

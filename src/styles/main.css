@@ -28,7 +28,15 @@
   --glass-bg: rgba(12, 12, 22, 0.55);
   --glass-border: rgba(255, 255, 255, 0.07);
   --glass-blur: 24px;
-  --glass-glow: 0 0 0 1px rgba(155, 109, 255, 0.18), 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* glass-glow uses var(--accent-dim) so it auto-updates with themes */
+  --glass-glow: 0 0 0 1px var(--accent-dim), 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  /* Derived accent tokens for borders/shadows — override these per theme */
+  --accent-subtle: rgba(155, 109, 255, 0.22);
+  --accent-faint:  rgba(155, 109, 255, 0.10);
+
+  /* Aurora hue-shift per theme — applied as filter on the aurora layers */
+  --aurora-filter: none;
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */
@@ -62,18 +70,23 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 2;  /* above the Three.js canvas (z-index 1), below UI (z-index 50+) */
   pointer-events: none;
-  /* Base blobs + energy-driven intensity boost via calc() */
+  filter: var(--aurora-filter);
+  /* Six reactive blobs — opacity driven by live audio energy bands */
   background:
-    radial-gradient(ellipse 65% 55% at 12% 42%,
-      rgba(155, 109, 255, calc(0.15 + var(--aurora-bass) * 0.45)) 0%, transparent 68%),
-    radial-gradient(ellipse 50% 45% at 88% 18%,
-      rgba(0, 212, 170, calc(0.10 + var(--aurora-treble) * 0.40)) 0%, transparent 62%),
-    radial-gradient(ellipse 55% 50% at 58% 88%,
-      rgba(110, 50, 220, calc(0.12 + var(--aurora-mid) * 0.35)) 0%, transparent 65%),
-    radial-gradient(ellipse 40% 35% at 72% 50%,
-      rgba(0, 180, 200, calc(0 + var(--aurora-treble) * 0.25)) 0%, transparent 60%);
+    radial-gradient(ellipse 70% 60% at 12% 42%,
+      rgba(155, 109, 255, calc(0.20 + var(--aurora-bass) * 0.60)) 0%, transparent 68%),
+    radial-gradient(ellipse 55% 50% at 88% 18%,
+      rgba(0, 212, 170, calc(0.14 + var(--aurora-treble) * 0.52)) 0%, transparent 62%),
+    radial-gradient(ellipse 60% 55% at 58% 88%,
+      rgba(110, 50, 220, calc(0.16 + var(--aurora-mid) * 0.44)) 0%, transparent 65%),
+    radial-gradient(ellipse 45% 38% at 72% 50%,
+      rgba(0, 180, 200, calc(0.04 + var(--aurora-treble) * 0.34)) 0%, transparent 60%),
+    radial-gradient(ellipse 42% 48% at 35% 8%,
+      rgba(200, 80, 255, calc(0.10 + var(--aurora-bass) * 0.32)) 0%, transparent 58%),
+    radial-gradient(ellipse 38% 42% at 90% 78%,
+      rgba(0, 230, 180, calc(0.08 + var(--aurora-mid) * 0.28)) 0%, transparent 55%);
   animation: aurora 22s ease-in-out infinite alternate;
 }
 
@@ -84,33 +97,79 @@ body::before {
   100% { opacity: 1;    transform: scale(1.03) rotate(0.5deg); }
 }
 
+/* Second aurora layer — pink/gold blobs for extra color depth */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2;  /* same layer as ::before — above canvas, below UI */
+  pointer-events: none;
+  filter: var(--aurora-filter);
+  background:
+    radial-gradient(ellipse 55% 48% at 22% 88%,
+      rgba(255, 80, 160, calc(0.10 + var(--aurora-mid) * 0.38)) 0%, transparent 62%),
+    radial-gradient(ellipse 48% 40% at 80% 80%,
+      rgba(255, 170, 0, calc(0.06 + var(--aurora-bass) * 0.24)) 0%, transparent 58%),
+    radial-gradient(ellipse 65% 38% at 50% 3%,
+      rgba(140, 80, 255, calc(0.08 + var(--aurora-bass) * 0.22)) 0%, transparent 65%);
+  animation: aurora-b 34s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-b {
+  0%   { opacity: 1;    transform: scale(1)    rotate(0deg); }
+  35%  { opacity: 0.70; transform: scale(1.07) rotate(-1.5deg); }
+  70%  { opacity: 0.88; transform: scale(1.03) rotate(1.5deg); }
+  100% { opacity: 1;    transform: scale(1.09) rotate(-0.5deg); }
+}
+
 /* Disable aurora motion for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  body::before { animation: none; }
+  body::before, body::after { animation: none; }
 }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 #app {
   position: relative;
   z-index: 1;
-  display: flex;
-  flex-direction: column;
   min-height: 100vh;
 }
 
-/* ── Header ─────────────────────────────────────────────────────────────── */
+/* ── Full-page orb canvas ────────────────────────────────────────────────── */
+/* Fixed behind all UI. pointer-events off so clicks pass through to HUD.
+   The radial mask fades the edges so the orb bleeds into the page. */
+.anomaly-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 1;  /* above page bg, below aurora (z-2) and UI (z-50+) */
+  pointer-events: none;
+}
+
+/* Three.js canvas fills the container */
+.anomaly-bg canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── Header — fixed minimal top bar ────────────────────────────────────── */
 .header {
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(155,109,255,0.04) 0%, transparent 100%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(8, 8, 16, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .header-inner {
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 24px 20px 20px;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
+  padding: 14px 20px;
+  width: 100%;
 }
 
 .logo {
@@ -121,6 +180,7 @@ body::before {
 }
 
 .logo-icon {
+  color: var(--accent);
   filter: drop-shadow(0 0 8px var(--accent-glow));
 }
 
@@ -141,37 +201,33 @@ body::before {
 
 /* ── Main ───────────────────────────────────────────────────────────────── */
 .main {
-  flex: 1;
-  max-width: 680px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 32px 20px 40px;
+  position: relative;
+  min-height: 100vh;
 }
 
-/* ── Drop zone ──────────────────────────────────────────────────────────── */
+/* ── Drop zone — full-page overlay before a file is loaded ──────────────── */
 .dropzone {
-  position: relative;
-  border: 1.5px dashed var(--glass-border);
-  border-radius: var(--radius);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  position: fixed;
+  inset: 0;
+  top: 54px; /* clear the fixed header */
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
   outline: none;
+  transition: background 0.2s;
 }
 
 .dropzone:hover,
 .dropzone:focus-visible {
-  border-color: rgba(155, 109, 255, 0.4);
-  background: rgba(20, 12, 36, 0.65);
-  box-shadow: var(--glass-glow);
+  background: rgba(155, 109, 255, 0.03);
 }
 
 .dropzone.drag-over {
-  border-color: var(--accent);
-  background: var(--accent-dim);
-  box-shadow: 0 0 0 4px var(--accent-dim), inset 0 0 60px var(--accent-dim);
+  background: rgba(155, 109, 255, 0.06);
 }
 
 .dropzone.loading {
@@ -179,13 +235,32 @@ body::before {
   opacity: 0.7;
 }
 
+/* The glass card centered in the full-page overlay */
 .dropzone-content {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 64px 24px;
+  padding: 56px 40px;
   text-align: center;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1.5px dashed var(--glass-border);
+  border-radius: var(--radius);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dropzone:hover .dropzone-content,
+.dropzone:focus-visible .dropzone-content {
+  border-color: rgba(155, 109, 255, 0.4);
+  box-shadow: var(--glass-glow);
+}
+
+.dropzone.drag-over .dropzone-content {
+  border-color: var(--accent);
+  background: rgba(155, 109, 255, 0.10);
+  box-shadow: 0 0 0 4px var(--accent-dim);
 }
 
 .dropzone-icon {
@@ -214,34 +289,138 @@ body::before {
 }
 
 #fileInput {
-  position: absolute;
+  position: fixed;
   inset: 0;
   opacity: 0;
   cursor: pointer;
   width: 100%;
   height: 100%;
+  pointer-events: none; /* click forwarded by parent .dropzone via JS */
 }
 
-/* ── Player ─────────────────────────────────────────────────────────────── */
+/* ── Player — children are fixed panels, shown after a file loads ────────── */
 .player {
   display: none;
-  flex-direction: column;
-  gap: 20px;
 }
 
 .player.visible {
+  display: block;
+}
+
+/* Top HUD: track name + preset strip, fixed below the header */
+.player-top {
+  position: fixed;
+  top: 54px;
+  left: 0;
+  right: 0;
+  z-index: 50;
   display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  background: rgba(8, 8, 16, 0.60);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--glass-border);
+  pointer-events: auto;
+  transition: opacity 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Bottom HUD: waveform + transport bar, anchored to the viewport bottom */
+.player-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: rgba(8, 8, 16, 0.72);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--glass-border);
+  pointer-events: auto;
+  transition: opacity 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Subtle dim while paused — makes the orb the visual focus */
+body.is-paused .player-top,
+body.is-paused .player-bottom {
+  opacity: 0.65;
+}
+body.is-playing .player-top,
+body.is-playing .player-bottom {
+  opacity: 1;
+}
+
+/* Star overlay dims when paused */
+.star-overlay {
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+body.is-paused  .star-overlay { opacity: 0.4; }
+body.is-playing .star-overlay { opacity: 1;   }
+
+/* Play/pause icons crossfade — both stack inside the button */
+#iconPlay,
+#iconPause {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.22s ease;
+}
+/* Default (no class yet): show play, hide pause */
+#iconPause                    { opacity: 0; }
+body.is-paused  #iconPlay     { opacity: 1; }
+body.is-paused  #iconPause    { opacity: 0; }
+body.is-playing #iconPlay     { opacity: 0; }
+body.is-playing #iconPause    { opacity: 1; }
+
+/* Waveform wrapper inside the bottom bar — no separate card border needed */
+.player-bottom .waveform-wrap {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-bottom: 1px solid var(--glass-border);
+  border-radius: 0;
+}
+
+/* Transport row: time | buttons | right-side controls */
+.transport-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 20px;
+  gap: 12px;
+}
+
+.time-current,
+.time-total {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  min-width: 34px;
+}
+
+.transport-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* ── Track info ─────────────────────────────────────────────────────────── */
 .track-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 220px;
 }
 
 .track-name {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -250,9 +429,12 @@ body::before {
 }
 
 .track-meta {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--text-dim);
   font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Waveform ───────────────────────────────────────────────────────────── */
@@ -268,20 +450,11 @@ body::before {
 .waveform {
   display: block;
   width: 100%;
-  height: 80px;
+  height: 96px;
   cursor: pointer;
 }
 
-/* ── Time row ───────────────────────────────────────────────────────────── */
-.time-row {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-dim);
-  padding: 0 2px;
-  margin-top: -10px;
-}
+/* .time-row removed — replaced by .transport-row + .time-current / .time-total */
 
 /* ── Transport ──────────────────────────────────────────────────────────── */
 .transport {
@@ -320,11 +493,19 @@ body::before {
 }
 
 .btn-play {
+  position: relative;
   width: 58px;
   height: 58px;
   background: var(--accent);
   color: #fff;
   box-shadow: 0 4px 20px var(--accent-glow);
+  transition: box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.4s ease,
+              transform 0.15s ease;
+}
+
+body.is-playing .btn-play {
+  box-shadow: 0 4px 32px var(--accent-glow), 0 0 18px rgba(155, 109, 255, 0.45);
 }
 
 .btn-play:hover {
@@ -458,43 +639,57 @@ body::before {
   font-family: var(--font-mono);
 }
 
-/* ── Footer ─────────────────────────────────────────────────────────────── */
-.footer {
-  border-top: 1px solid var(--border);
-  text-align: center;
-  padding: 16px 20px;
-}
-
-.footer p {
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-}
+/* Footer removed in v2 full-page layout */
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .header-inner {
+@media (max-width: 600px) {
+  /* Header: hide tagline to save space, keep logo + MIDI dot */
+  .tagline {
+    display: none;
+  }
+
+  /* Dropzone card shrinks on small screens */
+  .dropzone-content {
+    padding: 40px 24px;
+    margin: 0 16px;
+  }
+
+  /* Top HUD: track info + presets stack vertically on phones */
+  .player-top {
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
-    padding: 20px 16px 16px;
+    gap: 8px;
+    padding: 8px 16px;
   }
 
-  .main {
-    padding: 20px 16px 32px;
+  .track-info {
+    max-width: 100%;
   }
 
-  .dropzone-content {
-    padding: 48px 20px;
+  .preset-strip {
+    width: 100%;
   }
 
+  /* Waveform a bit shorter on phones */
   .waveform {
-    height: 64px;
+    height: 60px;
   }
 
+  /* Smaller play button */
   .btn-play {
-    width: 52px;
-    height: 52px;
+    width: 50px;
+    height: 50px;
+  }
+
+  /* Drawers: full-width at bottom of phones */
+  .controls-drawer,
+  .settings-drawer {
+    right: 0;
+    left: 0;
+    width: auto;
+    border-radius: var(--radius) var(--radius) 0 0;
+    bottom: 148px;
+    max-height: calc(100vh - 280px);
   }
 }
 
@@ -508,25 +703,35 @@ body::before {
   --red-dim: rgba(248, 113, 113, 0.15);
 }
 
-/* ── Preset cards (issue #11) ───────────────────────────────────────────── */
+/* ── Preset cards ───────────────────────────────────────────────────────── */
 .preset-strip {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.preset-strip::-webkit-scrollbar {
+  display: none;
 }
 
 /* Futuristic glass card - thin accent bar on top, sharp data-readout style */
 .preset-card {
-  flex: 1;
-  min-width: 80px;
-  padding: 13px 12px 11px;
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  min-width: 90px;
+  padding: 9px 12px 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   align-items: flex-start;
   position: relative;
   border: 1px solid var(--glass-border);
-  border-top: 1px solid rgba(155, 109, 255, 0.25);
+  border-top: 1px solid var(--accent-subtle);
   border-radius: var(--radius);
   background: linear-gradient(
     160deg,
@@ -575,8 +780,8 @@ body::before {
 }
 
 .preset-card:hover {
-  border-color: rgba(155, 109, 255, 0.35);
-  border-top-color: rgba(155, 109, 255, 0.5);
+  border-color: var(--accent-subtle);
+  border-top-color: var(--accent-dim);
   box-shadow:
     0 0 16px rgba(155, 109, 255, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -592,7 +797,7 @@ body::before {
 
 /* Active state: full neon glow + bright accent bar */
 .preset-card--active {
-  border-color: rgba(155, 109, 255, 0.5);
+  border-color: var(--accent-subtle);
   border-top-color: var(--accent);
   background: linear-gradient(
     160deg,
@@ -655,23 +860,7 @@ body::before {
   font-weight: 600;
 }
 
-/* ── Spectrum analyzer ──────────────────────────────────────────────────── */
-.spectrum-wrap {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  margin-top: -12px;
-}
-
-.spectrum {
-  display: block;
-  width: 100%;
-  height: 56px;
-  cursor: default;
-}
+/* .anomaly-bg styles live near the top of the Layout section */
 
 /* ── MIDI status dot ────────────────────────────────────────────────────── */
 .status-dot {
@@ -823,12 +1012,12 @@ body::before {
   background: var(--red-dim);
 }
 
-/* ── Collab panel ───────────────────────────────────────────────────────── */
+/* ── Collab panel — positioned below the viewport, reachable via scroll ─── */
 .collab-panel {
   max-width: 680px;
   width: 100%;
-  margin: 0 auto;
-  padding: 0 20px 32px;
+  margin: 100vh auto 0;
+  padding: 32px 20px 200px; /* bottom padding clears the fixed transport bar */
 }
 
 .collab-inner {
@@ -939,6 +1128,80 @@ body::before {
   border-radius: 3px;
 }
 
+/* ── Color Themes ───────────────────────────────────────────────────────── */
+/* Each theme overrides accent + teal tokens and sets --aurora-filter.
+   The filter is applied to the body::before/after aurora layers, shifting
+   all ambient blob colors simultaneously. */
+
+/* Void — deep space, dark indigo */
+[data-theme="void"] {
+  --accent:        #5533ff;
+  --accent-dim:    rgba(85, 51, 255, 0.18);
+  --accent-glow:   rgba(85, 51, 255, 0.40);
+  --accent-bright: #7755ff;
+  --accent-subtle: rgba(85, 51, 255, 0.22);
+  --accent-faint:  rgba(85, 51, 255, 0.10);
+  --teal:          #7733dd;
+  --teal-dim:      rgba(119, 51, 221, 0.15);
+  /* darken + deepen: shift purple toward deep indigo, strip warmth */
+  --aurora-filter: hue-rotate(-18deg) saturate(0.5) brightness(0.60);
+}
+
+/* Neon — cyberpunk cyan + hot pink */
+[data-theme="neon"] {
+  --accent:        #00ffcc;
+  --accent-dim:    rgba(0, 255, 204, 0.18);
+  --accent-glow:   rgba(0, 255, 204, 0.40);
+  --accent-bright: #66ffe6;
+  --accent-subtle: rgba(0, 255, 204, 0.22);
+  --accent-faint:  rgba(0, 255, 204, 0.10);
+  --teal:          #ff00aa;
+  --teal-dim:      rgba(255, 0, 170, 0.15);
+  /* rotate purples → electric cyan, boost saturation */
+  --aurora-filter: hue-rotate(-130deg) saturate(1.45);
+}
+
+/* Ember — fire: red, orange, amber */
+[data-theme="ember"] {
+  --accent:        #ff5500;
+  --accent-dim:    rgba(255, 85, 0, 0.18);
+  --accent-glow:   rgba(255, 85, 0, 0.40);
+  --accent-bright: #ff7722;
+  --accent-subtle: rgba(255, 85, 0, 0.22);
+  --accent-faint:  rgba(255, 85, 0, 0.10);
+  --teal:          #ffaa00;
+  --teal-dim:      rgba(255, 170, 0, 0.15);
+  /* rotate purples → warm red-orange */
+  --aurora-filter: hue-rotate(128deg) saturate(1.30);
+}
+
+/* Frost — icy pale blue */
+[data-theme="frost"] {
+  --accent:        #66bbff;
+  --accent-dim:    rgba(102, 187, 255, 0.18);
+  --accent-glow:   rgba(102, 187, 255, 0.40);
+  --accent-bright: #99ccff;
+  --accent-subtle: rgba(102, 187, 255, 0.22);
+  --accent-faint:  rgba(102, 187, 255, 0.10);
+  --teal:          #aaeeff;
+  --teal-dim:      rgba(170, 238, 255, 0.15);
+  /* rotate purples → cool blue, lift brightness */
+  --aurora-filter: hue-rotate(-62deg) saturate(0.80) brightness(1.15);
+}
+
+/* Mono — grayscale, minimal */
+[data-theme="mono"] {
+  --accent:        #9999aa;
+  --accent-dim:    rgba(153, 153, 170, 0.18);
+  --accent-glow:   rgba(153, 153, 170, 0.25);
+  --accent-bright: #bbbbcc;
+  --accent-subtle: rgba(153, 153, 170, 0.22);
+  --accent-faint:  rgba(153, 153, 170, 0.10);
+  --teal:          #aaaacc;
+  --teal-dim:      rgba(170, 170, 204, 0.15);
+  --aurora-filter: grayscale(1) brightness(0.50);
+}
+
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
@@ -953,9 +1216,9 @@ body::before {
 
 /* ── Controls drawer (issue #12) ────────────────────────────────────────── */
 
-/* Header bar - only shown on desktop, hidden on mobile */
+/* Header bar inside the drawer */
 .controls-drawer-header {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -1000,22 +1263,22 @@ body::before {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-/* "Controls" re-open button shown in the player when the drawer is dismissed */
+/* Controls toggle button — lives in transport-right, visible by default */
 .btn-controls-show {
-  display: none;
-  padding: 7px 14px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
-  align-self: center;
   transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
   outline: none;
 }
@@ -1030,46 +1293,459 @@ body::before {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-/* Hidden state - drawer dismissed by the close button */
+/* Hidden state — added by JS when drawer is open, removed when closed */
 .controls-drawer--hidden {
   display: none !important;
 }
 
-/* Desktop-only panel behavior */
-@media (min-width: 800px) {
-  /* Reveal the header bar on desktop */
-  .controls-drawer-header {
-    display: flex;
-  }
+/* Controls drawer — fixed panel above the bottom bar, on the right.
+   max-height accounts for header (54px) + player-top (~54px) + bottom bar (~172px)
+   so expanding the Effects Chain section never pushes the drawer above the top panel. */
+.controls-drawer {
+  position: fixed;
+  right: 20px;
+  bottom: 172px;
+  width: 300px;
+  z-index: 60;
+  background: rgba(8, 8, 18, 0.90);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--accent-subtle);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px var(--accent-faint), 0 20px 60px rgba(0, 0, 0, 0.65);
+  max-height: calc(100vh - 310px);
+  overflow-y: auto;
+}
 
-  /* Floating mode: fixed overlay panel on the right side */
-  .controls-drawer--floating {
-    position: fixed;
-    right: 24px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 300px;
-    z-index: 100;
-    background: rgba(10, 10, 20, 0.85);
-    backdrop-filter: blur(32px);
-    -webkit-backdrop-filter: blur(32px);
-    border: 1px solid rgba(155, 109, 255, 0.25);
-    border-radius: var(--radius);
-    box-shadow: 0 0 0 1px rgba(155, 109, 255, 0.12), 0 20px 60px rgba(0, 0, 0, 0.6);
-    max-height: 90vh;
-    overflow-y: auto;
-  }
+/* ── Visual Settings drawer — left side, same glass style ───────────────── */
+.settings-drawer {
+  position: fixed;
+  left: 20px;
+  bottom: 172px;
+  width: 290px;
+  z-index: 60;
+  background: rgba(8, 8, 18, 0.90);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(0, 212, 170, 0.20);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.08), 0 20px 60px rgba(0, 0, 0, 0.65);
+  max-height: calc(100vh - 310px);
+  overflow-y: auto;
+}
 
-  /* Remove border-radius from inner controls when inside a floating drawer */
-  .controls-drawer--floating .controls,
-  .controls-drawer--floating .controls-section {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-  }
+.settings-drawer--hidden {
+  display: none !important;
+}
 
-  .controls-drawer--floating .controls:last-child,
-  .controls-drawer--floating .controls-section:last-child {
-    border-bottom: none;
-  }
+.settings-drawer .controls {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+}
+
+.settings-drawer .controls-section {
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+}
+
+/* Settings gear button — sits next to Controls in transport-right */
+.btn-settings-show {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s, background 0.15s;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.btn-settings-show:hover,
+.btn-settings-show--active {
+  border-color: rgba(0, 212, 170, 0.45);
+  color: var(--teal);
+  box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.18), 0 4px 16px rgba(0, 0, 0, 0.35);
+  background: rgba(0, 212, 170, 0.08);
+}
+
+.btn-settings-show:focus-visible {
+  box-shadow: 0 0 0 2px var(--teal);
+}
+
+/* ── Theme chips ────────────────────────────────────────────────────────── */
+.settings-themes {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.settings-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.theme-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.theme-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  outline: none;
+}
+
+.theme-chip:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text);
+}
+
+.theme-chip:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.theme-chip--active {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: rgba(0, 212, 170, 0.10);
+}
+
+/* Per-theme swatch dots */
+.theme-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.theme-swatch--prism {
+  background: conic-gradient(from 0deg, #9b6dff, #00d4aa, #ff6eb4, #ffaa44, #9b6dff);
+}
+
+.theme-swatch--void {
+  background: #5533ff;
+}
+
+.theme-swatch--neon {
+  background: linear-gradient(135deg, #00ffcc, #ff00aa);
+}
+
+.theme-swatch--ember {
+  background: linear-gradient(135deg, #ff4422, #ffaa22);
+}
+
+.theme-swatch--frost {
+  background: linear-gradient(135deg, #88ccff, #ddeeff);
+}
+
+.theme-swatch--mono {
+  background: linear-gradient(135deg, #555, #aaa);
+}
+
+/* ── Toggle switches ────────────────────────────────────────────────────── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  cursor: pointer;
+}
+
+.toggle-row + .toggle-row {
+  border-top: 1px solid var(--border);
+}
+
+.toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  user-select: none;
+}
+
+.toggle-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The pill track */
+.toggle-track {
+  display: block;
+  width: 34px;
+  height: 18px;
+  border-radius: 100px;
+  background: var(--border-2);
+  border: 1px solid var(--border-2);
+  transition: background 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+
+/* The thumb */
+.toggle-track::after {
+  content: '';
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  margin: 2px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggle-input:checked + .toggle-track {
+  background: rgba(0, 212, 170, 0.25);
+  border-color: var(--teal);
+}
+
+.toggle-input:checked + .toggle-track::after {
+  background: var(--teal);
+  transform: translateX(16px);
+}
+
+.toggle-input:focus-visible + .toggle-track {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Drawer header is always visible (no desktop-only gate in new layout) */
+.controls-drawer-header {
+  display: flex;
+}
+
+/* Inner .controls panels don't need their own glass surface inside the drawer */
+.controls-drawer .controls {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+}
+
+.controls-drawer .controls-section {
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+}
+
+/* Float button is not used in the full-page layout */
+#controlsFloatBtn {
+  display: none !important;
+}
+
+/* ── v2 Visual Enhancement ──────────────────────────────────────────────── */
+
+/* Extra color tokens */
+:root {
+  --pink:       #ff6eb4;
+  --pink-dim:   rgba(255, 110, 180, 0.15);
+  --gold:       #ffd36b;
+  --gold-dim:   rgba(255, 211, 107, 0.12);
+  --cyan-neon:  #00e5ff;
+  --cyan-dim2:  rgba(0, 229, 255, 0.15);
+}
+
+/* Waveform container: bottom gradient shimmer */
+.waveform-wrap {
+  position: relative;
+  box-shadow:
+    inset 0 -1px 0 rgba(155, 109, 255, 0.20),
+    0 0 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Anomaly sphere: no box-shadow needed since the container is transparent */
+
+/* Lo-Fi preset: warm rose/pink accent */
+.preset-card[data-preset="lofi"] {
+  border-top-color: rgba(255, 90, 155, 0.30);
+}
+.preset-card[data-preset="lofi"]::before {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 90, 155, 0.60) 35%,
+    rgba(155, 109, 255, 0.45) 65%,
+    transparent 100%
+  );
+}
+.preset-card[data-preset="lofi"]:hover {
+  border-color: rgba(255, 90, 155, 0.40);
+  border-top-color: rgba(255, 90, 155, 0.55);
+  box-shadow: 0 0 18px rgba(255, 90, 155, 0.18), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.preset-card--active[data-preset="lofi"] {
+  border-color: rgba(255, 90, 155, 0.55);
+  border-top-color: #ff5a9b;
+  background: linear-gradient(160deg, rgba(55, 12, 32, 0.82) 0%, rgba(22, 8, 20, 0.66) 100%);
+  box-shadow: 0 0 30px rgba(255, 90, 155, 0.30), inset 0 1px 0 rgba(255, 90, 155, 0.22);
+}
+.preset-card--active[data-preset="lofi"]::before {
+  opacity: 1;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 90, 155, 0.95) 35%,
+    rgba(155, 109, 255, 0.72) 65%,
+    transparent 100%
+  );
+}
+.preset-card--active[data-preset="lofi"] .preset-card-name {
+  color: #ff8ec4;
+}
+.preset-card--active[data-preset="lofi"] .preset-card-hint {
+  color: rgba(255, 110, 180, 0.65);
+}
+
+/* Vaporwave preset: electric cyan/indigo accent */
+.preset-card[data-preset="vaporwave"] {
+  border-top-color: rgba(0, 200, 255, 0.30);
+}
+.preset-card[data-preset="vaporwave"]::before {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 200, 255, 0.60) 35%,
+    rgba(160, 55, 255, 0.45) 65%,
+    transparent 100%
+  );
+}
+.preset-card[data-preset="vaporwave"]:hover {
+  border-color: rgba(0, 200, 255, 0.40);
+  border-top-color: rgba(0, 200, 255, 0.55);
+  box-shadow: 0 0 18px rgba(0, 200, 255, 0.18), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.preset-card--active[data-preset="vaporwave"] {
+  border-color: rgba(0, 200, 255, 0.55);
+  border-top-color: #00c8ff;
+  background: linear-gradient(160deg, rgba(6, 28, 48, 0.82) 0%, rgba(5, 10, 28, 0.66) 100%);
+  box-shadow: 0 0 30px rgba(0, 200, 255, 0.30), inset 0 1px 0 rgba(0, 200, 255, 0.22);
+}
+.preset-card--active[data-preset="vaporwave"]::before {
+  opacity: 1;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 200, 255, 0.95) 35%,
+    rgba(160, 55, 255, 0.72) 65%,
+    transparent 100%
+  );
+}
+.preset-card--active[data-preset="vaporwave"] .preset-card-name {
+  color: #00d8ff;
+}
+.preset-card--active[data-preset="vaporwave"] .preset-card-hint {
+  color: rgba(0, 210, 255, 0.65);
+}
+
+/* Ambient preset: forest teal/green accent */
+.preset-card[data-preset="ambient"] {
+  border-top-color: rgba(0, 205, 140, 0.30);
+}
+.preset-card[data-preset="ambient"]::before {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 205, 140, 0.60) 35%,
+    rgba(0, 185, 220, 0.45) 65%,
+    transparent 100%
+  );
+}
+.preset-card[data-preset="ambient"]:hover {
+  border-color: rgba(0, 205, 140, 0.40);
+  border-top-color: rgba(0, 205, 140, 0.55);
+  box-shadow: 0 0 18px rgba(0, 205, 140, 0.18), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.preset-card--active[data-preset="ambient"] {
+  border-color: rgba(0, 205, 140, 0.55);
+  border-top-color: #00cd8c;
+  background: linear-gradient(160deg, rgba(6, 34, 26, 0.82) 0%, rgba(4, 18, 20, 0.66) 100%);
+  box-shadow: 0 0 30px rgba(0, 205, 140, 0.30), inset 0 1px 0 rgba(0, 205, 140, 0.22);
+}
+.preset-card--active[data-preset="ambient"]::before {
+  opacity: 1;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 205, 140, 0.95) 35%,
+    rgba(0, 185, 220, 0.72) 65%,
+    transparent 100%
+  );
+}
+.preset-card--active[data-preset="ambient"] .preset-card-name {
+  color: #00dca0;
+}
+.preset-card--active[data-preset="ambient"] .preset-card-hint {
+  color: rgba(0, 210, 150, 0.65);
+}
+
+/* Hyperpop preset: hot pink + electric yellow accent */
+.preset-card[data-preset="hyperpop"] {
+  border-top-color: rgba(255, 0, 170, 0.30);
+}
+.preset-card[data-preset="hyperpop"]::before {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 0, 170, 0.60) 35%,
+    rgba(255, 220, 0, 0.45) 65%,
+    transparent 100%
+  );
+}
+.preset-card[data-preset="hyperpop"]:hover {
+  border-color: rgba(255, 0, 170, 0.40);
+  border-top-color: rgba(255, 0, 170, 0.55);
+  box-shadow: 0 0 18px rgba(255, 0, 170, 0.20), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.preset-card--active[data-preset="hyperpop"] {
+  border-color: rgba(255, 0, 170, 0.55);
+  border-top-color: #ff00aa;
+  background: linear-gradient(160deg, rgba(48, 6, 34, 0.82) 0%, rgba(28, 6, 22, 0.66) 100%);
+  box-shadow: 0 0 30px rgba(255, 0, 170, 0.30), inset 0 1px 0 rgba(255, 0, 170, 0.22);
+}
+.preset-card--active[data-preset="hyperpop"]::before {
+  opacity: 1;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 0, 170, 0.95) 35%,
+    rgba(255, 220, 0, 0.72) 65%,
+    transparent 100%
+  );
+}
+.preset-card--active[data-preset="hyperpop"] .preset-card-name {
+  color: #ff44cc;
+}
+.preset-card--active[data-preset="hyperpop"] .preset-card-hint {
+  color: rgba(255, 80, 200, 0.65);
+}
+
+/* Mobile: keep waveform at a usable height */
+@media (max-width: 480px) {
+  .waveform { height: 60px; }
 }

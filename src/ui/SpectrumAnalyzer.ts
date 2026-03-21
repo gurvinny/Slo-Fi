@@ -1,6 +1,9 @@
-// Renders a real-time frequency spectrum on a canvas element.
-// Uses a logarithmic scale (20 Hz to 20 kHz) to match how we hear.
-// Fires onEnergyUpdate each frame so the aurora background can react to the audio.
+// Real-time frequency spectrum with:
+// - Slowly rotating rainbow hue (creates a drifting, trance-like color shift)
+// - Gradient-filled bars (dim at base, vivid at top)
+// - Rising particle sparks from high-energy bars
+// - Peak hold markers with matched glow color
+// Fires onEnergyUpdate each frame so the aurora background reacts to live audio.
 
 const BAR_COUNT = 64
 const MIN_FREQ = 20
@@ -9,15 +12,20 @@ const MAX_FREQ = 20000
 // How fast peak markers fall back down (normalized height units per frame)
 const PEAK_DECAY = 0.004
 
-// Smooth the aurora color update so it doesn't snap between frames
+// Smooth the aurora energy values so they don't snap between frames
 const AURORA_LERP = 0.08
 
-// Interpolates between purple (low energy) and teal (high energy)
-function lerpColor(t: number): string {
-  const r = Math.round(155 + (0   - 155) * t)
-  const g = Math.round(109 + (212 - 109) * t)
-  const b = Math.round(255 + (170 - 255) * t)
-  return `rgb(${r},${g},${b})`
+// Cap on live particles to keep performance consistent
+const MAX_PARTICLES = 150
+
+interface Particle {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  life: number   // 1.0 -> 0 as it fades out
+  hue: number
+  size: number
 }
 
 export class SpectrumAnalyzer {
@@ -34,6 +42,10 @@ export class SpectrumAnalyzer {
   private smoothTreble = 0
   private smoothEnergy = 0
 
+  // Slowly drifts over time to shift the entire color palette
+  private hueOffset = 0
+
+  private particles: Particle[] = []
   private rafId: number | null = null
 
   // Called each frame with smoothed bass/mid/treble energy (0-1 each)
@@ -59,6 +71,7 @@ export class SpectrumAnalyzer {
       cancelAnimationFrame(this.rafId)
       this.rafId = null
     }
+    this.particles = []
     // Fade aurora back to neutral when playback stops
     this.onEnergyUpdate?.(0, 0, 0)
     this.drawIdle()
@@ -79,7 +92,7 @@ export class SpectrumAnalyzer {
     this.drawIdle()
   }
 
-  // Maps a pixel position to a frequency bin using a log scale
+  // Maps a frequency (Hz) to the nearest FFT bin index
   private freqToBin(freq: number): number {
     const binCount = this.freqData.length
     const sampleRate = this.analyser.context.sampleRate
@@ -104,25 +117,26 @@ export class SpectrumAnalyzer {
     const sampleRate = analyser.context.sampleRate
     const binCount = freqData.length
 
+    // Slowly rotate hue across all bars — full cycle ~24 seconds at 60fps
+    this.hueOffset = (this.hueOffset + 0.25) % 360
+
     ctx.clearRect(0, 0, W, H)
 
-    // Compute per-bar heights on a log frequency scale
     const barW = W / BAR_COUNT
-    const gap = Math.max(1, barW * 0.2)
+    const gap = Math.max(1, barW * 0.18)
     const drawW = barW - gap
 
-    // Track overall energy for global glow
-    let totalEnergy = 0
-
     for (let i = 0; i < BAR_COUNT; i++) {
-      // Map bar index to frequency range
+      const freqT = i / BAR_COUNT   // 0 = bass end, 1 = treble end
+
+      // Log-scale frequency range for this bar
       const freqLo = MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, i / BAR_COUNT)
       const freqHi = MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, (i + 1) / BAR_COUNT)
 
       const binLo = Math.min(binCount - 1, Math.round((freqLo * binCount * 2) / sampleRate))
       const binHi = Math.min(binCount - 1, Math.round((freqHi * binCount * 2) / sampleRate))
 
-      // Use the peak bin value in this frequency range
+      // Peak bin value in this frequency range
       let peak = 0
       for (let b = binLo; b <= binHi; b++) {
         const v = freqData[b] ?? 0
@@ -130,7 +144,6 @@ export class SpectrumAnalyzer {
       }
 
       const norm = peak / 255
-      totalEnergy += norm
 
       // Update peak hold markers
       if (norm >= this.peaks[i]) {
@@ -139,29 +152,36 @@ export class SpectrumAnalyzer {
         this.peaks[i] = Math.max(0, this.peaks[i] - PEAK_DECAY)
       }
 
-      const x = i * barW
-      const barH = norm * H * 0.88
-      const peakH = this.peaks[i] * H * 0.88
+      const barH = norm * H * 0.90
+      const peakH = this.peaks[i] * H * 0.90
 
       if (barH < 0.5) continue
 
-      // Bar color interpolated from purple to teal based on height
-      const colorT = norm
-      const barColor = lerpColor(colorT)
+      // Hue: violet (270) at bass, shifts toward magenta/red (350) at treble,
+      // plus the slow global rotation so the whole palette drifts over time.
+      const hue = (270 + freqT * 80 + this.hueOffset) % 360
+      const sat = 80 + norm * 20         // 80-100% saturation
+      const light = 36 + norm * 38       // 36-74% lightness
 
-      // Glow intensity scales with bar height
-      ctx.shadowColor = lerpColor(Math.min(1, colorT * 1.4))
-      ctx.shadowBlur = 4 + norm * 18
+      const topColor = `hsl(${hue}, ${sat}%, ${light}%)`
+      const dimColor = `hsla(${hue}, ${sat}%, ${Math.round(light * 0.5)}%, 0.35)`
 
-      // Main bar fill
-      ctx.fillStyle = barColor
-      ctx.globalAlpha = 0.85 + norm * 0.15
-
-      // Draw bar with rounded top (via arc)
-      const bx = x + gap / 2
+      const bx = i * barW + gap / 2
       const by = H - barH
       const r = Math.min(drawW / 2, 3)
 
+      // Gradient fill: dark and transparent at the base, vivid at the top
+      const grad = ctx.createLinearGradient(bx, H, bx, by)
+      grad.addColorStop(0, dimColor)
+      grad.addColorStop(1, topColor)
+
+      // Glow scales with bar height
+      ctx.shadowColor = topColor
+      ctx.shadowBlur = 7 + norm * 26
+      ctx.globalAlpha = 0.88 + norm * 0.12
+      ctx.fillStyle = grad
+
+      // Bar with rounded top
       ctx.beginPath()
       ctx.moveTo(bx + r, by)
       ctx.lineTo(bx + drawW - r, by)
@@ -172,27 +192,66 @@ export class SpectrumAnalyzer {
       ctx.quadraticCurveTo(bx, by, bx + r, by)
       ctx.fill()
 
-      // Reflection below: mirror the bar at reduced opacity
-      ctx.globalAlpha = 0.12 * norm
+      // Soft reflection below the baseline
       ctx.shadowBlur = 0
-      ctx.fillStyle = barColor
-      ctx.fillRect(bx, H, drawW, Math.min(barH * 0.35, H * 0.2))
+      ctx.globalAlpha = 0.14 * norm
+      ctx.fillStyle = topColor
+      ctx.fillRect(bx, H, drawW, Math.min(barH * 0.30, H * 0.18))
 
-      // Peak hold dot
+      // Peak hold marker — glows with the same hue as the bar
       if (peakH > 2) {
-        ctx.globalAlpha = 0.7
-        ctx.shadowBlur = 6
-        ctx.shadowColor = '#00d4aa'
-        ctx.fillStyle = '#00d4aa'
-        ctx.fillRect(bx, H - peakH - 1.5, drawW, 1.5)
+        const peakSat = 90
+        const peakLight = 58 + this.peaks[i] * 22
+        const peakColor = `hsl(${hue}, ${peakSat}%, ${peakLight}%)`
+        ctx.globalAlpha = 0.85
+        ctx.shadowBlur = 10
+        ctx.shadowColor = peakColor
+        ctx.fillStyle = peakColor
+        ctx.fillRect(bx, H - peakH - 2, drawW, 2)
+      }
+
+      // Spawn a glowing particle spark from the top of high-energy bars
+      if (norm > 0.65 && this.particles.length < MAX_PARTICLES && Math.random() < norm * 0.22) {
+        this.particles.push({
+          x: bx + drawW / 2 + (Math.random() - 0.5) * drawW,
+          y: by,
+          vx: (Math.random() - 0.5) * 0.7,
+          vy: -(0.6 + Math.random() * 2.0),
+          life: 1.0,
+          hue,
+          size: 0.8 + Math.random() * 1.8,
+        })
       }
     }
 
-    // Reset canvas state
+    // Draw and update all active particles
+    ctx.shadowBlur = 0
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i]
+      p.x += p.vx
+      p.y += p.vy
+      p.life -= 0.032
+
+      if (p.life <= 0 || p.y < -p.size) {
+        this.particles.splice(i, 1)
+        continue
+      }
+
+      const pColor = `hsl(${p.hue}, 100%, 75%)`
+      ctx.globalAlpha = p.life * 0.85
+      ctx.shadowColor = pColor
+      ctx.shadowBlur = 7
+      ctx.fillStyle = pColor
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // Reset canvas state before computing energy
     ctx.shadowBlur = 0
     ctx.globalAlpha = 1
 
-    // Compute energy bands and smooth them toward current values
+    // Compute per-band energy and smooth toward current values
     const rawBass = this.bandEnergy(20, 250)
     const rawMid = this.bandEnergy(250, 4000)
     const rawTreble = this.bandEnergy(4000, 20000)
@@ -204,7 +263,7 @@ export class SpectrumAnalyzer {
     this.onEnergyUpdate?.(this.smoothBass, this.smoothEnergy, this.smoothTreble)
   }
 
-  // Shows a dim placeholder when not playing
+  // Colorful placeholder when not playing
   private drawIdle(): void {
     const { canvas, ctx } = this
     const dpr = window.devicePixelRatio || 1
@@ -213,15 +272,16 @@ export class SpectrumAnalyzer {
     ctx.clearRect(0, 0, W, H)
 
     const barW = W / BAR_COUNT
-    const gap = Math.max(1, barW * 0.2)
+    const gap = Math.max(1, barW * 0.18)
     const drawW = barW - gap
 
     for (let i = 0; i < BAR_COUNT; i++) {
       const t = i / BAR_COUNT
-      const h = (Math.sin(t * Math.PI * 3) * 0.2 + 0.25) * H * 0.45
+      const h = (Math.sin(t * Math.PI * 3) * 0.2 + 0.28) * H * 0.5
       const x = i * barW + gap / 2
-      ctx.fillStyle = lerpColor(t * 0.4)
-      ctx.globalAlpha = 0.15
+      const hue = 270 + t * 80
+      ctx.fillStyle = `hsl(${hue}, 65%, 40%)`
+      ctx.globalAlpha = 0.18
       ctx.fillRect(x, H - h, drawW, h)
     }
 

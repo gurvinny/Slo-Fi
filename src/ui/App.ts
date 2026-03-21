@@ -1,6 +1,7 @@
 import { AudioEngine } from '../audio/AudioEngine'
 import { Waveform } from './Waveform'
-import { SpectrumAnalyzer } from './SpectrumAnalyzer'
+import { AnomalySphere } from './AnomalySphere'
+import { StarOverlay } from './StarOverlay'
 import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
@@ -23,7 +24,8 @@ function formatBytes(bytes: number): string {
 export class App {
   private engine = new AudioEngine()
   private waveform: Waveform
-  private spectrum: SpectrumAnalyzer | null = null
+  private sphere: AnomalySphere | null = null
+  private starOverlay = new StarOverlay()
 
   // Controllers
   private presets: PresetController
@@ -42,8 +44,6 @@ export class App {
   private currentTimeEl = document.getElementById('currentTime')!
   private durationEl = document.getElementById('duration')!
   private playPauseBtn = document.getElementById('playPauseBtn')!
-  private iconPlay = document.getElementById('iconPlay')!
-  private iconPause = document.getElementById('iconPause')!
   private stopBtn = document.getElementById('stopBtn')!
   private rewindBtn = document.getElementById('rewindBtn')!
   private speedSlider = document.getElementById('speedSlider') as HTMLInputElement
@@ -63,6 +63,27 @@ export class App {
   private controlsCloseBtn = document.getElementById('controlsCloseBtn')!
   private controlsShowBtn = document.getElementById('controlsShowBtn')!
 
+  // Settings drawer refs
+  private settingsDrawer   = document.getElementById('settingsDrawer')!
+  private settingsCloseBtn = document.getElementById('settingsCloseBtn')!
+  private settingsShowBtn  = document.getElementById('settingsShowBtn')!
+
+  // Visual settings controls
+  private particleCountSlider  = document.getElementById('particleCountSlider') as HTMLInputElement
+  private particleCountValue   = document.getElementById('particleCountValue')!
+  private orbReactivitySlider  = document.getElementById('orbReactivitySlider') as HTMLInputElement
+  private orbReactivityValue   = document.getElementById('orbReactivityValue')!
+  private orbGlowSlider        = document.getElementById('orbGlowSlider') as HTMLInputElement
+  private orbGlowValue         = document.getElementById('orbGlowValue')!
+  private orbSizeSlider        = document.getElementById('orbSizeSlider') as HTMLInputElement
+  private orbSizeValue         = document.getElementById('orbSizeValue')!
+  private rotationSpeedSlider  = document.getElementById('rotationSpeedSlider') as HTMLInputElement
+  private rotationSpeedValue   = document.getElementById('rotationSpeedValue')!
+  private bassPulseToggle      = document.getElementById('bassPulseToggle') as HTMLInputElement
+  private wireframeToggle      = document.getElementById('wireframeToggle') as HTMLInputElement
+  private starsSlider          = document.getElementById('starsSlider') as HTMLInputElement
+  private starsValue           = document.getElementById('starsValue')!
+
   constructor() {
     this.waveform = new Waveform(document.getElementById('waveform') as HTMLCanvasElement)
 
@@ -77,6 +98,7 @@ export class App {
     this.wireKeyboard()
     this.wireCrossController()
     this.wireControlsPanel()
+    this.wireSettingsPanel()
     this.initMidi()
   }
 
@@ -103,11 +125,42 @@ export class App {
     })
   }
 
+  // Wires the visual settings drawer (left-side panel)
+  private wireSettingsPanel(): void {
+    this.settingsCloseBtn.addEventListener('click', () => {
+      this.settingsDrawer.classList.add('settings-drawer--hidden')
+      this.settingsShowBtn.classList.remove('btn-settings-show--active')
+    })
+
+    this.settingsShowBtn.addEventListener('click', () => {
+      const isHidden = this.settingsDrawer.classList.toggle('settings-drawer--hidden')
+      this.settingsShowBtn.classList.toggle('btn-settings-show--active', !isHidden)
+    })
+
+    // Theme chip clicks — update CSS custom properties (whole page) + orb
+    this.settingsDrawer.querySelectorAll<HTMLButtonElement>('.theme-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        this.settingsDrawer.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('theme-chip--active'))
+        chip.classList.add('theme-chip--active')
+        const theme = chip.dataset.theme ?? 'prism'
+        // Setting data-theme on <html> triggers the per-theme CSS variable overrides
+        if (theme === 'prism') {
+          document.documentElement.removeAttribute('data-theme')
+        } else {
+          document.documentElement.dataset.theme = theme
+        }
+        this.sphere?.setColorTheme(theme)
+      })
+    })
+  }
+
   // Cross-controller wiring (presets syncing sliders, etc.)
   private wireCrossController(): void {
     this.presets.onPresetApplied = (params: AudioParams) => {
       this.syncSlidersToParams(params)
       this.effects.syncToParams(params)
+      this.sphere?.setSpeed(params.playbackRate)
+      this.sphere?.setReverb(params.reverbMix)
     }
 
     this.effects.onChanged = () => {
@@ -138,11 +191,12 @@ export class App {
     })
 
     this.midi.bindCC(74, (v) => {
-      // CC 74 = Playback rate (maps 0-1 to 0.25-1.0)
-      const rate = 0.25 + v * 0.75
+      // CC 74 = Playback rate (maps 0-1 to 0.25-2.0)
+      const rate = 0.25 + v * 1.75
       this.engine.setPlaybackRate(rate)
       this.speedSlider.value = String(Math.round(rate * 100))
       this.speedValue.textContent = `${rate.toFixed(2)}x`
+      this.sphere?.setSpeed(rate)
       this.presets.clearActive()
       this.notifyParamChange()
     })
@@ -152,6 +206,7 @@ export class App {
       this.engine.setReverbMix(v)
       this.reverbSlider.value = String(Math.round(v * 100))
       this.reverbValue.textContent = `${Math.round(v * 100)}%`
+      this.sphere?.setReverb(v)
       this.notifyParamChange()
     })
 
@@ -168,7 +223,7 @@ export class App {
     this.engine.onEnded = () => {
       this.setPlayingState(false)
       this.waveform.setProgress(0)
-      this.spectrum?.stop()
+      this.sphere?.stop()
     }
 
     this.engine.onTimeUpdate = (current, duration) => {
@@ -212,7 +267,7 @@ export class App {
       this.setPlayingState(false)
       this.waveform.setProgress(0)
       this.currentTimeEl.textContent = '0:00'
-      this.spectrum?.stop()
+      this.sphere?.stop()
     })
     this.rewindBtn.addEventListener('click', () => {
       this.engine.seek(Math.max(0, this.engine.currentTime - 5))
@@ -228,6 +283,7 @@ export class App {
       const rate = parseInt(this.speedSlider.value) / 100
       this.engine.setPlaybackRate(rate)
       this.speedValue.textContent = `${rate.toFixed(2)}x`
+      this.sphere?.setSpeed(rate)
       this.presets.clearActive()
       this.notifyParamChange()
     })
@@ -237,6 +293,7 @@ export class App {
       const mix = parseInt(this.reverbSlider.value) / 100
       this.engine.setReverbMix(mix)
       this.reverbValue.textContent = `${this.reverbSlider.value}%`
+      this.sphere?.setReverb(mix)
       this.presets.clearActive()
       this.notifyParamChange()
     })
@@ -266,6 +323,58 @@ export class App {
       this.volumeValue.textContent = `${this.volumeSlider.value}%`
       this.notifyParamChange()
     })
+
+    // Visual settings — particle count
+    this.particleCountSlider.addEventListener('change', () => {
+      const n = parseInt(this.particleCountSlider.value)
+      this.sphere?.setParticleCount(n)
+      this.particleCountValue.textContent = String(n)
+    })
+
+    // Visual settings — orb reactivity
+    this.orbReactivitySlider.addEventListener('input', () => {
+      const v = parseInt(this.orbReactivitySlider.value) / 100
+      this.sphere?.setReactivity(v)
+      this.orbReactivityValue.textContent = `${this.orbReactivitySlider.value}%`
+    })
+
+    // Visual settings — orb glow
+    this.orbGlowSlider.addEventListener('input', () => {
+      const v = parseInt(this.orbGlowSlider.value) / 100
+      this.sphere?.setGlow(v)
+      this.orbGlowValue.textContent = `${this.orbGlowSlider.value}%`
+    })
+
+    // Visual settings — orb size
+    this.orbSizeSlider.addEventListener('input', () => {
+      const v = parseInt(this.orbSizeSlider.value) / 100
+      this.sphere?.setOrbSize(v)
+      this.orbSizeValue.textContent = `${this.orbSizeSlider.value}%`
+    })
+
+    // Visual settings — rotation speed
+    this.rotationSpeedSlider.addEventListener('input', () => {
+      const v = parseInt(this.rotationSpeedSlider.value) / 100
+      this.sphere?.setRotationSpeed(v)
+      this.rotationSpeedValue.textContent = `${v.toFixed(1)}×`
+    })
+
+    // Visual settings — bass pulse toggle
+    this.bassPulseToggle.addEventListener('change', () => {
+      this.sphere?.setBassPulse(this.bassPulseToggle.checked)
+    })
+
+    // Visual settings — wireframe toggle
+    this.wireframeToggle.addEventListener('change', () => {
+      this.sphere?.setWireframe(this.wireframeToggle.checked)
+    })
+
+    // Visual settings — star brightness
+    this.starsSlider.addEventListener('input', () => {
+      const v = parseInt(this.starsSlider.value) / 100
+      this.sphere?.setStarBrightness(v)
+      this.starsValue.textContent = `${this.starsSlider.value}%`
+    })
   }
 
   // Keyboard shortcuts
@@ -294,7 +403,7 @@ export class App {
           this.engine.stop()
           this.setPlayingState(false)
           this.waveform.setProgress(0)
-          this.spectrum?.stop()
+          this.sphere?.stop()
           break
       }
     })
@@ -336,27 +445,33 @@ export class App {
       this.durationEl.textContent = formatTime(this.engine.duration)
       this.currentTimeEl.textContent = '0:00'
 
-      // Create spectrum analyzer after the player is visible so the canvas has
-      // real dimensions when SpectrumAnalyzer calls resize() in its constructor
-      if (!this.spectrum && this.engine.analyserNode) {
-        this.spectrum = new SpectrumAnalyzer(
-          document.getElementById('spectrum') as HTMLCanvasElement,
-          this.engine.analyserNode,
-        )
-        // Feed live energy values into CSS variables so the aurora reacts to the audio
-        this.spectrum.onEnergyUpdate = (bass, mid, treble) => {
-          const root = document.documentElement.style
-          root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
-          root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
-          root.setProperty('--aurora-treble', String(treble.toFixed(3)))
-        }
-      }
     } catch (err) {
       console.error('Failed to decode audio:', err)
       alert('Could not decode this audio file. Please try a different format.')
       this.dropzone.querySelector('.dropzone-title')!.textContent = 'Drop your audio file here'
     } finally {
       this.dropzone.classList.remove('loading')
+    }
+
+    // Sphere init is intentionally outside the audio try-catch so that a
+    // WebGL or shader error here never surfaces as a "could not decode" alert.
+    if (!this.sphere && this.engine.analyserNode) {
+      try {
+        this.sphere = new AnomalySphere(
+          document.getElementById('anomaly') as HTMLElement,
+          this.engine.analyserNode,
+        )
+        // Feed live energy values into CSS variables so the aurora reacts to the audio
+        this.sphere.onEnergyUpdate = (bass, mid, treble) => {
+          const root = document.documentElement.style
+          root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
+          root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
+          root.setProperty('--aurora-treble', String(treble.toFixed(3)))
+          this.starOverlay.setTreble(treble)
+        }
+      } catch (sphereErr) {
+        console.error('3D sphere unavailable (WebGL may not be supported):', sphereErr)
+      }
     }
   }
 
@@ -386,18 +501,18 @@ export class App {
     if (this.engine.isPlaying) {
       this.engine.pause()
       this.setPlayingState(false)
-      this.spectrum?.stop()
+      this.sphere?.stop()
     } else {
       this.engine.play()
       this.setPlayingState(true)
-      this.spectrum?.start()
+      this.sphere?.start()
     }
   }
 
   private setPlayingState(playing: boolean): void {
-    this.iconPlay.style.display = playing ? 'none' : ''
-    this.iconPause.style.display = playing ? '' : 'none'
     this.playPauseBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play')
+    document.body.classList.toggle('is-playing', playing)
+    document.body.classList.toggle('is-paused', !playing)
   }
 
   private showPlayer(): void {

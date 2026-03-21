@@ -226,7 +226,7 @@ export class AudioEngine {
   // Parameter setters
 
   setPlaybackRate(rate: number): void {
-    const clamped = Math.max(0.25, Math.min(1.0, rate))
+    const clamped = Math.max(0.25, Math.min(2.0, rate))
     if (this._isPlaying && this.sourceNode && this.context) {
       const pos = this.currentTime
       this._startOffset = pos

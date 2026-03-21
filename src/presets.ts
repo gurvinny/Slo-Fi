@@ -43,4 +43,18 @@ export const PRESETS: PresetDefinition[] = [
       saturationDrive: 0.0,
     },
   },
+  {
+    id: 'hyperpop',
+    name: 'Hyperpop',
+    params: {
+      playbackRate: 1.15,
+      reverbMix: 0.22,
+      reverbDecay: 0.8,
+      reverbRoomSize: 0.20,
+      volume: 0.85,
+      eq: { low: 2, mid: 1, high: 6 },
+      chorus: { rate: 4.0, depth: 0.70 },
+      saturationDrive: 0.55,
+    },
+  },
 ]

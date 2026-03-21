@@ -1,7 +1,9 @@
-const UNPLAYED_COLOR = '#1e1e30'
-const PLAYED_COLOR = '#9b6dff'
-const PLAYHEAD_COLOR = 'rgba(155, 109, 255, 0.9)'
-const HOVER_COLOR = 'rgba(155, 109, 255, 0.15)'
+const UNPLAYED_COLOR = '#1a1a2c'
+
+// Reads a CSS custom property from :root so waveform colours follow the theme.
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 export class Waveform {
   private canvas: HTMLCanvasElement
@@ -51,13 +53,22 @@ export class Waveform {
 
     ctx.clearRect(0, 0, W, H)
 
+    // Read theme colours fresh each draw so switching themes is instant
+    const accent       = cssVar('--accent')       || '#9b6dff'
+    const accentBright = cssVar('--accent-bright') || '#b48aff'
+    const teal         = cssVar('--teal')          || '#00d4aa'
+
     if (data.length === 0) {
-      // Empty state placeholder bars
+      // Placeholder bars — tinted with the theme accent
       const count = 80
       const bw = W / count
+      const phGrad = ctx.createLinearGradient(0, 0, W, 0)
+      phGrad.addColorStop(0,   teal   + '33')   // 20% opacity
+      phGrad.addColorStop(0.5, accent + '44')   // 27% opacity
+      phGrad.addColorStop(1,   teal   + '33')
       for (let i = 0; i < count; i++) {
         const h = (Math.sin(i * 0.4) * 0.3 + 0.4) * cy * 0.3
-        ctx.fillStyle = '#1a1a28'
+        ctx.fillStyle = phGrad
         ctx.fillRect(i * bw + 1, cy - h, Math.max(1, bw - 2), h * 2)
       }
       return
@@ -66,34 +77,59 @@ export class Waveform {
     const bw = W / data.length
     const playheadX = progress * W
 
-    // Hover highlight
+    // Hover highlight — uses theme accent
     if (hoverX >= 0) {
-      ctx.fillStyle = HOVER_COLOR
+      const hoverGrad = ctx.createLinearGradient(0, 0, hoverX, 0)
+      hoverGrad.addColorStop(0,   teal   + '1a')   // 10%
+      hoverGrad.addColorStop(0.5, accent + '18')   // ~9%
+      hoverGrad.addColorStop(1,   teal   + '0f')   // 6%
+      ctx.fillStyle = hoverGrad
       ctx.fillRect(0, 0, hoverX, H)
     }
 
-    // Bars
+    // Played bars — gradient between the two theme accent colours
+    const playGrad = ctx.createLinearGradient(0, 0, W, 0)
+    playGrad.addColorStop(0,    teal)
+    playGrad.addColorStop(0.45, accent)
+    playGrad.addColorStop(0.75, accentBright)
+    playGrad.addColorStop(1,    teal)
+
+    // Draw all unplayed bars first (dark)
+    ctx.fillStyle = UNPLAYED_COLOR
     for (let i = 0; i < data.length; i++) {
       const x = i * bw
-      const h = Math.max(1, data[i] * cy * 0.92)
-      ctx.fillStyle = x < playheadX ? PLAYED_COLOR : UNPLAYED_COLOR
+      const h = Math.max(1, (data[i] ?? 0) * cy * 0.92)
       ctx.fillRect(x + 0.5, cy - h, Math.max(1, bw - 1), h * 2)
     }
 
-    // Playhead line
+    // Overdraw played bars with the rainbow gradient
+    ctx.fillStyle = playGrad
+    for (let i = 0; i < data.length; i++) {
+      const x = i * bw
+      if (x >= playheadX) break
+      const h = Math.max(1, (data[i] ?? 0) * cy * 0.92)
+      ctx.fillRect(x + 0.5, cy - h, Math.max(1, bw - 1), h * 2)
+    }
+
+    // Playhead line with bright glow — always matches the theme accent
     if (progress > 0 && progress < 1) {
-      ctx.strokeStyle = PLAYHEAD_COLOR
+      ctx.save()
+      ctx.shadowColor = accent
+      ctx.shadowBlur = 14
+      ctx.strokeStyle = accentBright
       ctx.lineWidth = 2
+      ctx.globalAlpha = 0.95
       ctx.beginPath()
       ctx.moveTo(playheadX, 0)
       ctx.lineTo(playheadX, H)
       ctx.stroke()
 
-      // Playhead handle
-      ctx.fillStyle = PLAYHEAD_COLOR
+      ctx.fillStyle = accentBright
+      ctx.shadowBlur = 18
       ctx.beginPath()
-      ctx.arc(playheadX, cy, 4, 0, Math.PI * 2)
+      ctx.arc(playheadX, cy, 5, 0, Math.PI * 2)
       ctx.fill()
+      ctx.restore()
     }
   }
 

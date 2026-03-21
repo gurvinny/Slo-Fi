@@ -53,6 +53,15 @@ export class AudioEngine {
   private _startContextTime = 0
   private _startOffset = 0
 
+  // Loop region
+  private _loopEnabled  = false
+  private _loopStart    = 0      // seconds
+  private _loopEnd      = 0      // seconds (0 = unset)
+  private _lastPollTime = -1     // previous poll position for cycle detection
+
+  // Inserted between sourceNode and dry/convolver split for xfade dips
+  private _loopXfadeGain: GainNode | null = null
+
   // EQ/chorus/saturation state (mirrors what EffectsChain holds internally)
   private _eq = { low: 0, mid: 0, high: 0 }
   private _chorus = { rate: 0.8, depth: 0 }
@@ -62,6 +71,7 @@ export class AudioEngine {
 
   public onEnded: (() => void) | null = null
   public onTimeUpdate: ((current: number, duration: number) => void) | null = null
+  public onLoopCycle: (() => void) | null = null
 
   // Getters
 
@@ -72,7 +82,14 @@ export class AudioEngine {
   get currentTime(): number {
     if (!this.context || !this._isPlaying) return this._startOffset
     const elapsed = this.context.currentTime - this._startContextTime
-    return Math.min(this._startOffset + elapsed * this._playbackRate, this.duration)
+    const raw = this._startOffset + elapsed * this._playbackRate
+    if (this._loopEnabled && this._loopEnd > this._loopStart) {
+      const regionLen = this._loopEnd - this._loopStart
+      if (raw >= this._loopEnd) {
+        return this._loopStart + ((raw - this._loopStart) % regionLen)
+      }
+    }
+    return Math.min(raw, this.duration)
   }
 
   get effectsChain(): EffectsChain | null { return this._effectsChain }
@@ -103,6 +120,11 @@ export class AudioEngine {
 
     this.context = new AudioContext({ latencyHint: 'interactive' })
 
+    // Crossfade gain: sits between sourceNode and the dry/wet split.
+    // Normally at 1.0; briefly dipped on loop boundaries to remove convolver artifacts.
+    this._loopXfadeGain = this.context.createGain()
+    this._loopXfadeGain.gain.value = 1
+
     // Reverb nodes
     this.convolverNode = this.context.createConvolver()
     this.dryGainNode = this.context.createGain()
@@ -113,7 +135,9 @@ export class AudioEngine {
     this.wetGainNode.gain.value = this._reverbMix
     this.masterGainNode.gain.value = this._volume
 
-    // Reverb graph: source splits into dry and wet paths, both merge at masterGain
+    // Reverb graph: source → xfadeGain → dry and wet paths, both merge at masterGain
+    this._loopXfadeGain.connect(this.dryGainNode)
+    this._loopXfadeGain.connect(this.convolverNode)
     this.dryGainNode.connect(this.masterGainNode)
     this.convolverNode.connect(this.wetGainNode)
     this.wetGainNode.connect(this.masterGainNode)
@@ -163,8 +187,18 @@ export class AudioEngine {
       (this.sourceNode as AudioBufferSourceNode & { preservesPitch: boolean }).preservesPitch = true
     }
 
-    this.sourceNode.connect(this.dryGainNode!)
-    this.sourceNode.connect(this.convolverNode!)
+    // Configure native loop before connecting if enabled
+    if (this._loopEnabled && this._loopEnd > this._loopStart) {
+      this.sourceNode.loop      = true
+      this.sourceNode.loopStart = this._loopStart
+      this.sourceNode.loopEnd   = this._loopEnd
+      // Clamp start offset into the loop region
+      if (this._startOffset < this._loopStart || this._startOffset >= this._loopEnd) {
+        this._startOffset = this._loopStart
+      }
+    }
+
+    this.sourceNode.connect(this._loopXfadeGain!)
 
     // Capture generation so that if this source is stopped early (seek,
     // pause, stop) the 'ended' event that fires from sourceNode.stop() does
@@ -175,6 +209,7 @@ export class AudioEngine {
         this._isPlaying = false
         this._startOffset = 0
         this.stopTimer()
+        this._lastPollTime = -1
         this.onEnded?.()
         this.onTimeUpdate?.(0, this.duration)
       }
@@ -199,6 +234,7 @@ export class AudioEngine {
     this.destroySource()
     this._isPlaying = false
     this._startOffset = 0
+    this._lastPollTime = -1
     this.stopTimer()
     this.onTimeUpdate?.(0, this.duration)
   }
@@ -207,6 +243,7 @@ export class AudioEngine {
     const clamped = Math.max(0, Math.min(time, this.duration))
     const wasPlaying = this._isPlaying
     this._startOffset = clamped
+    this._lastPollTime = -1
     if (wasPlaying) {
       this.play()
     } else {
@@ -299,6 +336,36 @@ export class AudioEngine {
     this.setSaturationDrive(params.saturationDrive)
   }
 
+  // Loop region control
+
+  setLoop(startSec: number, endSec: number): void {
+    const dur = this.duration
+    const start = Math.max(0, Math.min(startSec, dur))
+    const end   = Math.max(start + 0.05, Math.min(endSec, dur))
+    this._loopStart    = start
+    this._loopEnd      = end
+    this._lastPollTime = -1
+    if (this._isPlaying && this._loopEnabled) this.play()
+  }
+
+  setLoopEnabled(enabled: boolean): void {
+    this._loopEnabled  = enabled
+    this._lastPollTime = -1
+    if (this._isPlaying) {
+      if (!enabled && this._loopEnd > 0) {
+        // If current position is past loopEnd, jump back to loopStart
+        if (this.currentTime >= this._loopEnd) {
+          this._startOffset = this._loopStart
+        }
+      }
+      this.play()
+    }
+  }
+
+  getLoopState(): { enabled: boolean; start: number; end: number } {
+    return { enabled: this._loopEnabled, start: this._loopStart, end: this._loopEnd }
+  }
+
   private rebuildIR(): void {
     if (!this.convolverNode || !this.context) return
     this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
@@ -331,9 +398,30 @@ export class AudioEngine {
     this.stopTimer()
     this.timeUpdateTimer = setInterval(() => {
       if (this._isPlaying) {
-        this.onTimeUpdate?.(this.currentTime, this.duration)
+        const now = this.currentTime
+        this.onTimeUpdate?.(now, this.duration)
+
+        // Detect loop cycle: time wrapped backwards within the loop region
+        if (this._loopEnabled && this._loopEnd > this._loopStart && this._lastPollTime >= 0) {
+          if (now < this._lastPollTime - 0.1) {
+            this.onLoopCycle?.()
+            this._scheduleXfadeDip()
+          }
+        }
+        this._lastPollTime = now
       }
     }, 80)
+  }
+
+  // Brief 25 ms gain dip at a loop boundary to mask convolver click artifacts.
+  private _scheduleXfadeDip(): void {
+    if (!this.context || !this._loopXfadeGain) return
+    const t = this.context.currentTime
+    const g = this._loopXfadeGain.gain
+    g.cancelScheduledValues(t)
+    g.setValueAtTime(1, t)
+    g.linearRampToValueAtTime(0.15, t + 0.012)
+    g.linearRampToValueAtTime(1,    t + 0.025)
   }
 
   private stopTimer(): void {

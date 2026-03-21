@@ -373,6 +373,7 @@ export class AnomalySphere {
   private orbBaseScale  = 1.0
   private particleCount = 500
   private prevBass      = 0   // previous frame bass — used for transient detection
+  private _loopPulseAmount = 0  // decays each frame; set to 1 on each loop cycle
 
   // Visual fade for smooth pause/play transitions
   private visualFade = 0.4   // current rendered brightness (0-1)
@@ -611,6 +612,12 @@ export class AnomalySphere {
     this.scene.add(this.stars)
   }
 
+  // Fire once per loop cycle from App.ts to produce a slow steady pulse,
+  // distinct from the audio-reactive bass pulse.
+  public triggerLoopPulse(): void {
+    this._loopPulseAmount = 1
+  }
+
   start(): void {
     this.playing    = true
     this.targetFade = 1.0
@@ -722,9 +729,11 @@ export class AnomalySphere {
     // Bloom spikes on bass hits; capped and scaled by glow multiplier + fade
     this.bloom.strength = Math.min(0.20 + this.reverb * 0.28 + bVis * 0.32, 0.62) * this.glowMult * this.visualFade
 
-    // Mesh scale: base size + optional bass pulse
+    // Mesh scale: base size + optional bass pulse + loop cycle pulse (additive, independent)
     const pulseFactor = this.bassPulse ? bVis * 0.14 : 0
-    this.mesh.scale.setScalar(this.orbBaseScale * (1.0 + pulseFactor))
+    this._loopPulseAmount *= 0.985   // ~1.5 s decay at 60 fps
+    const loopPulseFactor  = this._loopPulseAmount * 0.08
+    this.mesh.scale.setScalar(this.orbBaseScale * (1.0 + pulseFactor + loopPulseFactor))
 
     // Rotation slows with playback speed; user-adjustable rotation speed
     const rotScale = (0.35 + this.speed * 0.65) * this.rotationSpeed

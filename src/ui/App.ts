@@ -42,12 +42,14 @@ export class App {
   private trackBpm  = document.getElementById('trackBpm')!
   private trackMeta = document.getElementById('trackMeta')!
 
-  private _baseBpm = 0
+  private _baseBpm    = 0
+  private _loopActive = false
   private currentTimeEl = document.getElementById('currentTime')!
   private durationEl = document.getElementById('duration')!
   private playPauseBtn = document.getElementById('playPauseBtn')!
   private stopBtn = document.getElementById('stopBtn')!
   private rewindBtn = document.getElementById('rewindBtn')!
+  private loopBtn   = document.getElementById('loopBtn')!
   private speedSlider = document.getElementById('speedSlider') as HTMLInputElement
   private speedValue = document.getElementById('speedValue')!
   private reverbSlider = document.getElementById('reverbSlider') as HTMLInputElement
@@ -197,6 +199,9 @@ export class App {
         this.waveform.setProgress(current / duration)
       }
     }
+    this.engine.onLoopCycle = () => {
+      this.sphere?.triggerLoopPulse()
+    }
   }
 
   private wireUI(): void {
@@ -240,6 +245,21 @@ export class App {
     this.waveform.onSeek = (ratio) => {
       this.engine.seek(ratio * this.engine.duration)
     }
+
+    // Waveform loop handle drag
+    this.waveform.onLoopChange = (start, end) => {
+      this.engine.setLoop(start * this.engine.duration, end * this.engine.duration)
+    }
+
+    // Loop toggle button
+    this.loopBtn.addEventListener('click', () => {
+      this._loopActive = !this._loopActive
+      this.engine.setLoopEnabled(this._loopActive)
+      this.waveform.setLoopEnabled(this._loopActive)
+      this.loopBtn.classList.toggle('btn-loop--active', this._loopActive)
+      this.loopBtn.setAttribute('aria-label', this._loopActive ? 'Disable loop' : 'Enable loop')
+      this.loopBtn.setAttribute('aria-pressed', String(this._loopActive))
+    })
 
     // Speed
     this.speedSlider.addEventListener('input', () => {
@@ -362,6 +382,10 @@ export class App {
           this.waveform.setProgress(0)
           this.sphere?.stop()
           break
+        case 'l':
+        case 'L':
+          this.loopBtn.click()
+          break
       }
     })
   }
@@ -387,6 +411,16 @@ export class App {
       const waveData = this.engine.getWaveform(400)
       this.waveform.setData(waveData)
       this.waveform.setProgress(0)
+
+      // Reset loop state for the new file
+      this._loopActive = false
+      this.engine.setLoop(0, this.engine.duration)
+      this.engine.setLoopEnabled(false)
+      this.waveform.setLoop(0, 1)
+      this.waveform.setLoopEnabled(false)
+      this.loopBtn.classList.remove('btn-loop--active')
+      this.loopBtn.setAttribute('aria-label', 'Enable loop')
+      this.loopBtn.setAttribute('aria-pressed', 'false')
 
       const baseName = file.name.replace(/\.[^.]+$/, '')
       this.trackName.textContent = baseName
@@ -445,6 +479,8 @@ export class App {
 
     this.notifyParamChange()
   }
+
+  private notifyParamChange(): void { /* hook point for future param-change listeners */ }
 
   private updateBpmDisplay(): void {
     if (!this._baseBpm) { this.trackBpm.textContent = ''; return }

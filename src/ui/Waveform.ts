@@ -13,6 +13,14 @@ export class Waveform {
   private hoverX = -1
   private _onSeek: ((ratio: number) => void) | null = null
 
+  // Loop region state (all in ratio 0-1)
+  private _loopStart   = 0
+  private _loopEnd     = 1
+  private _loopEnabled = false
+  private _dragTarget: 'start' | 'end' | null = null
+
+  public onLoopChange: ((start: number, end: number) => void) | null = null
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')!
@@ -33,6 +41,21 @@ export class Waveform {
   setProgress(ratio: number): void {
     this.progress = Math.max(0, Math.min(1, ratio))
     this.draw()
+  }
+
+  setLoop(start: number, end: number): void {
+    this._loopStart = Math.max(0, Math.min(1, start))
+    this._loopEnd   = Math.max(0, Math.min(1, end))
+    this.draw()
+  }
+
+  setLoopEnabled(enabled: boolean): void {
+    this._loopEnabled = enabled
+    this.draw()
+  }
+
+  getLoop(): { start: number; end: number } {
+    return { start: this._loopStart, end: this._loopEnd }
   }
 
   resize(): void {
@@ -131,6 +154,45 @@ export class Waveform {
       ctx.fill()
       ctx.restore()
     }
+
+    // Loop region: shaded fill + handle lines with knobs
+    // Always visible when markers are set (dimmer when disabled so user can still see them)
+    if (this._loopEnd > this._loopStart) {
+      const lx = this._loopStart * W
+      const rx = this._loopEnd   * W
+
+      // Shaded region
+      ctx.save()
+      ctx.globalAlpha = this._loopEnabled ? 0.18 : 0.07
+      ctx.fillStyle   = teal
+      ctx.fillRect(lx, 0, rx - lx, H)
+      ctx.restore()
+
+      // Handle lines + knobs
+      const handles: Array<['start' | 'end', number]> = [
+        ['start', this._loopStart],
+        ['end',   this._loopEnd],
+      ]
+      for (const [which, ratio] of handles) {
+        const hx = ratio * W
+        const color = which === 'start' ? accentBright : teal
+        ctx.save()
+        ctx.globalAlpha = this._loopEnabled ? 0.9 : 0.4
+        ctx.strokeStyle = color
+        ctx.lineWidth   = 2
+        ctx.beginPath()
+        ctx.moveTo(hx, 0)
+        ctx.lineTo(hx, H)
+        ctx.stroke()
+        ctx.fillStyle = color
+        ctx.shadowColor = color
+        ctx.shadowBlur  = this._loopEnabled ? 8 : 0
+        ctx.beginPath()
+        ctx.arc(hx, cy, 5, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
+    }
   }
 
   private bindEvents(): void {
@@ -142,40 +204,107 @@ export class Waveform {
       this._onSeek?.(ratio)
     }
 
+    // Returns which loop handle is within 8px of the click x, or null
+    const hitHandle = (clientX: number): 'start' | 'end' | null => {
+      const rect = this.canvas.getBoundingClientRect()
+      const x = clientX - rect.left
+      if (Math.abs(x - this._loopStart * rect.width) <= 8) return 'start'
+      if (Math.abs(x - this._loopEnd   * rect.width) <= 8) return 'end'
+      return null
+    }
+
     this.canvas.addEventListener('mousedown', (e) => {
+      const hit = hitHandle(e.clientX)
+      if (hit) {
+        this._dragTarget = hit
+        return
+      }
       dragging = true
       seekAt(e.clientX)
     })
 
     window.addEventListener('mousemove', (e) => {
-      if (!dragging) {
-        const rect = this.canvas.getBoundingClientRect()
-        this.hoverX = e.clientX - rect.left
+      // Dragging a loop handle
+      if (this._dragTarget) {
+        const rect  = this.canvas.getBoundingClientRect()
+        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+        if (this._dragTarget === 'start') {
+          this._loopStart = Math.min(ratio, this._loopEnd - 0.01)
+        } else {
+          this._loopEnd = Math.max(ratio, this._loopStart + 0.01)
+        }
+        this.onLoopChange?.(this._loopStart, this._loopEnd)
         this.draw()
         return
       }
-      seekAt(e.clientX)
+
+      // Seeking drag
+      if (dragging) {
+        seekAt(e.clientX)
+        return
+      }
+
+      // Hover highlight + cursor feedback
+      const rect = this.canvas.getBoundingClientRect()
+      this.hoverX = e.clientX - rect.left
+      const hit = hitHandle(e.clientX)
+      this.canvas.style.cursor = hit ? 'ew-resize' : 'default'
+      this.draw()
     })
 
     window.addEventListener('mouseup', () => {
+      this._dragTarget = null
       dragging = false
     })
 
     this.canvas.addEventListener('mouseleave', () => {
       this.hoverX = -1
+      this.canvas.style.cursor = 'default'
       this.draw()
+    })
+
+    // Double-click on a handle resets both markers to the full range
+    this.canvas.addEventListener('dblclick', (e) => {
+      if (hitHandle(e.clientX)) {
+        this._loopStart = 0
+        this._loopEnd   = 1
+        this.onLoopChange?.(0, 1)
+        this.draw()
+      }
     })
 
     // Touch support
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault()
+      const hit = hitHandle(e.touches[0].clientX)
+      if (hit) {
+        this._dragTarget = hit
+        return
+      }
       seekAt(e.touches[0].clientX)
     }, { passive: false })
 
     this.canvas.addEventListener('touchmove', (e) => {
       e.preventDefault()
-      seekAt(e.touches[0].clientX)
+      const touch = e.touches[0]
+      if (this._dragTarget) {
+        const rect  = this.canvas.getBoundingClientRect()
+        const ratio = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width))
+        if (this._dragTarget === 'start') {
+          this._loopStart = Math.min(ratio, this._loopEnd - 0.01)
+        } else {
+          this._loopEnd = Math.max(ratio, this._loopStart + 0.01)
+        }
+        this.onLoopChange?.(this._loopStart, this._loopEnd)
+        this.draw()
+        return
+      }
+      seekAt(touch.clientX)
     }, { passive: false })
+
+    this.canvas.addEventListener('touchend', () => {
+      this._dragTarget = null
+    })
 
     // Keyboard
     this.canvas.addEventListener('keydown', (e) => {

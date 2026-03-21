@@ -907,6 +907,17 @@ body.is-playing .btn-play {
   border-color: var(--teal);
 }
 
+.btn-loop--active {
+  color: var(--teal);
+  border-color: var(--teal);
+  background: rgba(0, 212, 170, 0.12);
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.25);
+}
+
+.btn-loop--active:hover {
+  background: rgba(0, 212, 170, 0.20);
+}
+
 .export-status {
   font-family: var(--font-mono);
   font-size: 11px;

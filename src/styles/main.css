@@ -23,6 +23,12 @@
   --radius-sm: 6px;
 
   --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+
+  /* Glass design tokens */
+  --glass-bg: rgba(12, 12, 22, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-blur: 24px;
+  --glass-glow: 0 0 0 1px rgba(155, 109, 255, 0.18), 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */
@@ -43,8 +49,50 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Aurora gradient background - animated color blobs behind the glass UI.
+   CSS variables --aurora-bass, --aurora-mid, --aurora-treble are updated
+   by SpectrumAnalyzer each frame so the aurora reacts to the live audio. */
+:root {
+  --aurora-bass:   0;
+  --aurora-mid:    0;
+  --aurora-treble: 0;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Base blobs + energy-driven intensity boost via calc() */
+  background:
+    radial-gradient(ellipse 65% 55% at 12% 42%,
+      rgba(155, 109, 255, calc(0.15 + var(--aurora-bass) * 0.45)) 0%, transparent 68%),
+    radial-gradient(ellipse 50% 45% at 88% 18%,
+      rgba(0, 212, 170, calc(0.10 + var(--aurora-treble) * 0.40)) 0%, transparent 62%),
+    radial-gradient(ellipse 55% 50% at 58% 88%,
+      rgba(110, 50, 220, calc(0.12 + var(--aurora-mid) * 0.35)) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 35% at 72% 50%,
+      rgba(0, 180, 200, calc(0 + var(--aurora-treble) * 0.25)) 0%, transparent 60%);
+  animation: aurora 22s ease-in-out infinite alternate;
+}
+
+@keyframes aurora {
+  0%   { opacity: 1;    transform: scale(1)    rotate(0deg); }
+  40%  { opacity: 0.80; transform: scale(1.05) rotate(1deg); }
+  70%  { opacity: 0.90; transform: scale(1.08) rotate(-1deg); }
+  100% { opacity: 1;    transform: scale(1.03) rotate(0.5deg); }
+}
+
+/* Disable aurora motion for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+}
+
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 #app {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -103,18 +151,21 @@ body {
 /* ── Drop zone ──────────────────────────────────────────────────────────── */
 .dropzone {
   position: relative;
-  border: 1.5px dashed var(--border-2);
+  border: 1.5px dashed var(--glass-border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
   outline: none;
 }
 
 .dropzone:hover,
 .dropzone:focus-visible {
-  border-color: var(--accent);
-  background: var(--surface-2);
+  border-color: rgba(155, 109, 255, 0.4);
+  background: rgba(20, 12, 36, 0.65);
+  box-shadow: var(--glass-glow);
 }
 
 .dropzone.drag-over {
@@ -206,8 +257,10 @@ body {
 
 /* ── Waveform ───────────────────────────────────────────────────────────── */
 .waveform-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -289,8 +342,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   padding: 4px 0;
 }
@@ -453,53 +508,159 @@ body {
   --red-dim: rgba(248, 113, 113, 0.15);
 }
 
-/* ── Preset strip ───────────────────────────────────────────────────────── */
+/* ── Preset cards (issue #11) ───────────────────────────────────────────── */
 .preset-strip {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.preset-btn {
+/* Futuristic glass card - thin accent bar on top, sharp data-readout style */
+.preset-card {
   flex: 1;
   min-width: 80px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text-dim);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  padding: 13px 12px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  position: relative;
+  border: 1px solid var(--glass-border);
+  border-top: 1px solid rgba(155, 109, 255, 0.25);
+  border-radius: var(--radius);
+  background: linear-gradient(
+    160deg,
+    rgba(20, 14, 40, 0.70) 0%,
+    rgba(10, 10, 22, 0.55) 100%
+  );
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  text-align: left;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   outline: none;
 }
 
-.preset-btn:hover {
-  border-color: var(--accent);
-  color: var(--text);
-  background: var(--surface-2);
+/* Thin neon accent bar at the top of each card */
+.preset-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(155, 109, 255, 0.6) 30%,
+    rgba(0, 212, 170, 0.4) 70%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
-.preset-btn:focus-visible {
+/* Subtle diagonal shimmer overlay */
+.preset-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    transparent 50%,
+    rgba(155, 109, 255, 0.02) 100%
+  );
+  pointer-events: none;
+}
+
+.preset-card:hover {
+  border-color: rgba(155, 109, 255, 0.35);
+  border-top-color: rgba(155, 109, 255, 0.5);
+  box-shadow:
+    0 0 16px rgba(155, 109, 255, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.preset-card:hover::before {
+  opacity: 1;
+}
+
+.preset-card:focus-visible {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-.preset-btn--active {
-  border-color: var(--accent);
-  background: var(--accent-dim);
+/* Active state: full neon glow + bright accent bar */
+.preset-card--active {
+  border-color: rgba(155, 109, 255, 0.5);
+  border-top-color: var(--accent);
+  background: linear-gradient(
+    160deg,
+    rgba(35, 18, 65, 0.80) 0%,
+    rgba(15, 10, 30, 0.65) 100%
+  );
+  box-shadow:
+    0 0 24px rgba(155, 109, 255, 0.25),
+    inset 0 1px 0 rgba(155, 109, 255, 0.2);
+}
+
+.preset-card--active::before {
+  opacity: 1;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(155, 109, 255, 0.9) 35%,
+    rgba(0, 212, 170, 0.7) 65%,
+    transparent 100%
+  );
+}
+
+/* Preset name - clean, slightly spaced */
+.preset-card-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.preset-card--active .preset-card-name {
   color: var(--accent-bright);
 }
 
-.preset-btn--dim {
+/* Thin separator line between name and hint */
+.preset-card-name + .preset-card-hint {
+  border-top: 1px solid var(--glass-border);
+  padding-top: 5px;
+  margin-top: 1px;
+  width: 100%;
+}
+
+/* Param data line - monospace readout style */
+.preset-card-hint {
+  font-size: 9px;
+  font-family: var(--font-mono);
   color: var(--text-muted);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.preset-card--active .preset-card-hint {
+  color: rgba(155, 109, 255, 0.6);
+}
+
+/* Dim variant for the Custom card when no preset is chosen */
+.preset-card--dim .preset-card-name {
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 /* ── Spectrum analyzer ──────────────────────────────────────────────────── */
 .spectrum-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   overflow: hidden;
   margin-top: -12px;
@@ -574,7 +735,9 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
-  background: var(--surface);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   user-select: none;
   list-style: none;
   outline: none;
@@ -586,7 +749,7 @@ body {
 
 .controls-section-header:hover {
   color: var(--text);
-  background: var(--surface-2);
+  background: rgba(20, 20, 40, 0.65);
 }
 
 .controls-section-header:focus-visible {
@@ -669,8 +832,10 @@ body {
 }
 
 .collab-inner {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   padding: 20px;
   display: flex;
@@ -784,4 +949,127 @@ body {
 ::selection {
   background: var(--accent-dim);
   color: var(--text);
+}
+
+/* ── Controls drawer (issue #12) ────────────────────────────────────────── */
+
+/* Header bar - only shown on desktop, hidden on mobile */
+.controls-drawer-header {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 4px;
+}
+
+.controls-drawer-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Small icon buttons in the drawer header */
+.controls-drawer-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  outline: none;
+}
+
+.controls-drawer-btn:hover {
+  border-color: rgba(155, 109, 255, 0.4);
+  color: var(--text);
+  background: var(--accent-dim);
+}
+
+.controls-drawer-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* "Controls" re-open button shown in the player when the drawer is dismissed */
+.btn-controls-show {
+  display: none;
+  padding: 7px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  align-self: center;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+.btn-controls-show:hover {
+  border-color: rgba(155, 109, 255, 0.4);
+  color: var(--text);
+  box-shadow: var(--glass-glow);
+}
+
+.btn-controls-show:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Hidden state - drawer dismissed by the close button */
+.controls-drawer--hidden {
+  display: none !important;
+}
+
+/* Desktop-only panel behavior */
+@media (min-width: 800px) {
+  /* Reveal the header bar on desktop */
+  .controls-drawer-header {
+    display: flex;
+  }
+
+  /* Floating mode: fixed overlay panel on the right side */
+  .controls-drawer--floating {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 300px;
+    z-index: 100;
+    background: rgba(10, 10, 20, 0.85);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(155, 109, 255, 0.25);
+    border-radius: var(--radius);
+    box-shadow: 0 0 0 1px rgba(155, 109, 255, 0.12), 0 20px 60px rgba(0, 0, 0, 0.6);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Remove border-radius from inner controls when inside a floating drawer */
+  .controls-drawer--floating .controls,
+  .controls-drawer--floating .controls-section {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .controls-drawer--floating .controls:last-child,
+  .controls-drawer--floating .controls-section:last-child {
+    border-bottom: none;
+  }
 }

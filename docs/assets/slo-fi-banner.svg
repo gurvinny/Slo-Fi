@@ -1,185 +1,376 @@
 <svg width="1200" height="300" viewBox="0 0 1200 300" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Background gradient -->
+
+    <!-- Deep space base -->
     <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="300" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#08080f"/>
-      <stop offset="50%" stop-color="#0c0c1a"/>
-      <stop offset="100%" stop-color="#080810"/>
+      <stop offset="0%"   stop-color="#04040e"/>
+      <stop offset="45%"  stop-color="#07071a"/>
+      <stop offset="100%" stop-color="#030310"/>
     </linearGradient>
 
-    <!-- Purple glow radial -->
-    <radialGradient id="glowLeft" cx="280" cy="150" r="260" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#9b6dff" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#9b6dff" stop-opacity="0"/>
+    <!-- Aurora bloom — purple left -->
+    <radialGradient id="aurora1" cx="280" cy="110" r="340" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#7c3aed" stop-opacity="0.22"/>
+      <stop offset="55%"  stop-color="#a855f7" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Teal glow radial -->
-    <radialGradient id="glowRight" cx="960" cy="150" r="220" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#00d4aa" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#00d4aa" stop-opacity="0"/>
+    <!-- Aurora bloom — cyan right -->
+    <radialGradient id="aurora2" cx="980" cy="160" r="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#06b6d4" stop-opacity="0.18"/>
+      <stop offset="55%"  stop-color="#0e7490" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
     </radialGradient>
+
+    <!-- Aurora bloom — magenta center hint -->
+    <radialGradient id="aurora3" cx="620" cy="150" r="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#d946ef" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#d946ef" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Title gradient — purple → pink → cyan -->
+    <linearGradient id="titleGrad" x1="228" y1="0" x2="570" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#c084fc"/>
+      <stop offset="45%"  stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+
+    <!-- Hex logo gradient — purple to cyan -->
+    <linearGradient id="hexGrad" x1="74" y1="52" x2="206" y2="198" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
 
     <!-- Waveform gradient -->
-    <linearGradient id="waveGrad" x1="700" y1="0" x2="1150" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#9b6dff" stop-opacity="0"/>
-      <stop offset="20%" stop-color="#9b6dff" stop-opacity="0.8"/>
-      <stop offset="70%" stop-color="#00d4aa" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#00d4aa" stop-opacity="0"/>
+    <linearGradient id="waveGrad" x1="650" y1="0" x2="1170" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#a855f7" stop-opacity="0"/>
+      <stop offset="12%"  stop-color="#a855f7" stop-opacity="0.95"/>
+      <stop offset="48%"  stop-color="#e879f9" stop-opacity="0.9"/>
+      <stop offset="82%"  stop-color="#06b6d4" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
     </linearGradient>
 
-    <filter id="blur4">
-      <feGaussianBlur stdDeviation="4"/>
-    </filter>
-    <filter id="blur8">
-      <feGaussianBlur stdDeviation="8"/>
-    </filter>
-    <filter id="blur2">
-      <feGaussianBlur stdDeviation="2"/>
-    </filter>
+    <!-- Waveform glow (blurred duplicate) -->
+    <linearGradient id="waveGlow" x1="650" y1="0" x2="1170" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#a855f7" stop-opacity="0"/>
+      <stop offset="12%"  stop-color="#a855f7" stop-opacity="0.4"/>
+      <stop offset="50%"  stop-color="#e879f9" stop-opacity="0.35"/>
+      <stop offset="88%"  stop-color="#06b6d4" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Bottom separator gradient -->
+    <linearGradient id="sepGrad" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#a855f7" stop-opacity="0"/>
+      <stop offset="25%"  stop-color="#a855f7" stop-opacity="0.6"/>
+      <stop offset="75%"  stop-color="#06b6d4" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Underline accent gradient -->
+    <linearGradient id="underlineGrad" x1="228" y1="0" x2="560" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#a855f7" stop-opacity="0.9"/>
+      <stop offset="60%"  stop-color="#06b6d4" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="blur3">  <feGaussianBlur stdDeviation="3"/>  </filter>
+    <filter id="blur6">  <feGaussianBlur stdDeviation="6"/>  </filter>
+    <filter id="blur10"> <feGaussianBlur stdDeviation="10"/> </filter>
+    <filter id="blur16"> <feGaussianBlur stdDeviation="16"/> </filter>
+
   </defs>
 
-  <!-- Background -->
+  <!-- ── Background ── -->
   <rect width="1200" height="300" fill="url(#bg)"/>
+  <rect width="1200" height="300" fill="url(#aurora1)"/>
+  <rect width="1200" height="300" fill="url(#aurora2)"/>
+  <rect width="1200" height="300" fill="url(#aurora3)"/>
 
-  <!-- Glow layers -->
-  <rect width="1200" height="300" fill="url(#glowLeft)"/>
-  <rect width="1200" height="300" fill="url(#glowRight)"/>
-
-  <!-- Subtle grid lines -->
-  <g stroke="#1e1e32" stroke-width="0.5" opacity="0.6">
-    <line x1="0" y1="60" x2="1200" y2="60"/>
-    <line x1="0" y1="120" x2="1200" y2="120"/>
-    <line x1="0" y1="180" x2="1200" y2="180"/>
-    <line x1="0" y1="240" x2="1200" y2="240"/>
-    <line x1="200" y1="0" x2="200" y2="300"/>
-    <line x1="400" y1="0" x2="400" y2="300"/>
-    <line x1="600" y1="0" x2="600" y2="300"/>
-    <line x1="800" y1="0" x2="800" y2="300"/>
-    <line x1="1000" y1="0" x2="1000" y2="300"/>
+  <!-- Subtle grid -->
+  <g stroke="#12122a" stroke-width="0.5" opacity="0.8">
+    <line x1="0" y1="75"  x2="1200" y2="75"/>
+    <line x1="0" y1="150" x2="1200" y2="150"/>
+    <line x1="0" y1="225" x2="1200" y2="225"/>
+    <line x1="300"  y1="0" x2="300"  y2="300" opacity="0.5"/>
+    <line x1="600"  y1="0" x2="600"  y2="300" opacity="0.5"/>
+    <line x1="900"  y1="0" x2="900"  y2="300" opacity="0.5"/>
+    <line x1="1150" y1="0" x2="1150" y2="300" opacity="0.3"/>
   </g>
 
-  <!-- ── Hexagon logo (left side) ── -->
-  <!-- Outer hex glow -->
-  <polygon points="140,60 200,93 200,159 140,192 80,159 80,93"
-    fill="none" stroke="#9b6dff" stroke-width="1.5" opacity="0.2" filter="url(#blur8)"/>
-  <!-- Outer hex -->
-  <polygon points="140,62 198,95 198,161 140,194 82,161 82,95"
-    fill="none" stroke="#9b6dff" stroke-width="1.5" opacity="0.6"/>
-  <!-- Middle hex -->
-  <polygon points="140,82 178,103 178,145 140,166 102,145 102,103"
-    fill="none" stroke="#9b6dff" stroke-width="1" opacity="0.35"/>
-  <!-- Inner hex -->
-  <polygon points="140,100 162,112 162,136 140,148 118,136 118,112"
-    fill="none" stroke="#9b6dff" stroke-width="0.8" opacity="0.2"/>
-  <!-- Center dot -->
-  <circle cx="140" cy="128" r="8" fill="#9b6dff" opacity="0.9"/>
-  <circle cx="140" cy="128" r="8" fill="#9b6dff" filter="url(#blur4)" opacity="0.6"/>
-  <!-- Connector lines from center -->
-  <line x1="140" y1="128" x2="198" y2="95" stroke="#9b6dff" stroke-width="0.5" opacity="0.2"/>
-  <line x1="140" y1="128" x2="198" y2="161" stroke="#9b6dff" stroke-width="0.5" opacity="0.2"/>
-  <line x1="140" y1="128" x2="82" y2="95" stroke="#9b6dff" stroke-width="0.5" opacity="0.2"/>
-  <line x1="140" y1="128" x2="82" y2="161" stroke="#9b6dff" stroke-width="0.5" opacity="0.2"/>
+  <!-- ── Hexagon Logo ── -->
 
-  <!-- ── Title text ── -->
-  <text x="232" y="108" font-family="'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace"
-    font-size="72" font-weight="700" fill="#e2e2f0" letter-spacing="-2">Slo-Fi</text>
+  <!-- Outermost glow ring -->
+  <polygon points="140,46 210,84 210,160 140,198 70,160 70,84"
+    fill="none" stroke="#a855f7" stroke-width="1" opacity="0.08" filter="url(#blur16)"/>
 
-  <!-- Purple underline accent -->
-  <rect x="232" y="118" width="320" height="2" rx="1" fill="url(#waveGrad)" opacity="0.5"/>
+  <!-- Ring 1 — outer -->
+  <polygon points="140,50 208,88 208,162 140,200 72,162 72,88"
+    fill="none" stroke="url(#hexGrad)" stroke-width="1.5" opacity="0.45"/>
+
+  <!-- Ring 2 -->
+  <polygon points="140,68 194,105 194,155 140,192 86,155 86,105"
+    fill="none" stroke="#a855f7" stroke-width="1" opacity="0.28"/>
+
+  <!-- Ring 3 -->
+  <polygon points="140,88 178,110 178,150 140,172 102,150 102,110"
+    fill="none" stroke="#06b6d4" stroke-width="0.8" opacity="0.22"/>
+
+  <!-- Ring 4 — inner -->
+  <polygon points="140,106 160,118 160,142 140,154 120,142 120,118"
+    fill="none" stroke="url(#hexGrad)" stroke-width="0.7" opacity="0.35"/>
+
+  <!-- Vertex glow dots -->
+  <circle cx="208" cy="88"  r="2.5" fill="#a855f7" opacity="0.7"/>
+  <circle cx="208" cy="162" r="2.5" fill="#a855f7" opacity="0.6"/>
+  <circle cx="140" cy="50"  r="2.5" fill="#c084fc" opacity="0.8"/>
+  <circle cx="140" cy="200" r="2.5" fill="#06b6d4" opacity="0.7"/>
+  <circle cx="72"  cy="88"  r="2.5" fill="#06b6d4" opacity="0.6"/>
+  <circle cx="72"  cy="162" r="2.5" fill="#06b6d4" opacity="0.6"/>
+
+  <!-- Connector spokes -->
+  <g stroke="url(#hexGrad)" stroke-width="0.5" opacity="0.2">
+    <line x1="140" y1="125" x2="208" y2="88"/>
+    <line x1="140" y1="125" x2="208" y2="162"/>
+    <line x1="140" y1="125" x2="140" y2="50"/>
+    <line x1="140" y1="125" x2="140" y2="200"/>
+    <line x1="140" y1="125" x2="72"  y2="88"/>
+    <line x1="140" y1="125" x2="72"  y2="162"/>
+  </g>
+
+  <!-- Center halo -->
+  <circle cx="140" cy="125" r="18" fill="url(#hexGrad)" fill-opacity="0.12"/>
+  <circle cx="140" cy="125" r="18" fill="url(#hexGrad)" fill-opacity="0.10" filter="url(#blur6)"/>
+
+  <!-- Center core -->
+  <circle cx="140" cy="125" r="8"  fill="#a855f7" fill-opacity="0.9"/>
+  <circle cx="140" cy="125" r="8"  fill="#a855f7" opacity="0.6" filter="url(#blur3)"/>
+  <!-- Specular highlight -->
+  <circle cx="138" cy="123" r="2.5" fill="white" opacity="0.85"/>
+
+  <!-- ── Title ── -->
+
+  <!-- Title bloom glow -->
+  <text x="228" y="114"
+    font-family="'SF Mono','Fira Code','Cascadia Code',Consolas,monospace"
+    font-size="82" font-weight="800" fill="#a855f7" opacity="0.25"
+    filter="url(#blur16)">Slo-Fi</text>
+
+  <!-- Title — gradient fill -->
+  <text x="228" y="114"
+    font-family="'SF Mono','Fira Code','Cascadia Code',Consolas,monospace"
+    font-size="82" font-weight="800" fill="url(#titleGrad)" letter-spacing="-1">Slo-Fi</text>
+
+  <!-- Thin accent underline -->
+  <rect x="228" y="122" width="330" height="1.5" rx="1" fill="url(#underlineGrad)"/>
 
   <!-- Tagline -->
-  <text x="234" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
-    font-size="16" fill="#8888a8" letter-spacing="0.1em" text-transform="uppercase">YOUR BROWSER IS THE STUDIO</text>
+  <text x="230" y="152"
+    font-family="'SF Mono','Fira Code',Consolas,monospace"
+    font-size="12.5" fill="#7c8db5" letter-spacing="0.22em">YOUR BROWSER IS THE STUDIO</text>
 
   <!-- Feature pills -->
-  <!-- Pill 1 -->
-  <rect x="234" y="170" width="118" height="26" rx="13" fill="#9b6dff" fill-opacity="0.12" stroke="#9b6dff" stroke-width="0.8" stroke-opacity="0.4"/>
-  <text x="293" y="187" font-family="-apple-system, sans-serif" font-size="11" fill="#9b6dff" text-anchor="middle" letter-spacing="0.04em">Time-Stretch</text>
+  <rect x="230" y="168" width="106" height="23" rx="11.5"
+    fill="#a855f7" fill-opacity="0.1" stroke="#a855f7" stroke-width="0.8" stroke-opacity="0.55"/>
+  <text x="283" y="184"
+    font-family="-apple-system,sans-serif" font-size="10.5"
+    fill="#c084fc" text-anchor="middle" letter-spacing="0.05em">Time-Stretch</text>
 
-  <!-- Pill 2 -->
-  <rect x="362" y="170" width="128" height="26" rx="13" fill="#00d4aa" fill-opacity="0.1" stroke="#00d4aa" stroke-width="0.8" stroke-opacity="0.4"/>
-  <text x="426" y="187" font-family="-apple-system, sans-serif" font-size="11" fill="#00d4aa" text-anchor="middle" letter-spacing="0.04em">Conv. Reverb</text>
+  <rect x="344" y="168" width="108" height="23" rx="11.5"
+    fill="#06b6d4" fill-opacity="0.1" stroke="#06b6d4" stroke-width="0.8" stroke-opacity="0.55"/>
+  <text x="398" y="184"
+    font-family="-apple-system,sans-serif" font-size="10.5"
+    fill="#22d3ee" text-anchor="middle" letter-spacing="0.05em">Conv. Reverb</text>
 
-  <!-- Pill 3 -->
-  <rect x="500" y="170" width="110" height="26" rx="13" fill="#9b6dff" fill-opacity="0.08" stroke="#9b6dff" stroke-width="0.8" stroke-opacity="0.3"/>
-  <text x="555" y="187" font-family="-apple-system, sans-serif" font-size="11" fill="#9b6dff" text-anchor="middle" letter-spacing="0.04em">Local-First</text>
+  <rect x="460" y="168" width="96" height="23" rx="11.5"
+    fill="#e879f9" fill-opacity="0.08" stroke="#e879f9" stroke-width="0.8" stroke-opacity="0.4"/>
+  <text x="508" y="184"
+    font-family="-apple-system,sans-serif" font-size="10.5"
+    fill="#e879f9" text-anchor="middle" letter-spacing="0.05em">Local-First</text>
 
-  <!-- ── Waveform visualization (right side) ── -->
-  <!-- Waveform bars — drawn as a pseudo-audio waveform -->
-  <g fill="url(#waveGrad)" opacity="0.85">
-    <!-- Each bar: x, y(top), width, height. Centered at y=150 -->
-    <!-- Bars drawn from x=700 to x=1140, width=6, gap=3 -->
-    <rect x="700" y="126" width="5" height="48"/>
-    <rect x="709" y="136" width="5" height="28"/>
-    <rect x="718" y="118" width="5" height="64"/>
-    <rect x="727" y="130" width="5" height="40"/>
-    <rect x="736" y="108" width="5" height="84"/>
-    <rect x="745" y="122" width="5" height="56"/>
-    <rect x="754" y="132" width="5" height="36"/>
-    <rect x="763" y="112" width="5" height="76"/>
-    <rect x="772" y="124" width="5" height="52"/>
-    <rect x="781" y="138" width="5" height="24"/>
-    <rect x="790" y="105" width="5" height="90"/>
-    <rect x="799" y="118" width="5" height="64"/>
-    <rect x="808" y="128" width="5" height="44"/>
-    <rect x="817" y="102" width="5" height="96"/>
-    <rect x="826" y="120" width="5" height="60"/>
-    <rect x="835" y="134" width="5" height="32"/>
-    <rect x="844" y="110" width="5" height="80"/>
-    <rect x="853" y="125" width="5" height="50"/>
-    <rect x="862" y="140" width="5" height="20"/>
-    <rect x="871" y="108" width="5" height="84"/>
-    <rect x="880" y="118" width="5" height="64"/>
-    <rect x="889" y="130" width="5" height="40"/>
-    <rect x="898" y="100" width="5" height="100"/>
-    <rect x="907" y="115" width="5" height="70"/>
-    <rect x="916" y="128" width="5" height="44"/>
-    <rect x="925" y="106" width="5" height="88"/>
-    <rect x="934" y="122" width="5" height="56"/>
-    <rect x="943" y="136" width="5" height="28"/>
-    <rect x="952" y="112" width="5" height="76"/>
-    <rect x="961" y="124" width="5" height="52"/>
-    <rect x="970" y="142" width="5" height="16"/>
-    <rect x="979" y="116" width="5" height="68"/>
-    <rect x="988" y="128" width="5" height="44"/>
-    <rect x="997" y="104" width="5" height="92"/>
-    <rect x="1006" y="119" width="5" height="62"/>
-    <rect x="1015" y="132" width="5" height="36"/>
-    <rect x="1024" y="110" width="5" height="80"/>
-    <rect x="1033" y="126" width="5" height="48"/>
-    <rect x="1042" y="138" width="5" height="24"/>
-    <rect x="1051" y="114" width="5" height="72"/>
-    <rect x="1060" y="124" width="5" height="52"/>
-    <rect x="1069" y="136" width="5" height="28"/>
-    <rect x="1078" y="108" width="5" height="84"/>
-    <rect x="1087" y="120" width="5" height="60"/>
-    <rect x="1096" y="130" width="5" height="40"/>
-    <rect x="1105" y="116" width="5" height="68"/>
-    <rect x="1114" y="128" width="5" height="44"/>
-    <rect x="1123" y="140" width="5" height="20"/>
-    <rect x="1132" y="120" width="5" height="60"/>
+  <rect x="564" y="168" width="68" height="23" rx="11.5"
+    fill="#06b6d4" fill-opacity="0.08" stroke="#06b6d4" stroke-width="0.8" stroke-opacity="0.4"/>
+  <text x="598" y="184"
+    font-family="-apple-system,sans-serif" font-size="10.5"
+    fill="#22d3ee" text-anchor="middle" letter-spacing="0.05em">MIDI</text>
+
+  <!-- GitHub handle -->
+  <text x="230" y="222"
+    font-family="'SF Mono','Fira Code',Consolas,monospace"
+    font-size="11.5" fill="#4a5568" letter-spacing="0.1em">⬡  github.com/gurvinny</text>
+
+  <!-- ── Waveform (right) ── -->
+
+  <!-- Waveform glow layer (blurred) -->
+  <g fill="url(#waveGlow)" filter="url(#blur6)" opacity="0.6">
+    <rect x="652"  y="128" width="5" height="44"/>
+    <rect x="661"  y="116" width="5" height="68"/>
+    <rect x="670"  y="132" width="5" height="36"/>
+    <rect x="679"  y="104" width="5" height="92"/>
+    <rect x="688"  y="120" width="5" height="60"/>
+    <rect x="697"  y="138" width="5" height="24"/>
+    <rect x="706"  y="108" width="5" height="84"/>
+    <rect x="715"  y="124" width="5" height="52"/>
+    <rect x="724"  y="140" width="5" height="20"/>
+    <rect x="733"  y="102" width="5" height="96"/>
+    <rect x="742"  y="118" width="5" height="64"/>
+    <rect x="751"  y="130" width="5" height="40"/>
+    <rect x="760"  y="98"  width="5" height="104"/>
+    <rect x="769"  y="114" width="5" height="72"/>
+    <rect x="778"  y="134" width="5" height="32"/>
+    <rect x="787"  y="106" width="5" height="88"/>
+    <rect x="796"  y="122" width="5" height="56"/>
+    <rect x="805"  y="138" width="5" height="24"/>
+    <rect x="814"  y="110" width="5" height="80"/>
+    <rect x="823"  y="126" width="5" height="48"/>
+    <rect x="832"  y="142" width="5" height="16"/>
+    <rect x="841"  y="114" width="5" height="72"/>
+    <rect x="850"  y="128" width="5" height="44"/>
+    <rect x="859"  y="100" width="5" height="100"/>
+    <rect x="868"  y="116" width="5" height="68"/>
+    <rect x="877"  y="132" width="5" height="36"/>
+    <rect x="886"  y="106" width="5" height="88"/>
+    <rect x="895"  y="122" width="5" height="56"/>
+    <rect x="904"  y="136" width="5" height="28"/>
+    <rect x="913"  y="108" width="5" height="84"/>
+    <rect x="922"  y="124" width="5" height="52"/>
+    <rect x="931"  y="140" width="5" height="20"/>
+    <rect x="940"  y="112" width="5" height="76"/>
+    <rect x="949"  y="126" width="5" height="48"/>
+    <rect x="958"  y="138" width="5" height="24"/>
+    <rect x="967"  y="104" width="5" height="92"/>
+    <rect x="976"  y="120" width="5" height="60"/>
+    <rect x="985"  y="132" width="5" height="36"/>
+    <rect x="994"  y="110" width="5" height="80"/>
+    <rect x="1003" y="126" width="5" height="48"/>
+    <rect x="1012" y="140" width="5" height="20"/>
+    <rect x="1021" y="114" width="5" height="72"/>
+    <rect x="1030" y="128" width="5" height="44"/>
+    <rect x="1039" y="102" width="5" height="96"/>
+    <rect x="1048" y="118" width="5" height="64"/>
+    <rect x="1057" y="130" width="5" height="40"/>
+    <rect x="1066" y="108" width="5" height="84"/>
+    <rect x="1075" y="124" width="5" height="52"/>
+    <rect x="1084" y="136" width="5" height="28"/>
+    <rect x="1093" y="116" width="5" height="68"/>
+    <rect x="1102" y="128" width="5" height="44"/>
+    <rect x="1111" y="140" width="5" height="20"/>
+    <rect x="1120" y="120" width="5" height="60"/>
+    <rect x="1129" y="132" width="5" height="36"/>
+    <rect x="1138" y="138" width="5" height="24"/>
+    <rect x="1147" y="122" width="5" height="56"/>
+    <rect x="1156" y="128" width="5" height="44"/>
   </g>
 
-  <!-- Playhead line on waveform -->
-  <line x1="870" y1="90" x2="870" y2="210" stroke="#9b6dff" stroke-width="2" opacity="0.9"/>
-  <circle cx="870" cy="150" r="5" fill="#9b6dff"/>
-  <circle cx="870" cy="150" r="5" fill="#9b6dff" filter="url(#blur4)" opacity="0.7"/>
+  <!-- Waveform crisp layer -->
+  <g fill="url(#waveGrad)">
+    <rect x="652"  y="128" width="5" height="44"/>
+    <rect x="661"  y="116" width="5" height="68"/>
+    <rect x="670"  y="132" width="5" height="36"/>
+    <rect x="679"  y="104" width="5" height="92"/>
+    <rect x="688"  y="120" width="5" height="60"/>
+    <rect x="697"  y="138" width="5" height="24"/>
+    <rect x="706"  y="108" width="5" height="84"/>
+    <rect x="715"  y="124" width="5" height="52"/>
+    <rect x="724"  y="140" width="5" height="20"/>
+    <rect x="733"  y="102" width="5" height="96"/>
+    <rect x="742"  y="118" width="5" height="64"/>
+    <rect x="751"  y="130" width="5" height="40"/>
+    <rect x="760"  y="98"  width="5" height="104"/>
+    <rect x="769"  y="114" width="5" height="72"/>
+    <rect x="778"  y="134" width="5" height="32"/>
+    <rect x="787"  y="106" width="5" height="88"/>
+    <rect x="796"  y="122" width="5" height="56"/>
+    <rect x="805"  y="138" width="5" height="24"/>
+    <rect x="814"  y="110" width="5" height="80"/>
+    <rect x="823"  y="126" width="5" height="48"/>
+    <rect x="832"  y="142" width="5" height="16"/>
+    <rect x="841"  y="114" width="5" height="72"/>
+    <rect x="850"  y="128" width="5" height="44"/>
+    <rect x="859"  y="100" width="5" height="100"/>
+    <rect x="868"  y="116" width="5" height="68"/>
+    <rect x="877"  y="132" width="5" height="36"/>
+    <rect x="886"  y="106" width="5" height="88"/>
+    <rect x="895"  y="122" width="5" height="56"/>
+    <rect x="904"  y="136" width="5" height="28"/>
+    <rect x="913"  y="108" width="5" height="84"/>
+    <rect x="922"  y="124" width="5" height="52"/>
+    <rect x="931"  y="140" width="5" height="20"/>
+    <rect x="940"  y="112" width="5" height="76"/>
+    <rect x="949"  y="126" width="5" height="48"/>
+    <rect x="958"  y="138" width="5" height="24"/>
+    <rect x="967"  y="104" width="5" height="92"/>
+    <rect x="976"  y="120" width="5" height="60"/>
+    <rect x="985"  y="132" width="5" height="36"/>
+    <rect x="994"  y="110" width="5" height="80"/>
+    <rect x="1003" y="126" width="5" height="48"/>
+    <rect x="1012" y="140" width="5" height="20"/>
+    <rect x="1021" y="114" width="5" height="72"/>
+    <rect x="1030" y="128" width="5" height="44"/>
+    <rect x="1039" y="102" width="5" height="96"/>
+    <rect x="1048" y="118" width="5" height="64"/>
+    <rect x="1057" y="130" width="5" height="40"/>
+    <rect x="1066" y="108" width="5" height="84"/>
+    <rect x="1075" y="124" width="5" height="52"/>
+    <rect x="1084" y="136" width="5" height="28"/>
+    <rect x="1093" y="116" width="5" height="68"/>
+    <rect x="1102" y="128" width="5" height="44"/>
+    <rect x="1111" y="140" width="5" height="20"/>
+    <rect x="1120" y="120" width="5" height="60"/>
+    <rect x="1129" y="132" width="5" height="36"/>
+    <rect x="1138" y="138" width="5" height="24"/>
+    <rect x="1147" y="122" width="5" height="56"/>
+    <rect x="1156" y="128" width="5" height="44"/>
+  </g>
 
-  <!-- Waveform played portion overlay (dim the left of playhead) -->
-  <rect x="700" y="90" width="170" height="120" fill="#9b6dff" opacity="0.06"/>
+  <!-- Played region tint -->
+  <rect x="652" y="88" width="216" height="124" fill="#a855f7" opacity="0.04"/>
 
-  <!-- Bottom privacy note -->
-  <text x="600" y="268" font-family="-apple-system, sans-serif" font-size="11"
-    fill="#44445a" text-anchor="middle" letter-spacing="0.06em">
+  <!-- Playhead glow -->
+  <line x1="868" y1="86" x2="868" y2="214"
+    stroke="#e879f9" stroke-width="8" opacity="0.12" filter="url(#blur6)"/>
+  <!-- Playhead line -->
+  <line x1="868" y1="86" x2="868" y2="214"
+    stroke="#e879f9" stroke-width="1.5" opacity="0.95"/>
+  <!-- Playhead head ring -->
+  <circle cx="868" cy="150" r="9"  fill="none" stroke="#e879f9" stroke-width="1" opacity="0.4"/>
+  <circle cx="868" cy="150" r="5"  fill="#e879f9"/>
+  <circle cx="868" cy="150" r="5"  fill="#e879f9" filter="url(#blur3)" opacity="0.8"/>
+  <circle cx="867" cy="149" r="2"  fill="white" opacity="0.7"/>
+
+  <!-- ── Bottom bar ── -->
+  <line x1="0" y1="272" x2="1200" y2="272" stroke="url(#sepGrad)" stroke-width="0.8"/>
+
+  <text x="600" y="288"
+    font-family="'SF Mono','Fira Code',Consolas,monospace" font-size="10"
+    fill="#2d3554" text-anchor="middle" letter-spacing="0.14em">
     🔒  ALL AUDIO STAYS ON YOUR DEVICE  ·  ZERO UPLOADS  ·  ZERO TRACKING
   </text>
 
-  <!-- Bottom border line -->
-  <line x1="0" y1="280" x2="1200" y2="280" stroke="#1e1e32" stroke-width="0.5"/>
+  <!-- ── Corner brackets ── -->
+  <!-- Top-left -->
+  <path d="M 0 18 L 0 0 L 18 0"   stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <circle cx="0"    cy="0"   r="2" fill="#a855f7" opacity="0.7"/>
+  <!-- Top-right -->
+  <path d="M 1182 0 L 1200 0 L 1200 18"  stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <circle cx="1200" cy="0"   r="2" fill="#06b6d4" opacity="0.7"/>
+  <!-- Bottom-left -->
+  <path d="M 0 282 L 0 300 L 18 300"    stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <circle cx="0"    cy="300" r="2" fill="#a855f7" opacity="0.7"/>
+  <!-- Bottom-right -->
+  <path d="M 1182 300 L 1200 300 L 1200 282" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <circle cx="1200" cy="300" r="2" fill="#06b6d4" opacity="0.7"/>
 
-  <!-- Corner accent marks -->
-  <path d="M 0 0 L 40 0 L 0 40" fill="none" stroke="#9b6dff" stroke-width="1" opacity="0.3"/>
-  <path d="M 1200 0 L 1160 0 L 1200 40" fill="none" stroke="#00d4aa" stroke-width="1" opacity="0.3"/>
-  <path d="M 0 300 L 40 300 L 0 260" fill="none" stroke="#9b6dff" stroke-width="1" opacity="0.3"/>
-  <path d="M 1200 300 L 1160 300 L 1200 260" fill="none" stroke="#00d4aa" stroke-width="1" opacity="0.3"/>
+  <!-- ── Scattered particles ── -->
+  <circle cx="630" cy="38"  r="1.5" fill="#a855f7" opacity="0.45"/>
+  <circle cx="648" cy="62"  r="1"   fill="#06b6d4" opacity="0.35"/>
+  <circle cx="614" cy="82"  r="1"   fill="#e879f9" opacity="0.3"/>
+  <circle cx="620" cy="248" r="1.5" fill="#06b6d4" opacity="0.3"/>
+  <circle cx="1172" cy="55"  r="1.5" fill="#06b6d4" opacity="0.4"/>
+  <circle cx="1185" cy="110" r="1"   fill="#a855f7" opacity="0.3"/>
+  <circle cx="1165" cy="210" r="1.5" fill="#06b6d4" opacity="0.35"/>
+  <circle cx="42"   cy="248" r="1.5" fill="#a855f7" opacity="0.3"/>
+  <circle cx="28"   cy="58"  r="1"   fill="#06b6d4" opacity="0.25"/>
+
 </svg>

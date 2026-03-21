@@ -1,0 +1,12 @@
+{
+  "name": "slo-fi-signaling",
+  "version": "1.0.0",
+  "description": "WebSocket signaling server for Slo-Fi collaborative sessions",
+  "main": "signaling.js",
+  "scripts": {
+    "start": "node signaling.js"
+  },
+  "dependencies": {
+    "ws": "^8.0.0"
+  }
+}

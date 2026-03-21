@@ -1,13 +1,42 @@
+import { EffectsChain } from './EffectsChain'
+import type { AudioParams } from '../types'
+
+// Builds an exponential-decay noise IR that models room acoustics.
+// Extracted to module scope so Exporter.ts can use it without importing AudioEngine.
+export function buildIR(ctx: BaseAudioContext, decay: number, size: number): AudioBuffer {
+  const sr = ctx.sampleRate
+  const len = Math.floor(sr * Math.max(0.1, decay))
+  const ir = ctx.createBuffer(2, len, sr)
+  const decayRate = 3.0 / (decay * (0.15 + size * 0.85))
+
+  for (let ch = 0; ch < 2; ch++) {
+    const data = ir.getChannelData(ch)
+    for (let i = 0; i < len; i++) {
+      const t = i / sr
+      const envelope = Math.exp(-t * decayRate)
+      data[i] = (Math.random() * 2 - 1) * envelope
+    }
+  }
+
+  return ir
+}
+
 export class AudioEngine {
   private context: AudioContext | null = null
   private buffer: AudioBuffer | null = null
   private sourceNode: AudioBufferSourceNode | null = null
 
-  // Graph nodes
+  // Core graph nodes
   private convolverNode: ConvolverNode | null = null
   private dryGainNode: GainNode | null = null
   private wetGainNode: GainNode | null = null
   private masterGainNode: GainNode | null = null
+
+  // Effects chain (EQ, chorus, saturation) inserted after masterGain
+  private _effectsChain: EffectsChain | null = null
+
+  // Analyser tapped from effects chain output for the spectrum visualizer
+  private _analyserNode: AnalyserNode | null = null
 
   // State
   private _playbackRate = 1.0
@@ -19,24 +48,21 @@ export class AudioEngine {
   private _startContextTime = 0
   private _startOffset = 0
 
+  // EQ/chorus/saturation state (mirrors what EffectsChain holds internally)
+  private _eq = { low: 0, mid: 0, high: 0 }
+  private _chorus = { rate: 0.8, depth: 0 }
+  private _saturationDrive = 0
+
   private timeUpdateTimer: ReturnType<typeof setInterval> | null = null
 
   public onEnded: (() => void) | null = null
   public onTimeUpdate: ((current: number, duration: number) => void) | null = null
 
-  // ── Getters ────────────────────────────────────────────────────────────────
+  // Getters
 
-  get isPlaying() {
-    return this._isPlaying
-  }
-
-  get hasBuffer() {
-    return this.buffer !== null
-  }
-
-  get duration() {
-    return this.buffer?.duration ?? 0
-  }
+  get isPlaying() { return this._isPlaying }
+  get hasBuffer() { return this.buffer !== null }
+  get duration() { return this.buffer?.duration ?? 0 }
 
   get currentTime(): number {
     if (!this.context || !this._isPlaying) return this._startOffset
@@ -44,7 +70,25 @@ export class AudioEngine {
     return Math.min(this._startOffset + elapsed * this._playbackRate, this.duration)
   }
 
-  // ── Setup ──────────────────────────────────────────────────────────────────
+  get effectsChain(): EffectsChain | null { return this._effectsChain }
+  get analyserNode(): AnalyserNode | null { return this._analyserNode }
+
+  getBuffer(): AudioBuffer | null { return this.buffer }
+
+  getParams(): AudioParams {
+    return {
+      playbackRate: this._playbackRate,
+      reverbMix: this._reverbMix,
+      reverbDecay: this._reverbDecay,
+      reverbRoomSize: this._reverbRoomSize,
+      volume: this._volume,
+      eq: { ...this._eq },
+      chorus: { ...this._chorus },
+      saturationDrive: this._saturationDrive,
+    }
+  }
+
+  // Setup
 
   private async ensureContext(): Promise<void> {
     if (this.context) {
@@ -53,6 +97,8 @@ export class AudioEngine {
     }
 
     this.context = new AudioContext({ latencyHint: 'interactive' })
+
+    // Reverb nodes
     this.convolverNode = this.context.createConvolver()
     this.dryGainNode = this.context.createGain()
     this.wetGainNode = this.context.createGain()
@@ -62,20 +108,34 @@ export class AudioEngine {
     this.wetGainNode.gain.value = this._reverbMix
     this.masterGainNode.gain.value = this._volume
 
-    // Signal graph:
-    // source ─┬─→ dryGain ─────────────┐
-    //          └─→ convolver → wetGain ─┴─→ masterGain → destination
+    // Reverb graph: source splits into dry and wet paths, both merge at masterGain
     this.dryGainNode.connect(this.masterGainNode)
     this.convolverNode.connect(this.wetGainNode)
     this.wetGainNode.connect(this.masterGainNode)
-    this.masterGainNode.connect(this.context.destination)
 
-    this.convolverNode.buffer = this.buildIR(this._reverbDecay, this._reverbRoomSize)
+    this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
+
+    // Effects chain sits between masterGain and destination
+    this._effectsChain = new EffectsChain()
+    const chainOutput = this._effectsChain.init(this.context, this.masterGainNode)
+
+    // Analyser taps the fully processed signal
+    this._analyserNode = this.context.createAnalyser()
+    this._analyserNode.fftSize = 2048
+    this._analyserNode.smoothingTimeConstant = 0.8
+    this._analyserNode.minDecibels = -90
+    this._analyserNode.maxDecibels = -10
+    chainOutput.connect(this._analyserNode)
+    this._analyserNode.connect(this.context.destination)
   }
 
-  // ── File loading ───────────────────────────────────────────────────────────
+  // File loading
 
   async loadFile(file: File): Promise<void> {
+    // Basic security checks before handing to AudioContext
+    const maxBytes = 300 * 1024 * 1024  // 300 MB cap
+    if (file.size > maxBytes) throw new Error('File is too large (max 300 MB)')
+
     await this.ensureContext()
     this.stop()
     const arrayBuffer = await file.arrayBuffer()
@@ -83,7 +143,7 @@ export class AudioEngine {
     this._startOffset = 0
   }
 
-  // ── Transport ──────────────────────────────────────────────────────────────
+  // Transport
 
   async play(): Promise<void> {
     if (!this.buffer) return
@@ -94,7 +154,6 @@ export class AudioEngine {
     this.sourceNode.buffer = this.buffer
     this.sourceNode.playbackRate.value = this._playbackRate
 
-    // Use preservesPitch where available (Chromium 86+)
     if ('preservesPitch' in this.sourceNode) {
       (this.sourceNode as AudioBufferSourceNode & { preservesPitch: boolean }).preservesPitch = true
     }
@@ -149,22 +208,17 @@ export class AudioEngine {
   private destroySource(): void {
     if (this.sourceNode) {
       this.sourceNode.onended = null
-      try {
-        this.sourceNode.stop(0)
-      } catch {
-        // Already stopped
-      }
+      try { this.sourceNode.stop(0) } catch { /* already stopped */ }
       this.sourceNode.disconnect()
       this.sourceNode = null
     }
   }
 
-  // ── Parameters ─────────────────────────────────────────────────────────────
+  // Parameter setters
 
   setPlaybackRate(rate: number): void {
     const clamped = Math.max(0.25, Math.min(1.0, rate))
     if (this._isPlaying && this.sourceNode && this.context) {
-      // Snapshot current position so formula stays correct after rate change
       const pos = this.currentTime
       this._startOffset = pos
       this._startContextTime = this.context.currentTime
@@ -201,37 +255,47 @@ export class AudioEngine {
     this.rebuildIR()
   }
 
+  setEQ(band: 'low' | 'mid' | 'high', db: number): void {
+    this._eq[band] = Math.max(-12, Math.min(12, db))
+    this._effectsChain?.setEQBand(band, this._eq[band])
+  }
+
+  setChorusRate(hz: number): void {
+    this._chorus.rate = Math.max(0.1, Math.min(5, hz))
+    this._effectsChain?.setChorusRate(this._chorus.rate)
+  }
+
+  setChorusDepth(depth: number): void {
+    this._chorus.depth = Math.max(0, Math.min(1, depth))
+    this._effectsChain?.setChorusDepth(this._chorus.depth)
+  }
+
+  setSaturationDrive(drive: number): void {
+    this._saturationDrive = Math.max(0, Math.min(1, drive))
+    this._effectsChain?.setSaturationDrive(this._saturationDrive)
+  }
+
+  // Applies a full preset in one shot. Used by PresetController and collab sync.
+  applyPreset(params: AudioParams): void {
+    this.setPlaybackRate(params.playbackRate)
+    this.setReverbMix(params.reverbMix)
+    this.setReverbDecay(params.reverbDecay)
+    this.setReverbRoomSize(params.reverbRoomSize)
+    this.setVolume(params.volume)
+    this.setEQ('low', params.eq.low)
+    this.setEQ('mid', params.eq.mid)
+    this.setEQ('high', params.eq.high)
+    this.setChorusRate(params.chorus.rate)
+    this.setChorusDepth(params.chorus.depth)
+    this.setSaturationDrive(params.saturationDrive)
+  }
+
   private rebuildIR(): void {
     if (!this.convolverNode || !this.context) return
-    this.convolverNode.buffer = this.buildIR(this._reverbDecay, this._reverbRoomSize)
+    this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
   }
 
-  // ── Synthetic impulse response generation ──────────────────────────────────
-  //
-  // Creates a stereo exponential-decay noise buffer that models room acoustics.
-  // decay   — reverb tail length in seconds
-  // size    — affects the rate of decay (larger = longer, denser reflections)
-
-  private buildIR(decay: number, size: number): AudioBuffer {
-    const ctx = this.context!
-    const sr = ctx.sampleRate
-    const len = Math.floor(sr * Math.max(0.1, decay))
-    const ir = ctx.createBuffer(2, len, sr)
-    const decayRate = 3.0 / (decay * (0.15 + size * 0.85))
-
-    for (let ch = 0; ch < 2; ch++) {
-      const data = ir.getChannelData(ch)
-      for (let i = 0; i < len; i++) {
-        const t = i / sr
-        const envelope = Math.exp(-t * decayRate)
-        data[i] = (Math.random() * 2 - 1) * envelope
-      }
-    }
-
-    return ir
-  }
-
-  // ── Waveform data ──────────────────────────────────────────────────────────
+  // Waveform data for the canvas renderer
 
   getWaveform(samples: number): Float32Array {
     if (!this.buffer) return new Float32Array(samples)
@@ -252,7 +316,7 @@ export class AudioEngine {
     return waveform
   }
 
-  // ── Timer ──────────────────────────────────────────────────────────────────
+  // Timer
 
   private startTimer(): void {
     this.stopTimer()

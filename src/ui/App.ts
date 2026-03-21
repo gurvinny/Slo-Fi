@@ -1,5 +1,13 @@
 import { AudioEngine } from '../audio/AudioEngine'
 import { Waveform } from './Waveform'
+import { SpectrumAnalyzer } from './SpectrumAnalyzer'
+import { PresetController } from './PresetController'
+import { EffectsController } from './EffectsController'
+import { ExportController } from './ExportController'
+import { CollabController } from './CollabController'
+import { MidiController } from '../audio/MidiController'
+import { MidiStatusIndicator } from './MidiStatusIndicator'
+import type { AudioParams } from '../types'
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -15,8 +23,17 @@ function formatBytes(bytes: number): string {
 export class App {
   private engine = new AudioEngine()
   private waveform: Waveform
+  private spectrum: SpectrumAnalyzer | null = null
 
-  // DOM refs
+  // Controllers
+  private presets: PresetController
+  private effects: EffectsController
+  private exporter: ExportController
+  private collab: CollabController
+  private midi = new MidiController()
+  private midiIndicator = new MidiStatusIndicator()
+
+  // Core DOM refs
   private dropzone = document.getElementById('dropzone')!
   private fileInput = document.getElementById('fileInput') as HTMLInputElement
   private player = document.getElementById('player')!
@@ -42,17 +59,86 @@ export class App {
 
   constructor() {
     this.waveform = new Waveform(document.getElementById('waveform') as HTMLCanvasElement)
+
+    // Controllers are instantiated here; DOM elements must exist before this runs
+    this.presets = new PresetController(this.engine)
+    this.effects = new EffectsController(this.engine)
+    this.exporter = new ExportController(this.engine)
+    this.collab = new CollabController(this.engine)
+
     this.wireEngineCallbacks()
     this.wireUI()
     this.wireKeyboard()
+    this.wireCrossController()
+    this.initMidi()
   }
 
-  // ── Engine callbacks ───────────────────────────────────────────────────────
+  // Cross-controller wiring (presets syncing sliders, etc.)
+  private wireCrossController(): void {
+    this.presets.onPresetApplied = (params: AudioParams) => {
+      this.syncSlidersToParams(params)
+      this.effects.syncToParams(params)
+    }
+
+    this.effects.onChanged = () => {
+      this.presets.clearActive()
+      this.notifyParamChange()
+    }
+  }
+
+  // Broadcasts current params to the collab session if one is active
+  private notifyParamChange(): void {
+    this.collab.broadcast(this.engine.getParams())
+  }
+
+  private async initMidi(): Promise<void> {
+    this.midi.onStatusChange = (status) => this.midiIndicator.update(status)
+
+    const available = await this.midi.init()
+    if (!available) return
+
+    // Wire default CC mappings (0-127 normalized to 0-1 by MidiController)
+    this.midi.bindCC(7, (v) => {
+      // CC 7 = Volume
+      const vol = v
+      this.engine.setVolume(vol)
+      this.volumeSlider.value = String(Math.round(vol * 100))
+      this.volumeValue.textContent = `${Math.round(vol * 100)}%`
+      this.notifyParamChange()
+    })
+
+    this.midi.bindCC(74, (v) => {
+      // CC 74 = Playback rate (maps 0-1 to 0.25-1.0)
+      const rate = 0.25 + v * 0.75
+      this.engine.setPlaybackRate(rate)
+      this.speedSlider.value = String(Math.round(rate * 100))
+      this.speedValue.textContent = `${rate.toFixed(2)}x`
+      this.presets.clearActive()
+      this.notifyParamChange()
+    })
+
+    this.midi.bindCC(91, (v) => {
+      // CC 91 = Reverb send
+      this.engine.setReverbMix(v)
+      this.reverbSlider.value = String(Math.round(v * 100))
+      this.reverbValue.textContent = `${Math.round(v * 100)}%`
+      this.notifyParamChange()
+    })
+
+    this.midi.bindCC(93, (v) => {
+      // CC 93 = Chorus depth
+      this.engine.setChorusDepth(v)
+      this.notifyParamChange()
+    })
+  }
+
+  // Engine callbacks
 
   private wireEngineCallbacks(): void {
     this.engine.onEnded = () => {
       this.setPlayingState(false)
       this.waveform.setProgress(0)
+      this.spectrum?.stop()
     }
 
     this.engine.onTimeUpdate = (current, duration) => {
@@ -63,16 +149,14 @@ export class App {
     }
   }
 
-  // ── UI wiring ──────────────────────────────────────────────────────────────
+  // Core UI wiring
 
   private wireUI(): void {
-    // Drop zone — click
+    // Drop zone
     this.dropzone.addEventListener('click', () => this.fileInput.click())
     this.dropzone.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') this.fileInput.click()
     })
-
-    // Drop zone — drag & drop
     this.dropzone.addEventListener('dragover', (e) => {
       e.preventDefault()
       this.dropzone.classList.add('drag-over')
@@ -86,8 +170,6 @@ export class App {
       const file = e.dataTransfer?.files[0]
       if (file) this.loadFile(file)
     })
-
-    // File input
     this.fileInput.addEventListener('change', () => {
       const file = this.fileInput.files?.[0]
       if (file) this.loadFile(file)
@@ -100,6 +182,7 @@ export class App {
       this.setPlayingState(false)
       this.waveform.setProgress(0)
       this.currentTimeEl.textContent = '0:00'
+      this.spectrum?.stop()
     })
     this.rewindBtn.addEventListener('click', () => {
       this.engine.seek(Math.max(0, this.engine.currentTime - 5))
@@ -114,7 +197,9 @@ export class App {
     this.speedSlider.addEventListener('input', () => {
       const rate = parseInt(this.speedSlider.value) / 100
       this.engine.setPlaybackRate(rate)
-      this.speedValue.textContent = `${rate.toFixed(2)}×`
+      this.speedValue.textContent = `${rate.toFixed(2)}x`
+      this.presets.clearActive()
+      this.notifyParamChange()
     })
 
     // Reverb mix
@@ -122,6 +207,8 @@ export class App {
       const mix = parseInt(this.reverbSlider.value) / 100
       this.engine.setReverbMix(mix)
       this.reverbValue.textContent = `${this.reverbSlider.value}%`
+      this.presets.clearActive()
+      this.notifyParamChange()
     })
 
     // Decay
@@ -129,6 +216,8 @@ export class App {
       const decay = parseInt(this.decaySlider.value) / 10
       this.engine.setReverbDecay(decay)
       this.decayValue.textContent = `${decay.toFixed(1)}s`
+      this.presets.clearActive()
+      this.notifyParamChange()
     })
 
     // Room size
@@ -136,6 +225,8 @@ export class App {
       const size = parseInt(this.roomSlider.value) / 100
       this.engine.setReverbRoomSize(size)
       this.roomValue.textContent = `${this.roomSlider.value}%`
+      this.presets.clearActive()
+      this.notifyParamChange()
     })
 
     // Volume
@@ -143,10 +234,11 @@ export class App {
       const vol = parseInt(this.volumeSlider.value) / 100
       this.engine.setVolume(vol)
       this.volumeValue.textContent = `${this.volumeSlider.value}%`
+      this.notifyParamChange()
     })
   }
 
-  // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+  // Keyboard shortcuts
 
   private wireKeyboard(): void {
     document.addEventListener('keydown', (e) => {
@@ -172,16 +264,23 @@ export class App {
           this.engine.stop()
           this.setPlayingState(false)
           this.waveform.setProgress(0)
+          this.spectrum?.stop()
           break
       }
     })
   }
 
-  // ── File loading ───────────────────────────────────────────────────────────
+  // File loading
 
   private async loadFile(file: File): Promise<void> {
+    // Validate MIME type before decoding
+    if (file.type && !file.type.startsWith('audio/')) {
+      alert('Please drop an audio file.')
+      return
+    }
+
     this.dropzone.classList.add('loading')
-    this.dropzone.querySelector('.dropzone-title')!.textContent = 'Decoding audio…'
+    this.dropzone.querySelector('.dropzone-title')!.textContent = 'Decoding audio...'
 
     try {
       await this.engine.loadFile(file)
@@ -190,10 +289,22 @@ export class App {
       this.waveform.setData(waveData)
       this.waveform.setProgress(0)
 
-      this.trackName.textContent = file.name.replace(/\.[^.]+$/, '')
+      // Strip extension for display and export filename
+      const baseName = file.name.replace(/\.[^.]+$/, '')
+      this.trackName.textContent = baseName
+      this.exporter.trackName = baseName
+
       this.trackMeta.textContent = `${formatTime(this.engine.duration)} · ${formatBytes(file.size)} · ${file.type || 'audio'}`
       this.durationEl.textContent = formatTime(this.engine.duration)
       this.currentTimeEl.textContent = '0:00'
+
+      // Set up spectrum analyzer now that the audio context exists
+      if (!this.spectrum && this.engine.analyserNode) {
+        this.spectrum = new SpectrumAnalyzer(
+          document.getElementById('spectrum') as HTMLCanvasElement,
+          this.engine.analyserNode,
+        )
+      }
 
       this.showPlayer()
       this.setPlayingState(false)
@@ -206,15 +317,37 @@ export class App {
     }
   }
 
-  // ── State helpers ──────────────────────────────────────────────────────────
+  // Syncs the core slider positions and badges after a preset is applied
+  private syncSlidersToParams(params: AudioParams): void {
+    this.speedSlider.value = String(Math.round(params.playbackRate * 100))
+    this.speedValue.textContent = `${params.playbackRate.toFixed(2)}x`
+
+    this.reverbSlider.value = String(Math.round(params.reverbMix * 100))
+    this.reverbValue.textContent = `${Math.round(params.reverbMix * 100)}%`
+
+    this.decaySlider.value = String(Math.round(params.reverbDecay * 10))
+    this.decayValue.textContent = `${params.reverbDecay.toFixed(1)}s`
+
+    this.roomSlider.value = String(Math.round(params.reverbRoomSize * 100))
+    this.roomValue.textContent = `${Math.round(params.reverbRoomSize * 100)}%`
+
+    this.volumeSlider.value = String(Math.round(params.volume * 100))
+    this.volumeValue.textContent = `${Math.round(params.volume * 100)}%`
+
+    this.notifyParamChange()
+  }
+
+  // State helpers
 
   private togglePlayPause(): void {
     if (this.engine.isPlaying) {
       this.engine.pause()
       this.setPlayingState(false)
+      this.spectrum?.stop()
     } else {
       this.engine.play()
       this.setPlayingState(true)
+      this.spectrum?.start()
     }
   }
 

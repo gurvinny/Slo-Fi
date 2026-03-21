@@ -443,6 +443,337 @@ body {
   }
 }
 
+/* ── New design tokens for effects chain ───────────────────────────────── */
+:root {
+  --green: #4ade80;
+  --green-dim: rgba(74, 222, 128, 0.15);
+  --orange: #fb923c;
+  --orange-dim: rgba(251, 146, 60, 0.15);
+  --red: #f87171;
+  --red-dim: rgba(248, 113, 113, 0.15);
+}
+
+/* ── Preset strip ───────────────────────────────────────────────────────── */
+.preset-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  outline: none;
+}
+
+.preset-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.preset-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.preset-btn--active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+
+.preset-btn--dim {
+  color: var(--text-muted);
+}
+
+/* ── Spectrum analyzer ──────────────────────────────────────────────────── */
+.spectrum-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: -12px;
+}
+
+.spectrum {
+  display: block;
+  width: 100%;
+  height: 56px;
+  cursor: default;
+}
+
+/* ── MIDI status dot ────────────────────────────────────────────────────── */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  cursor: default;
+  transition: background 0.3s;
+}
+
+.status-dot--connected {
+  background: var(--teal);
+  box-shadow: 0 0 6px var(--teal-dim);
+}
+
+.status-dot--disconnected {
+  background: var(--orange);
+}
+
+.status-dot--unavailable {
+  background: var(--text-muted);
+}
+
+/* ── Export button + status ─────────────────────────────────────────────── */
+.btn-export {
+  color: var(--teal);
+  border-color: var(--teal-dim);
+}
+
+.btn-export:hover {
+  background: var(--teal-dim);
+  color: var(--teal);
+  border-color: var(--teal);
+}
+
+.export-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 60px;
+}
+
+/* ── Effects chain section ──────────────────────────────────────────────── */
+.controls-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.controls-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: var(--surface);
+  user-select: none;
+  list-style: none;
+  outline: none;
+}
+
+.controls-section-header::-webkit-details-marker {
+  display: none;
+}
+
+.controls-section-header:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.controls-section-header:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.controls-section-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+.controls-section .controls {
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  border: none;
+}
+
+/* ── Slider color variants for effects chain ────────────────────────────── */
+.slider--green::-webkit-slider-thumb {
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-dim), 0 2px 6px rgba(0,0,0,0.4);
+}
+.slider--green::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 5px var(--green-dim), 0 2px 8px rgba(0,0,0,0.5);
+}
+.slider--green::-moz-range-thumb {
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-dim);
+}
+
+.slider--orange::-webkit-slider-thumb {
+  background: var(--orange);
+  box-shadow: 0 0 0 3px var(--orange-dim), 0 2px 6px rgba(0,0,0,0.4);
+}
+.slider--orange::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 5px var(--orange-dim), 0 2px 8px rgba(0,0,0,0.5);
+}
+.slider--orange::-moz-range-thumb {
+  background: var(--orange);
+  box-shadow: 0 0 0 3px var(--orange-dim);
+}
+
+.slider--red::-webkit-slider-thumb {
+  background: var(--red);
+  box-shadow: 0 0 0 3px var(--red-dim), 0 2px 6px rgba(0,0,0,0.4);
+}
+.slider--red::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 5px var(--red-dim), 0 2px 8px rgba(0,0,0,0.5);
+}
+.slider--red::-moz-range-thumb {
+  background: var(--red);
+  box-shadow: 0 0 0 3px var(--red-dim);
+}
+
+/* ── Value badge color variants ─────────────────────────────────────────── */
+.value-badge--green {
+  color: var(--green);
+  background: var(--green-dim);
+}
+
+.value-badge--orange {
+  color: var(--orange);
+  background: var(--orange-dim);
+}
+
+.value-badge--red {
+  color: var(--red);
+  background: var(--red-dim);
+}
+
+/* ── Collab panel ───────────────────────────────────────────────────────── */
+.collab-panel {
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 20px 32px;
+}
+
+.collab-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.collab-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.collab-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.collab-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.collab-join {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.collab-input {
+  flex: 1;
+  padding: 7px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  min-width: 0;
+}
+
+.collab-input:focus {
+  border-color: var(--accent);
+}
+
+.btn-collab {
+  padding: 7px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  outline: none;
+}
+
+.btn-collab:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.btn-collab:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.btn-collab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.collab-status {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  min-height: 18px;
+}
+
+.collab-status--success { color: var(--teal); }
+.collab-status--error   { color: var(--red); }
+.collab-status--warning { color: var(--orange); }
+.collab-status--info    { color: var(--text-dim); }
+
+.collab-note {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.collab-note code {
+  font-family: var(--font-mono);
+  background: var(--surface-3);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }

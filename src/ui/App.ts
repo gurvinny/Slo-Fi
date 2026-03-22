@@ -67,6 +67,11 @@ export class App {
   private controlsCloseBtn = document.getElementById('controlsCloseBtn')!
   private controlsShowBtn = document.getElementById('controlsShowBtn')!
 
+  // Effects drawer refs
+  private effectsDrawer   = document.getElementById('effectsDrawer')!
+  private effectsCloseBtn = document.getElementById('effectsCloseBtn')!
+  private effectsShowBtn  = document.getElementById('effectsShowBtn')!
+
   // Settings drawer refs
   private settingsDrawer   = document.getElementById('settingsDrawer')!
   private settingsCloseBtn = document.getElementById('settingsCloseBtn')!
@@ -100,6 +105,7 @@ export class App {
     this.wireKeyboard()
     this.wireCrossController()
     this.wireControlsPanel()
+    this.wireEffectsPanel()
     this.wireSettingsPanel()
     this.initMidi()
   }
@@ -118,6 +124,24 @@ export class App {
     this.controlsShowBtn.addEventListener('click', () => {
       this.controlsDrawer.classList.remove('controls-drawer--hidden')
       this.controlsShowBtn.style.display = 'none'
+      // Close effects drawer if open
+      this.effectsDrawer.classList.add('controls-drawer--hidden')
+      this.effectsShowBtn.style.display = ''
+    })
+  }
+
+  private wireEffectsPanel(): void {
+    this.effectsCloseBtn.addEventListener('click', () => {
+      this.effectsDrawer.classList.add('controls-drawer--hidden')
+      this.effectsShowBtn.style.display = ''
+    })
+    this.effectsShowBtn.addEventListener('click', () => {
+      this.effectsDrawer.classList.remove('controls-drawer--hidden')
+      this.effectsShowBtn.style.display = 'none'
+      // Close controls drawer if open
+      this.controlsDrawer.classList.add('controls-drawer--hidden')
+      this.controlsDrawer.classList.remove('controls-drawer--floating')
+      this.controlsShowBtn.style.display = ''
     })
   }
 
@@ -154,6 +178,14 @@ export class App {
     }
     this.effects.onChanged = () => {
       this.presets.clearActive()
+    }
+    this.effects.on8DChange = (enabled, _speed) => {
+      this.sphere?.set8DMode(enabled)
+      if (!enabled) this.sphere?.set8DAngle(0)
+    }
+    // Keep the orb rotation in sync with the 8D panner angle every animation frame
+    this.engine.on8DAngleUpdate = (angle) => {
+      this.sphere?.set8DAngle(angle)
     }
   }
 

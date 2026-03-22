@@ -22,6 +22,7 @@ export interface AudioParams {
   eq: EQParams
   chorus: ChorusParams
   saturationDrive: number   // 0 to 1
+  hzFrequency: number | null  // Solfeggio resonance Hz, null = off
 }
 
 export interface PresetDefinition {

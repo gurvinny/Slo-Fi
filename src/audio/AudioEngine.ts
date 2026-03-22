@@ -38,6 +38,16 @@ export class AudioEngine {
   // Analyser tapped from effects chain output for the spectrum visualizer
   private _analyserNode: AnalyserNode | null = null
 
+  // 8D binaural panner — sits after analyser, before destination
+  private _panner8D: PannerNode | null = null
+  private _8DEnabled = false
+  private _8DSpeed   = 0.5   // Hz, rotation rate
+  private _8DRafId:  number | null = null
+
+  // Fires each animation frame when 8D is enabled, with the current angle in radians.
+  // App.ts uses this to keep the orb rotation in sync with the panner.
+  public on8DAngleUpdate: ((angle: number) => void) | null = null
+
   // Incremented each time a new source node is started. Lets the 'ended'
   // handler distinguish "this source finished naturally" from "this source was
   // stopped early because we seeked or restarted."
@@ -66,6 +76,7 @@ export class AudioEngine {
   private _eq = { low: 0, mid: 0, high: 0 }
   private _chorus = { rate: 0.8, depth: 0 }
   private _saturationDrive = 0
+  private _hzFrequency: number | null = null
 
   private timeUpdateTimer: ReturnType<typeof setInterval> | null = null
 
@@ -107,6 +118,7 @@ export class AudioEngine {
       eq: { ...this._eq },
       chorus: { ...this._chorus },
       saturationDrive: this._saturationDrive,
+      hzFrequency: this._hzFrequency,
     }
   }
 
@@ -155,7 +167,16 @@ export class AudioEngine {
     this._analyserNode.minDecibels = -90
     this._analyserNode.maxDecibels = -10
     chainOutput.connect(this._analyserNode)
-    this._analyserNode.connect(this.context.destination)
+
+    // 8D panner sits after the analyser so visualisation sees the pre-spatial signal.
+    // Default position (0, 0, -1) = directly ahead — transparent when 8D is off.
+    this._panner8D = this.context.createPanner()
+    this._panner8D.panningModel  = 'equalpower'  // overridden to HRTF when 8D enabled
+    this._panner8D.positionX.value =  0
+    this._panner8D.positionY.value =  0
+    this._panner8D.positionZ.value = -1
+    this._analyserNode.connect(this._panner8D)
+    this._panner8D.connect(this.context.destination)
   }
 
   // File loading
@@ -334,6 +355,69 @@ export class AudioEngine {
     this.setChorusRate(params.chorus.rate)
     this.setChorusDepth(params.chorus.depth)
     this.setSaturationDrive(params.saturationDrive)
+    this.setHzFrequency(params.hzFrequency)
+  }
+
+  setHzFrequency(hz: number | null): void {
+    this._hzFrequency = hz
+    this._effectsChain?.setHzFrequency(hz)
+  }
+
+  // 8D binaural panning
+
+  set8DEnabled(enabled: boolean): void {
+    if (!this._panner8D) return
+    this._8DEnabled = enabled
+
+    if (enabled) {
+      // Switch to HRTF for binaural rendering and start the animation loop
+      this._panner8D.panningModel = 'HRTF'
+      this._start8DLoop()
+    } else {
+      // Stop the animation loop and return panner to a neutral position
+      this._stop8DLoop()
+      this._panner8D.panningModel  = 'equalpower'
+      this._panner8D.positionX.value =  0
+      this._panner8D.positionY.value =  0
+      this._panner8D.positionZ.value = -1
+      this.on8DAngleUpdate?.(0)
+    }
+  }
+
+  set8DSpeed(hz: number): void {
+    this._8DSpeed = Math.max(0.1, Math.min(2, hz))
+  }
+
+  get8DEnabled(): boolean { return this._8DEnabled }
+  get8DSpeed():   number  { return this._8DSpeed }
+
+  private _start8DLoop(): void {
+    if (this._8DRafId !== null) return
+    const tick = () => {
+      if (!this._8DEnabled || !this._panner8D) return
+      this._8DRafId = requestAnimationFrame(tick)
+
+      // Derive angle from wall time so the rotation is always smooth and
+      // never jumps when playback is paused or resumed.
+      const wallSec = performance.now() / 1000
+      const angle   = (wallSec * 2 * Math.PI * this._8DSpeed) % (2 * Math.PI)
+
+      // Place the sound source on a horizontal circle of radius 5 m
+      const r = 5
+      this._panner8D.positionX.value = r * Math.sin(angle)
+      this._panner8D.positionY.value = 0
+      this._panner8D.positionZ.value = -r * Math.cos(angle)
+
+      this.on8DAngleUpdate?.(angle)
+    }
+    this._8DRafId = requestAnimationFrame(tick)
+  }
+
+  private _stop8DLoop(): void {
+    if (this._8DRafId !== null) {
+      cancelAnimationFrame(this._8DRafId)
+      this._8DRafId = null
+    }
   }
 
   // Loop region control

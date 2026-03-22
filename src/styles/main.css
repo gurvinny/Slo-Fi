@@ -949,8 +949,31 @@ body.is-playing .btn-play::before {
     left: 0;
     width: auto;
     border-radius: var(--radius) var(--radius) 0 0;
-    bottom: 148px;
+    bottom: 175px;
     max-height: calc(100vh - 280px);
+  }
+
+  /* Two-row transport layout so Controls and Effects buttons are never hidden.
+     Row 1: current time + transport buttons.
+     Row 2: total time + fullscreen + settings + Controls + Effects. */
+  .transport-row {
+    flex-wrap: wrap;
+    padding: 6px 12px 2px;
+    gap: 4px 6px;
+  }
+
+  .transport {
+    flex: 1;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .transport-right {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: center;
+    gap: 8px;
+    padding-bottom: 4px;
   }
 
   /* Landing page: scale down rings and text on mobile */
@@ -2026,5 +2049,93 @@ body.is-paused .site-footer {
 /* Mobile: keep waveform at a usable height */
 @media (max-width: 480px) {
   .waveform { height: 60px; }
+}
+
+/* ── Waveform touch behavior ────────────────────────────────────────────── */
+/* Suppress the iOS long-press callout and text-selection highlight that
+   would otherwise appear when the user swipes to scrub. touch-action:none
+   hands all pointer events to the JS handler and removes the 300ms tap
+   delay on Android browsers. */
+.waveform {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+/* ── Safe area insets (iPhone X+ notch / Dynamic Island) ────────────────── */
+/* Extends the bottom transport bar to fill the space above the home
+   indicator on notched iPhones. env() resolves to 0 on non-notched devices. */
+.player-bottom {
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}
+
+/* Inside fullscreen the insets collapse to zero so no extra padding needed */
+@media (display-mode: fullscreen) {
+  .player-bottom { padding-bottom: 0; }
+}
+
+/* ── Safe-area-aware drawer positioning on notched phones ───────────────── */
+/* The drawers sit 148px above the transport bar. On notched phones that bar
+   itself gets extra bottom padding, so the drawers need to shift up too. */
+@media (max-width: 600px) {
+  .controls-drawer,
+  .settings-drawer {
+    bottom: calc(175px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ── iOS momentum scroll for drawers ────────────────────────────────────── */
+/* Gives the panel scroll areas a native rubber-band feel on iOS Safari. */
+.controls-drawer,
+.settings-drawer {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Fullscreen button ──────────────────────────────────────────────────── */
+.btn-fullscreen {
+  opacity: 0.75;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.btn-fullscreen:hover {
+  opacity: 1;
+}
+
+/* When in fullscreen the exit-icon button gets a subtle accent tint so
+   the user knows the mode is active */
+:fullscreen .btn-fullscreen,
+:-webkit-full-screen .btn-fullscreen {
+  opacity: 1;
+  color: var(--accent-bright);
+}
+
+/* Hide the fullscreen button on touch devices that do not support the
+   Fullscreen API (i.e. iOS Safari). @supports checks for :fullscreen selector
+   support; browsers without requestFullscreen also lack this pseudo-class. */
+@supports not (selector(:fullscreen)) {
+  @media (pointer: coarse) {
+    .btn-fullscreen { display: none; }
+  }
+}
+
+/* ── Fullscreen layout fill ─────────────────────────────────────────────── */
+:fullscreen #app,
+:-webkit-full-screen #app {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Tablet / large phone (601-768px) ───────────────────────────────────── */
+/* Slightly taller waveform and narrower capped drawers for wider phones and
+   small tablets where the 600px phone rules would be too cramped. */
+@media (min-width: 601px) and (max-width: 768px) {
+  .waveform { height: 80px; }
+
+  .controls-drawer,
+  .settings-drawer {
+    max-width: 380px;
+  }
 }
 

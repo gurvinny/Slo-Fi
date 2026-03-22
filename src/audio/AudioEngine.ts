@@ -38,6 +38,12 @@ export class AudioEngine {
   // Analyser tapped from effects chain output for the spectrum visualizer
   private _analyserNode: AnalyserNode | null = null
 
+  // Hidden <audio> element whose srcObject is a silent MediaStream from this
+  // context. Playing it keeps the iOS audio session alive in the background
+  // without exposing a file duration - so Control Center shows our
+  // setPositionState values instead of a looping 0-1 second counter.
+  private _keepaliveEl: HTMLAudioElement | null = null
+
   // 8D binaural panner — sits after analyser, before destination
   private _panner8D: PannerNode | null = null
   private _8DEnabled = false
@@ -178,7 +184,25 @@ export class AudioEngine {
     this._panner8D.positionZ.value = -1
     this._analyserNode.connect(this._panner8D)
     this._panner8D.connect(this.context.destination)
+
+    // Create a silent MediaStream tap from the audio graph and wire it to a
+    // hidden <audio> element. Playing a MediaStream source keeps the iOS audio
+    // session alive in the background. Because a MediaStream has no file
+    // duration, iOS cannot display a looping 0-1 s counter in Control Center,
+    // so our navigator.mediaSession.setPositionState calls take full effect.
+    const keepaliveDest = this.context.createMediaStreamDestination()
+    const keepaliveGain = this.context.createGain()
+    keepaliveGain.gain.value = 0
+    keepaliveGain.connect(keepaliveDest)
+
+    const el = document.createElement('audio')
+    el.srcObject = keepaliveDest.stream
+    el.setAttribute('playsinline', '')
+    el.setAttribute('aria-hidden', 'true')
+    this._keepaliveEl = el
   }
+
+  get keepaliveEl(): HTMLAudioElement | null { return this._keepaliveEl }
 
   // File loading
 
@@ -514,5 +538,27 @@ export class AudioEngine {
       clearInterval(this.timeUpdateTimer)
       this.timeUpdateTimer = null
     }
+  }
+
+  // Ramps master gain to silence before the OS suspends the AudioContext.
+  // A 30ms linear fade eliminates the click that iOS produces when it cuts
+  // the audio session abruptly as the app goes to the background.
+  prepareForBackground(): void {
+    if (!this.context || !this.masterGainNode || !this._isPlaying) return
+    const t = this.context.currentTime
+    this.masterGainNode.gain.cancelScheduledValues(t)
+    this.masterGainNode.gain.setValueAtTime(this._volume, t)
+    this.masterGainNode.gain.linearRampToValueAtTime(0, t + 0.03)
+  }
+
+  // Resumes the AudioContext after a background suspension and fades gain
+  // back up so the return from background sounds clean rather than popping in.
+  resumeFromBackground(): void {
+    if (!this.context || !this.masterGainNode) return
+    this.context.resume().catch(() => {})
+    const t = this.context.currentTime
+    this.masterGainNode.gain.cancelScheduledValues(t)
+    this.masterGainNode.gain.setValueAtTime(0, t)
+    this.masterGainNode.gain.linearRampToValueAtTime(this._volume, t + 0.05)
   }
 }

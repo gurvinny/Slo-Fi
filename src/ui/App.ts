@@ -6,6 +6,7 @@ import { StarOverlay } from './StarOverlay'
 import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
+import { MobileController } from './MobileController'
 import type { AudioParams } from '../types'
 
 function formatTime(seconds: number): string {
@@ -29,6 +30,7 @@ export class App {
   private presets: PresetController
   private effects: EffectsController
   private exporter: ExportController
+  private _mobile!: MobileController
   // Core DOM refs
   private dropzone = document.getElementById('dropzone')!
   private fileInput = document.getElementById('fileInput') as HTMLInputElement
@@ -102,6 +104,21 @@ export class App {
     this.wireControlsPanel()
     this.wireEffectsPanel()
     this.wireSettingsPanel()
+
+    // Wire up mobile APIs: Media Session, Fullscreen, Vibration, and
+    // AudioContext background recovery via visibilitychange.
+    this._mobile = new MobileController(this.engine)
+    this._mobile.onExternalPlay  = () => { this.setPlayingState(true);  this.sphere?.start() }
+    this._mobile.onExternalPause = () => { this.setPlayingState(false); this.sphere?.stop()  }
+    this._mobile.onExternalStop  = () => {
+      this.setPlayingState(false)
+      this.waveform.setProgress(0)
+      this.currentTimeEl.textContent = '0:00'
+      this.sphere?.stop()
+      this._mobile.stopSilenceLoop()
+    }
+    const fsBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement | null
+    if (fsBtn) this._mobile.bindFullscreenBtn(fsBtn)
   }
 
   private wireControlsPanel(): void {
@@ -188,11 +205,14 @@ export class App {
       this.setPlayingState(false)
       this.waveform.setProgress(0)
       this.sphere?.stop()
+      this._mobile?.stopSilenceLoop()
     }
     this.engine.onTimeUpdate = (current, duration) => {
       this.currentTimeEl.textContent = formatTime(current)
       if (duration > 0) {
         this.waveform.setProgress(current / duration)
+        // Keep the lock screen position scrubber moving in real time
+        this._mobile?.updatePlaybackState(this.engine.isPlaying)
       }
     }
     this.engine.onLoopCycle = () => {
@@ -232,6 +252,7 @@ export class App {
       this.waveform.setProgress(0)
       this.currentTimeEl.textContent = '0:00'
       this.sphere?.stop()
+      this._mobile?.stopSilenceLoop()
     })
     this.rewindBtn.addEventListener('click', () => {
       this.engine.seek(Math.max(0, this.engine.currentTime - 5))
@@ -240,6 +261,7 @@ export class App {
     // Waveform seek
     this.waveform.onSeek = (ratio) => {
       this.engine.seek(ratio * this.engine.duration)
+      this._mobile?.hapticSeek()
     }
 
     // Waveform loop handle drag
@@ -382,6 +404,10 @@ export class App {
         case 'L':
           this.loopBtn.click()
           break
+        case 'f':
+        case 'F':
+          ;(document.getElementById('fullscreenBtn') as HTMLButtonElement | null)?.click()
+          break
       }
     })
   }
@@ -421,6 +447,8 @@ export class App {
       const baseName = file.name.replace(/\.[^.]+$/, '')
       this.trackName.textContent = baseName
       this.exporter.trackName = baseName
+      // Push the track title to the OS lock screen / notification card
+      this._mobile.setMediaSessionMetadata(baseName)
 
       this._baseBpm = detectBpm(this.engine.getBuffer()!)
       this.updateBpmDisplay()
@@ -491,10 +519,17 @@ export class App {
       this.engine.pause()
       this.setPlayingState(false)
       this.sphere?.stop()
+      this._mobile.hapticPause()
+      this._mobile.updatePlaybackState(false)
+      // Keep the silence loop running during pause so the iOS audio session
+      // and lock screen controls stay visible while the track is paused.
     } else {
       this.engine.play()
       this.setPlayingState(true)
       this.sphere?.start()
+      this._mobile.hapticPlay()
+      this._mobile.updatePlaybackState(true)
+      this._mobile.ensureSilenceLoop()
     }
   }
 
@@ -502,6 +537,8 @@ export class App {
     this.playPauseBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play')
     document.body.classList.toggle('is-playing', playing)
     document.body.classList.toggle('is-paused', !playing)
+    // Keep the OS lock screen transport badge in sync with the in-app state
+    this._mobile?.updatePlaybackState(playing)
   }
 
   private showPlayer(): void {

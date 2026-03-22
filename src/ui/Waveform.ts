@@ -198,18 +198,42 @@ export class Waveform {
   private bindEvents(): void {
     let dragging = false
 
+    // Pending RAF for touch-seek throttling - ensures the audio engine seek
+    // fires at most once per animation frame so rapid touchmove events don't
+    // recreate the source node faster than it can settle.
+    let _touchSeekRaf: number | null = null
+    let _pendingTouchX = 0
+
     const seekAt = (clientX: number) => {
       const rect = this.canvas.getBoundingClientRect()
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
       this._onSeek?.(ratio)
     }
 
-    // Returns which loop handle is within 8px of the click x, or null
-    const hitHandle = (clientX: number): 'start' | 'end' | null => {
+    // Updates the waveform playhead position visually without triggering an
+    // audio seek - used to give instant visual feedback during touch scrubbing.
+    const updateVisualProgress = (clientX: number) => {
+      const rect = this.canvas.getBoundingClientRect()
+      this.progress = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+      this.draw()
+    }
+
+    const seekAtThrottled = (clientX: number) => {
+      _pendingTouchX = clientX
+      if (_touchSeekRaf !== null) return
+      _touchSeekRaf = requestAnimationFrame(() => {
+        _touchSeekRaf = null
+        seekAt(_pendingTouchX)
+      })
+    }
+
+    // Returns which loop handle is within `radius` px of the click x, or null.
+    // Mouse events use 8px for precision; touch events pass 20px for finger accuracy.
+    const hitHandle = (clientX: number, radius = 8): 'start' | 'end' | null => {
       const rect = this.canvas.getBoundingClientRect()
       const x = clientX - rect.left
-      if (Math.abs(x - this._loopStart * rect.width) <= 8) return 'start'
-      if (Math.abs(x - this._loopEnd   * rect.width) <= 8) return 'end'
+      if (Math.abs(x - this._loopStart * rect.width) <= radius) return 'start'
+      if (Math.abs(x - this._loopEnd   * rect.width) <= radius) return 'end'
       return null
     }
 
@@ -276,7 +300,8 @@ export class Waveform {
     // Touch support
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault()
-      const hit = hitHandle(e.touches[0].clientX)
+      // Use a 20px radius for touch so loop handles are easy to grab with a finger
+      const hit = hitHandle(e.touches[0].clientX, 20)
       if (hit) {
         this._dragTarget = hit
         return
@@ -299,11 +324,19 @@ export class Waveform {
         this.draw()
         return
       }
-      seekAt(touch.clientX)
+      // Update the playhead position visually on every touchmove for smooth
+      // feedback, then throttle the actual audio seek to once per RAF so the
+      // source node isn't recreated faster than it can settle.
+      updateVisualProgress(touch.clientX)
+      seekAtThrottled(touch.clientX)
     }, { passive: false })
 
     this.canvas.addEventListener('touchend', () => {
       this._dragTarget = null
+      if (_touchSeekRaf !== null) {
+        cancelAnimationFrame(_touchSeekRaf)
+        _touchSeekRaf = null
+      }
     })
 
     // Keyboard

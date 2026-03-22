@@ -1157,30 +1157,6 @@ body.is-paused .site-footer {
 
 /* .anomaly-bg styles live near the top of the Layout section */
 
-/* ── MIDI status dot ────────────────────────────────────────────────────── */
-.status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  flex-shrink: 0;
-  cursor: default;
-  transition: background 0.3s;
-}
-
-.status-dot--connected {
-  background: var(--teal);
-  box-shadow: 0 0 6px var(--teal-dim);
-}
-
-.status-dot--disconnected {
-  background: var(--orange);
-}
-
-.status-dot--unavailable {
-  background: var(--text-muted);
-}
 
 /* ── Export button + status ─────────────────────────────────────────────── */
 .btn-export {

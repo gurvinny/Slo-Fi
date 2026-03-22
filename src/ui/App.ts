@@ -6,8 +6,6 @@ import { StarOverlay } from './StarOverlay'
 import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
-import { MidiController } from '../audio/MidiController'
-import { MidiStatusIndicator } from './MidiStatusIndicator'
 import type { AudioParams } from '../types'
 
 function formatTime(seconds: number): string {
@@ -31,9 +29,6 @@ export class App {
   private presets: PresetController
   private effects: EffectsController
   private exporter: ExportController
-  private midi = new MidiController()
-  private midiIndicator = new MidiStatusIndicator()
-
   // Core DOM refs
   private dropzone = document.getElementById('dropzone')!
   private fileInput = document.getElementById('fileInput') as HTMLInputElement
@@ -107,7 +102,6 @@ export class App {
     this.wireControlsPanel()
     this.wireEffectsPanel()
     this.wireSettingsPanel()
-    this.initMidi()
   }
 
   private wireControlsPanel(): void {
@@ -187,36 +181,6 @@ export class App {
     this.engine.on8DAngleUpdate = (angle) => {
       this.sphere?.set8DAngle(angle)
     }
-  }
-
-  private async initMidi(): Promise<void> {
-    this.midi.onStatusChange = (status) => this.midiIndicator.update(status)
-    const available = await this.midi.init()
-    if (!available) return
-
-    this.midi.bindCC(7, (v) => {
-      this.engine.setVolume(v)
-      this.volumeSlider.value = String(Math.round(v * 100))
-      this.volumeValue.textContent = `${Math.round(v * 100)}%`
-    })
-    this.midi.bindCC(74, (v) => {
-      const rate = 0.50 + v * 1.20
-      this.engine.setPlaybackRate(rate)
-      this.speedSlider.value = String(Math.round(rate * 100))
-      this.speedValue.textContent = `${rate.toFixed(2)}x`
-      this.sphere?.setSpeed(rate)
-      this.presets.clearActive()
-      this.updateBpmDisplay()
-    })
-    this.midi.bindCC(91, (v) => {
-      this.engine.setReverbMix(v)
-      this.reverbSlider.value = String(Math.round(v * 100))
-      this.reverbValue.textContent = `${Math.round(v * 100)}%`
-      this.sphere?.setReverb(v)
-    })
-    this.midi.bindCC(93, (v) => {
-      this.engine.setChorusDepth(v)
-    })
   }
 
   private wireEngineCallbacks(): void {

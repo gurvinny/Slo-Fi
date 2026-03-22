@@ -31,10 +31,3 @@ export interface PresetDefinition {
   params: AudioParams
 }
 
-// MIDI CC binding: maps a CC number to a handler
-export interface MidiBinding {
-  ccNumber: number
-  label: string
-  handler: (normalizedValue: number) => void
-}
-

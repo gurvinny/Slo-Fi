@@ -381,6 +381,10 @@ export class AnomalySphere {
   private visualFade = 0.4   // current rendered brightness (0-1)
   private targetFade = 0.4   // lerp target — 1.0 playing, 0.4 paused
 
+  // Intro reveal: orb materialises from a point when first created
+  private introProgress  = 0    // 0 → 1 (ease-out-back) over ~1.5 s
+  private introStartTime = -1   // clock time on first rendered frame
+
   // Star field
   private stars!: THREE.Points
   private starUniforms!: {
@@ -642,6 +646,18 @@ export class AnomalySphere {
 
     const elapsed = this.clock.getElapsedTime()
 
+    // Intro animation: orb grows from a point over ~1.5 s with ease-out-back
+    // (slight overshoot → spring feel, like the orb is accepting the file)
+    if (this.introProgress < 1) {
+      if (this.introStartTime < 0) this.introStartTime = elapsed
+      const t = Math.min((elapsed - this.introStartTime) / 1.5, 1)
+      // ease-out-back: overshoots ~10% at peak then settles at 1.0
+      const c1 = 1.70158, c3 = c1 + 1
+      this.introProgress = t < 1
+        ? 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+        : 1
+    }
+
     // Read audio data only while playing
     if (this.playing) {
       this.analyser.getByteFrequencyData(this.freqData)
@@ -726,16 +742,21 @@ export class AnomalySphere {
 
     // Smooth fade for pause/play — slow lerp for an organic, weighty feel
     this.visualFade += (this.targetFade - this.visualFade) * 0.028
-    this.renderer.toneMappingExposure = 0.50 * this.visualFade
+    // Clamp introProgress so it never over-brighten the exposure
+    const introClamp = Math.min(this.introProgress, 1)
+    this.renderer.toneMappingExposure = 0.50 * this.visualFade * introClamp
 
-    // Bloom spikes on bass hits; capped and scaled by glow multiplier + fade
-    this.bloom.strength = Math.min(0.20 + this.reverb * 0.28 + bVis * 0.32, 0.62) * this.glowMult * this.visualFade
+    // Bloom spikes on bass hits; intro adds a brief acceptance surge (sin arc)
+    // peaks at the midpoint of the reveal, fades out as the orb settles
+    const introSurge = Math.sin(introClamp * Math.PI) * 0.55
+    this.bloom.strength = (Math.min(0.20 + this.reverb * 0.28 + bVis * 0.32, 0.62) + introSurge) * this.glowMult * this.visualFade * introClamp
 
-    // Mesh scale: base size + optional bass pulse + loop cycle pulse (additive, independent)
+    // Mesh scale: intro reveal + base size + optional bass pulse + loop pulse
+    // introProgress uses ease-out-back so the orb slightly overshoots before settling
     const pulseFactor = this.bassPulse ? bVis * 0.14 : 0
     this._loopPulseAmount *= 0.985   // ~1.5 s decay at 60 fps
     const loopPulseFactor  = this._loopPulseAmount * 0.08
-    this.mesh.scale.setScalar(this.orbBaseScale * (1.0 + pulseFactor + loopPulseFactor))
+    this.mesh.scale.setScalar(this.orbBaseScale * (1.0 + pulseFactor + loopPulseFactor) * this.introProgress)
 
     // Rotation: when 8D mode is active, the orb tracks the panner angle directly.
     // Otherwise the normal audio-reactive rotation drives it.

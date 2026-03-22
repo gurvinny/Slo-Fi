@@ -126,6 +126,15 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
   .btn-play::before { animation: none !important; }
+  .landing-scan-line,
+  .landing-ring { animation: none; }
+  .landing-badge { animation: none; opacity: 1; }
+  .landing-logo-text {
+    animation: none;
+    -webkit-text-fill-color: var(--accent);
+    background: none;
+  }
+  .dropzone.landing-exit { transition: opacity 0.2s; transform: none; }
 }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
@@ -219,7 +228,9 @@ body::after {
   background: transparent;
   cursor: pointer;
   outline: none;
-  transition: background 0.2s;
+  transform-origin: center center;
+  transition: background 0.2s, opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dropzone:hover,
@@ -299,13 +310,180 @@ body::after {
   pointer-events: none; /* click forwarded by parent .dropzone via JS */
 }
 
+/* ── Landing page — hero content, orbit rings, scan line, badges ─────────── */
+
+@keyframes shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes orbit-ring {
+  from { transform: rotateX(70deg) rotateZ(0deg); }
+  to   { transform: rotateX(70deg) rotateZ(360deg); }
+}
+
+@keyframes badge-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scan-sweep {
+  0%   { top: 0%;   opacity: 0; }
+  4%   { opacity: 0.55; }
+  96%  { opacity: 0.25; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Orbit rings — 3D concentric circles that rotate at different speeds */
+.landing-rings {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  perspective: 600px;
+  z-index: 0;
+}
+
+.landing-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid transparent;
+}
+
+.landing-ring--1 {
+  width: 520px;
+  height: 520px;
+  border-color: rgba(155, 109, 255, 0.13);
+  box-shadow: 0 0 16px rgba(155, 109, 255, 0.05) inset;
+  animation: orbit-ring 16s linear infinite;
+}
+
+.landing-ring--2 {
+  width: 380px;
+  height: 380px;
+  border-color: rgba(0, 212, 170, 0.15);
+  box-shadow: 0 0 12px rgba(0, 212, 170, 0.05) inset;
+  animation: orbit-ring 10s linear infinite reverse;
+}
+
+.landing-ring--3 {
+  width: 260px;
+  height: 260px;
+  border-color: rgba(180, 138, 255, 0.18);
+  animation: orbit-ring 6s linear infinite;
+}
+
+/* Scan line — a gradient beam that sweeps top-to-bottom on repeat */
+.landing-scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(155, 109, 255, 0.5) 30%,
+    rgba(0, 212, 170, 0.6) 70%,
+    transparent 100%);
+  pointer-events: none;
+  animation: scan-sweep 9s ease-in-out infinite;
+  animation-delay: 1.5s;
+  z-index: 1;
+}
+
+/* Hero layout — vertical flex stack centered inside the dropzone */
+.landing-hero {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 0 20px;
+  width: 100%;
+  max-width: 520px;
+}
+
+.landing-title-block {
+  text-align: center;
+}
+
+/* Holographic shimmer title */
+.landing-logo-text {
+  font-size: clamp(60px, 10vw, 96px);
+  font-weight: 800;
+  letter-spacing: -3px;
+  line-height: 1;
+  margin: 0 0 10px;
+  background: linear-gradient(90deg,
+    var(--accent) 0%,
+    #ffffff 35%,
+    var(--teal) 65%,
+    var(--accent) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 5s linear infinite;
+}
+
+.landing-tagline {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Feature badge pills with staggered entrance animation */
+.landing-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.landing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  opacity: 0;
+  animation: badge-rise 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.landing-badge:nth-child(1) { animation-delay: 0.3s; }
+.landing-badge:nth-child(2) { animation-delay: 0.5s; }
+.landing-badge:nth-child(3) { animation-delay: 0.7s; }
+
+/* Landing exit: zoom + fade out triggered by JS on file load */
+.dropzone.landing-exit {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
 /* ── Player — children are fixed panels, shown after a file loads ────────── */
 .player {
   display: none;
+  opacity: 0;
+  transition: opacity 0.65s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .player.visible {
   display: block;
+  opacity: 1;
 }
 
 /* Top HUD: track name + preset strip, fixed below the header */
@@ -757,6 +935,53 @@ body.is-playing .btn-play::before {
     bottom: 148px;
     max-height: calc(100vh - 280px);
   }
+
+  /* Landing page: scale down rings and text on mobile */
+  .landing-logo-text { font-size: 52px; letter-spacing: -1.5px; }
+  .landing-tagline   { font-size: 11px; }
+  .landing-badge     { font-size: 10px; padding: 5px 10px; }
+  .landing-ring--1   { width: 300px; height: 300px; }
+  .landing-ring--2   { width: 220px; height: 220px; }
+  .landing-ring--3   { width: 150px; height: 150px; }
+}
+
+/* ── Site footer — GitHub link ──────────────────────────────────────────── */
+.site-footer {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 48; /* below dropzone (50) so it fades with the landing */
+  pointer-events: auto;
+}
+
+.footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.footer-link:hover {
+  color: var(--text);
+  border-color: rgba(155, 109, 255, 0.35);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+}
+
+/* Hide footer once the player is visible so it doesn't overlap the waveform */
+body.is-playing .site-footer,
+body.is-paused .site-footer {
+  display: none;
 }
 
 /* ── New design tokens for effects chain ───────────────────────────────── */

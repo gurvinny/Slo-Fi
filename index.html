@@ -33,17 +33,52 @@
 
       <main class="main">
 
-        <!-- Drop zone: full-page overlay shown before a file is loaded -->
+        <!-- Drop zone / Landing page — full-page overlay shown before a file is loaded -->
         <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio file or click to browse">
-          <div class="dropzone-content">
-            <svg class="dropzone-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M24 4 L44 14 L44 34 L24 44 L4 34 L4 14 Z" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.4"/>
-              <path d="M24 14 L34 19 L34 29 L24 34 L14 29 L14 19 Z" stroke="currentColor" stroke-width="1" fill="none" opacity="0.3"/>
-              <path d="M20 24 L24 20 L28 24 M24 20 L24 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <p class="dropzone-title">Drop your audio file here</p>
-            <p class="dropzone-hint">or click to browse &nbsp;·&nbsp; mp3 &nbsp;wav &nbsp;flac &nbsp;ogg &nbsp;aac</p>
+
+          <!-- Orbit rings — decorative CSS-animated concentric rings -->
+          <div class="landing-rings" aria-hidden="true">
+            <div class="landing-ring landing-ring--1"></div>
+            <div class="landing-ring landing-ring--2"></div>
+            <div class="landing-ring landing-ring--3"></div>
           </div>
+
+          <!-- Scan line sweep -->
+          <div class="landing-scan-line" aria-hidden="true"></div>
+
+          <!-- Hero content: title, feature badges, and drop card -->
+          <div class="landing-hero">
+            <div class="landing-title-block">
+              <h1 class="landing-logo-text">Slo&#8209;Fi</h1>
+              <p class="landing-tagline">Your browser is the studio.</p>
+            </div>
+
+            <ul class="landing-features" aria-label="Key features">
+              <li class="landing-badge">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1" y="9" width="2" height="6" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="2" height="10" rx="1" fill="currentColor"/><rect x="8" y="2" width="2" height="13" rx="1" fill="currentColor"/><rect x="11.5" y="5" width="2" height="10" rx="1" fill="currentColor"/></svg>
+                Time-stretch any audio
+              </li>
+              <li class="landing-badge">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="4" y="7" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Zero uploads &mdash; 100% private
+              </li>
+              <li class="landing-badge">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 5h2v6H2zM6 3h2v10H6zM10 6h2v4h-2zM14 4h0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                Reverb &middot; EQ &middot; Effects chain
+              </li>
+            </ul>
+
+            <div class="dropzone-content">
+              <svg class="dropzone-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M24 4 L44 14 L44 34 L24 44 L4 34 L4 14 Z" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.4"/>
+                <path d="M24 14 L34 19 L34 29 L24 34 L14 29 L14 19 Z" stroke="currentColor" stroke-width="1" fill="none" opacity="0.3"/>
+                <path d="M20 24 L24 20 L28 24 M24 20 L24 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <p class="dropzone-title">Drop your audio file here</p>
+              <p class="dropzone-hint">or click to browse &nbsp;&middot;&nbsp; mp3 &nbsp;wav &nbsp;flac &nbsp;ogg &nbsp;aac</p>
+            </div>
+          </div>
+
           <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,audio/*" aria-hidden="true" tabindex="-1" />
         </div>
 

@@ -539,7 +539,10 @@ export class App {
   }
 
   private showPlayer(): void {
-    this.dropzone.style.display = 'none'
+    this.dropzone.classList.add('landing-exit')
+    window.setTimeout(() => {
+      this.dropzone.style.display = 'none'
+    }, 520)
     this.player.classList.add('visible')
     this.player.removeAttribute('aria-hidden')
   }

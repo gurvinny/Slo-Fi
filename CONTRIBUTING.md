@@ -127,7 +127,7 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 feat: add loop region selection to waveform
 fix: prevent ConvolverNode clipping at high reverb mix
 docs: update CONTRIBUTING with Node version requirement
-chore: bump Vite to 5.2
+chore: bump Vite to 8.0
 perf: defer OfflineAudioContext creation until export
 ```
 

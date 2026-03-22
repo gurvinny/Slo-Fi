@@ -443,11 +443,13 @@ export class App {
           document.getElementById('anomaly') as HTMLElement,
           this.engine.analyserNode,
         )
-        this.sphere.onEnergyUpdate = (bass, mid, treble) => {
+        this.sphere.onEnergyUpdate = (bass, mid, treble, uiBass, uiTreble) => {
           const root = document.documentElement.style
           root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
           root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
           root.setProperty('--aurora-treble', String(treble.toFixed(3)))
+          root.setProperty('--ui-bass',       String(uiBass.toFixed(3)))
+          root.setProperty('--ui-treble',     String(uiTreble.toFixed(3)))
           this.starOverlay.setTreble(treble)
         }
       } catch (sphereErr) {

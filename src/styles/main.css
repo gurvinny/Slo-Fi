@@ -64,6 +64,9 @@ body {
   --aurora-bass:   0;
   --aurora-mid:    0;
   --aurora-treble: 0;
+  /* Fast-attack beat-pulse values — drive snappy UI reactivity */
+  --ui-bass:    0;
+  --ui-treble:  0;
 }
 
 body::before {
@@ -76,17 +79,17 @@ body::before {
   /* Six reactive blobs — opacity driven by live audio energy bands */
   background:
     radial-gradient(ellipse 70% 60% at 12% 42%,
-      rgba(155, 109, 255, calc(0.20 + var(--aurora-bass) * 0.60)) 0%, transparent 68%),
+      rgba(155, 109, 255, calc(0.20 + var(--aurora-bass) * 1.00)) 0%, transparent 68%),
     radial-gradient(ellipse 55% 50% at 88% 18%,
-      rgba(0, 212, 170, calc(0.14 + var(--aurora-treble) * 0.52)) 0%, transparent 62%),
+      rgba(0, 212, 170, calc(0.14 + var(--aurora-treble) * 0.75)) 0%, transparent 62%),
     radial-gradient(ellipse 60% 55% at 58% 88%,
-      rgba(110, 50, 220, calc(0.16 + var(--aurora-mid) * 0.44)) 0%, transparent 65%),
+      rgba(110, 50, 220, calc(0.16 + var(--aurora-mid) * 0.65)) 0%, transparent 65%),
     radial-gradient(ellipse 45% 38% at 72% 50%,
-      rgba(0, 180, 200, calc(0.04 + var(--aurora-treble) * 0.34)) 0%, transparent 60%),
+      rgba(0, 180, 200, calc(0.04 + var(--aurora-treble) * 0.55)) 0%, transparent 60%),
     radial-gradient(ellipse 42% 48% at 35% 8%,
-      rgba(200, 80, 255, calc(0.10 + var(--aurora-bass) * 0.32)) 0%, transparent 58%),
+      rgba(200, 80, 255, calc(0.10 + var(--aurora-bass) * 0.55)) 0%, transparent 58%),
     radial-gradient(ellipse 38% 42% at 90% 78%,
-      rgba(0, 230, 180, calc(0.08 + var(--aurora-mid) * 0.28)) 0%, transparent 55%);
+      rgba(0, 230, 180, calc(0.08 + var(--aurora-mid) * 0.48)) 0%, transparent 55%);
   animation: aurora 22s ease-in-out infinite alternate;
 }
 
@@ -107,11 +110,11 @@ body::after {
   filter: var(--aurora-filter);
   background:
     radial-gradient(ellipse 55% 48% at 22% 88%,
-      rgba(255, 80, 160, calc(0.10 + var(--aurora-mid) * 0.38)) 0%, transparent 62%),
+      rgba(255, 80, 160, calc(0.10 + var(--aurora-mid) * 0.60)) 0%, transparent 62%),
     radial-gradient(ellipse 48% 40% at 80% 80%,
-      rgba(255, 170, 0, calc(0.06 + var(--aurora-bass) * 0.24)) 0%, transparent 58%),
+      rgba(255, 170, 0, calc(0.06 + var(--aurora-bass) * 0.45)) 0%, transparent 58%),
     radial-gradient(ellipse 65% 38% at 50% 3%,
-      rgba(140, 80, 255, calc(0.08 + var(--aurora-bass) * 0.22)) 0%, transparent 65%);
+      rgba(140, 80, 255, calc(0.08 + var(--aurora-bass) * 0.45)) 0%, transparent 65%);
   animation: aurora-b 34s ease-in-out infinite alternate;
 }
 
@@ -120,6 +123,18 @@ body::after {
   35%  { opacity: 0.70; transform: scale(1.07) rotate(-1.5deg); }
   70%  { opacity: 0.88; transform: scale(1.03) rotate(1.5deg); }
   100% { opacity: 1;    transform: scale(1.09) rotate(-0.5deg); }
+}
+
+/* Screen-edge bass vignette — inset glow that pulses outward from the edges
+   on every kick, making the pulse feel like it radiates through the whole site */
+.anomaly-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 120px rgba(155, 109, 255, calc(var(--ui-bass, 0) * 0.55)),
+    inset 0 0 60px  rgba(0, 212, 170,  calc(var(--ui-treble, 0) * 0.22));
 }
 
 /* Disable aurora motion for users who prefer reduced motion */
@@ -500,7 +515,8 @@ body::after {
   background: rgba(8, 8, 16, 0.60);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid rgba(155, 109, 255, calc(0.07 + var(--ui-bass, 0) * 0.55));
+  box-shadow: 0 2px 20px rgba(155, 109, 255, calc(var(--ui-bass, 0) * 0.18));
   pointer-events: auto;
   transition: opacity 0.75s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -515,7 +531,8 @@ body::after {
   background: rgba(8, 8, 16, 0.72);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid rgba(155, 109, 255, calc(0.07 + var(--ui-bass, 0) * 0.55));
+  box-shadow: 0 -2px 30px rgba(155, 109, 255, calc(var(--ui-bass, 0) * 0.22));
   pointer-events: auto;
   transition: opacity 0.75s cubic-bezier(0.4, 0, 0.2, 1);
 }

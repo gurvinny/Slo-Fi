@@ -89,18 +89,16 @@ void main() {
   // Subtle slowAmp so the shape stays orb-like even at 0.25x speed
   float slowAmp = 1.0 + (1.0 - uSpeed) * 0.18;
 
-  // Keep each layer's amplitude small enough that the sphere always reads as
-  // a sphere. Bass gets the biggest bumps but they stay under 20% of radius.
-  float d1   = snoise(normal * 1.4 + t * 0.22) * uBass   * 0.20 * slowAmp;
-  float d2   = snoise(normal * 3.6 + t * 0.50) * uMid    * 0.10;
-  float d4   = snoise(normal * 5.8 + t * 0.38) * uMid    * 0.06;
-  float d3   = snoise(normal * 9.2 + t * 1.05) * uTreble * 0.04;
+  // Bass gets the biggest bumps; mid adds ripples; treble adds shimmer.
+  // Amplitudes are tuned so the orb deforms dramatically but stays readable.
+  float d1   = snoise(normal * 1.4 + t * 0.22) * uBass   * 0.28 * slowAmp;
+  float d2   = snoise(normal * 3.6 + t * 0.50) * uMid    * 0.12;
+  float d4   = snoise(normal * 5.8 + t * 0.38) * uMid    * 0.07;
+  float d3   = snoise(normal * 9.2 + t * 1.05) * uTreble * 0.05;
   float idle = snoise(normal * 1.9 + t * 0.16) * 0.028;
 
-  // Hard clamp: total displacement never exceeds 26% of sphere radius.
-  // This is the safety net — no matter how loud the track gets, the orb
-  // stays recognisably round.
-  float disp = clamp(d1 + d2 + d3 + d4 + idle, -0.26, 0.26);
+  // Hard clamp: displacement never exceeds 34% of sphere radius.
+  float disp = clamp(d1 + d2 + d3 + d4 + idle, -0.34, 0.34);
   vDisp = disp;
 
   vNormal   = normalize(normalMatrix * normal);
@@ -322,7 +320,7 @@ const GRAIN_CA_SHADER = {
       // The offset grows toward the edges and pulses slightly with bass.
       vec2  center = vUv - 0.5;
       float dist   = length(center);
-      float ca     = (0.0018 + uBass * 0.008) * dist;
+      float ca     = (0.0018 + uBass * 0.018) * dist;
       vec2  dir    = normalize(center + 0.0001);
 
       float r = texture2D(tDiffuse, vUv - dir * ca).r;
@@ -339,10 +337,14 @@ const GRAIN_CA_SHADER = {
 
 // ── Damping constants ────────────────────────────────────────────────────────
 // Bass uses asymmetric lerp (fast attack, slow decay) for punchy impact.
-const BASS_LERP_UP   = 0.18   // fast attack — orb snaps to the beat immediately
+const BASS_LERP_UP   = 0.26   // fast attack — orb snaps to the beat immediately
 const BASS_LERP_DOWN = 0.025  // slow decay  — energy lingers after the hit
 const MID_LERP       = 0.040
 const TREBLE_LERP    = 0.060
+// UI beat-pulse values — fast attack + moderate decay for snappy site-wide reactivity
+const UI_BASS_UP     = 0.32   // near-instant attack so UI hits land on the beat
+const UI_BASS_DOWN   = 0.08   // faster decay than aurora bass (~12 frames)
+const UI_TREBLE_LERP = 0.10
 
 export class AnomalySphere {
   private renderer:  THREE.WebGLRenderer
@@ -361,6 +363,9 @@ export class AnomalySphere {
   private bass   = 0
   private mid    = 0
   private treble = 0
+  // Fast-attack/decay values for snappy site-wide UI reactivity
+  private uiBass   = 0
+  private uiTreble = 0
   private hueOffset  = 0    // rotating palette hue, advanced each frame by beat energy
   private reverb     = 0.2  // current reverb mix (0-1), set via setReverb()
   private speed      = 1.0  // current playback rate (0.25-1), set via setSpeed()
@@ -420,9 +425,9 @@ export class AnomalySphere {
   private rafId:   number | null = null
   private playing  = false
 
-  // Called each frame with smoothed bass/mid/treble (0-1), same contract
-  // as SpectrumAnalyzer.onEnergyUpdate so the aurora still reacts.
-  public onEnergyUpdate: ((bass: number, mid: number, treble: number) => void) | null = null
+  // Called each frame with smoothed bass/mid/treble for the aurora, plus
+  // fast-attack uiBass/uiTreble for snappy site-wide UI reactivity.
+  public onEnergyUpdate: ((bass: number, mid: number, treble: number, uiBass: number, uiTreble: number) => void) | null = null
 
   constructor(container: HTMLElement, analyser: AnalyserNode) {
     this.analyser  = analyser
@@ -632,7 +637,7 @@ export class AnomalySphere {
   stop(): void {
     this.playing    = false
     this.targetFade = 0.4
-    this.onEnergyUpdate?.(0, 0, 0)
+    this.onEnergyUpdate?.(0, 0, 0, 0, 0)
   }
 
   // Called from App.ts whenever the reverb mix slider changes (0-1)
@@ -672,12 +677,19 @@ export class AnomalySphere {
       this.mid    += (rawMid    - this.mid)    * MID_LERP
       this.treble += (rawTreble - this.treble) * TREBLE_LERP
 
-      this.onEnergyUpdate?.(this.bass, this.mid, this.treble)
+      // Fast-attack UI pulse values for site-wide reactivity
+      const uiBassLerp = rawBass > this.uiBass ? UI_BASS_UP : UI_BASS_DOWN
+      this.uiBass   += (rawBass   - this.uiBass)   * uiBassLerp
+      this.uiTreble += (rawTreble - this.uiTreble) * UI_TREBLE_LERP
+
+      this.onEnergyUpdate?.(this.bass, this.mid, this.treble, this.uiBass, this.uiTreble)
     } else {
       // Decay toward zero so the sphere calms down after stopping
       this.bass   *= 0.96
       this.mid    *= 0.96
       this.treble *= 0.96
+      this.uiBass   *= 0.92
+      this.uiTreble *= 0.92
     }
 
     // ── Reactivity scaling ───────────────────────────────────────────────────
@@ -749,11 +761,11 @@ export class AnomalySphere {
     // Bloom spikes on bass hits; intro adds a brief acceptance surge (sin arc)
     // peaks at the midpoint of the reveal, fades out as the orb settles
     const introSurge = Math.sin(introClamp * Math.PI) * 0.55
-    this.bloom.strength = (Math.min(0.20 + this.reverb * 0.28 + bVis * 0.32, 0.62) + introSurge) * this.glowMult * this.visualFade * introClamp
+    this.bloom.strength = (Math.min(0.20 + this.reverb * 0.28 + bVis * 0.50, 0.90) + introSurge) * this.glowMult * this.visualFade * introClamp
 
     // Mesh scale: intro reveal + base size + optional bass pulse + loop pulse
     // introProgress uses ease-out-back so the orb slightly overshoots before settling
-    const pulseFactor = this.bassPulse ? bVis * 0.14 : 0
+    const pulseFactor = this.bassPulse ? bVis * 0.22 : 0
     this._loopPulseAmount *= 0.985   // ~1.5 s decay at 60 fps
     const loopPulseFactor  = this._loopPulseAmount * 0.08
     this.mesh.scale.setScalar(this.orbBaseScale * (1.0 + pulseFactor + loopPulseFactor) * this.introProgress)

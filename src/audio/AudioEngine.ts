@@ -172,6 +172,7 @@ export class AudioEngine {
     // Default position (0, 0, -1) = directly ahead — transparent when 8D is off.
     this._panner8D = this.context.createPanner()
     this._panner8D.panningModel  = 'equalpower'  // overridden to HRTF when 8D enabled
+    this._panner8D.rolloffFactor = 0             // no distance attenuation — HRTF for direction only
     this._panner8D.positionX.value =  0
     this._panner8D.positionY.value =  0
     this._panner8D.positionZ.value = -1

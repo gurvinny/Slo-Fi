@@ -61,6 +61,7 @@ export class AudioEngine {
 
   // State
   private _playbackRate = 1.0
+  private _pitchSemitones = 0
   private _reverbMix = 0.2
   private _volume = 0.8
   private _reverbDecay = 2.5
@@ -125,6 +126,7 @@ export class AudioEngine {
       chorus: { ...this._chorus },
       saturationDrive: this._saturationDrive,
       hzFrequency: this._hzFrequency,
+      pitchSemitones: this._pitchSemitones,
     }
   }
 
@@ -228,6 +230,7 @@ export class AudioEngine {
     this.sourceNode = this.context!.createBufferSource()
     this.sourceNode.buffer = this.buffer
     this.sourceNode.playbackRate.value = this._playbackRate
+    this.sourceNode.detune.value = this._pitchSemitones * 100
 
     if ('preservesPitch' in this.sourceNode) {
       (this.sourceNode as AudioBufferSourceNode & { preservesPitch: boolean }).preservesPitch = true
@@ -308,6 +311,13 @@ export class AudioEngine {
 
   // Parameter setters
 
+  setPitch(semitones: number): void {
+    this._pitchSemitones = Math.max(-12, Math.min(12, semitones))
+    if (this.sourceNode) {
+      this.sourceNode.detune.value = this._pitchSemitones * 100
+    }
+  }
+
   setPlaybackRate(rate: number): void {
     const clamped = Math.max(0.50, Math.min(1.70, rate))
     if (this._isPlaying && this.sourceNode && this.context) {
@@ -381,6 +391,7 @@ export class AudioEngine {
     this.setChorusDepth(params.chorus.depth)
     this.setSaturationDrive(params.saturationDrive)
     this.setHzFrequency(params.hzFrequency)
+    this.setPitch(params.pitchSemitones)
   }
 
   setHzFrequency(hz: number | null): void {

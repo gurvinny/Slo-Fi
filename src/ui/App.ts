@@ -1,5 +1,7 @@
 import { AudioEngine } from '../audio/AudioEngine'
 import { detectBpm } from '../audio/BpmDetector'
+import { detectKey, NOTE_NAMES } from '../audio/KeyDetector'
+import type { DetectedKey } from '../audio/KeyDetector'
 import { Waveform } from './Waveform'
 import { AnomalySphere } from './AnomalySphere'
 import { StarOverlay } from './StarOverlay'
@@ -40,6 +42,7 @@ export class App {
   private trackMeta = document.getElementById('trackMeta')!
 
   private _baseBpm    = 0
+  private _detectedKey: DetectedKey | null = null
   private _loopActive = false
   private currentTimeEl = document.getElementById('currentTime')!
   private durationEl = document.getElementById('duration')!
@@ -49,6 +52,8 @@ export class App {
   private loopBtn   = document.getElementById('loopBtn')!
   private speedSlider = document.getElementById('speedSlider') as HTMLInputElement
   private speedValue = document.getElementById('speedValue')!
+  private pitchSlider = document.getElementById('pitchSlider') as HTMLInputElement
+  private pitchValue = document.getElementById('pitchValue')!
   private reverbSlider = document.getElementById('reverbSlider') as HTMLInputElement
   private reverbValue = document.getElementById('reverbValue')!
   private decaySlider = document.getElementById('decaySlider') as HTMLInputElement
@@ -167,15 +172,7 @@ export class App {
     })
     this.settingsDrawer.querySelectorAll<HTMLButtonElement>('.theme-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
-        this.settingsDrawer.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('theme-chip--active'))
-        chip.classList.add('theme-chip--active')
-        const theme = chip.dataset.theme ?? 'prism'
-        if (theme === 'prism') {
-          document.documentElement.removeAttribute('data-theme')
-        } else {
-          document.documentElement.dataset.theme = theme
-        }
-        this.sphere?.setColorTheme(theme)
+        this.applyTheme(chip.dataset.theme ?? 'prism')
       })
     })
   }
@@ -186,6 +183,9 @@ export class App {
       this.effects.syncToParams(params)
       this.sphere?.setSpeed(params.playbackRate)
       this.sphere?.setReverb(params.reverbMix)
+    }
+    this.presets.onThemeApplied = (theme: string) => {
+      this.applyTheme(theme)
     }
     this.effects.onChanged = () => {
       this.presets.clearActive()
@@ -285,6 +285,15 @@ export class App {
       this.engine.setPlaybackRate(rate)
       this.speedValue.textContent = `${rate.toFixed(2)}x`
       this.sphere?.setSpeed(rate)
+      this.presets.clearActive()
+      this.updateBpmDisplay()
+    })
+
+    // Pitch
+    this.pitchSlider.addEventListener('input', () => {
+      const st = parseInt(this.pitchSlider.value)
+      this.engine.setPitch(st)
+      this.pitchValue.textContent = st === 0 ? '0 st' : `${st > 0 ? '+' : ''}${st} st`
       this.presets.clearActive()
       this.updateBpmDisplay()
     })
@@ -450,7 +459,8 @@ export class App {
       // Push the track title to the OS lock screen / notification card
       this._mobile.setMediaSessionMetadata(baseName)
 
-      this._baseBpm = detectBpm(this.engine.getBuffer()!)
+      this._baseBpm  = detectBpm(this.engine.getBuffer()!)
+      this._detectedKey = detectKey(this.engine.getBuffer()!)
       this.updateBpmDisplay()
 
       this.trackMeta.textContent = `${formatTime(this.engine.duration)} · ${formatBytes(file.size)} · ${file.type || 'audio'}`
@@ -491,6 +501,10 @@ export class App {
     this.speedValue.textContent = `${params.playbackRate.toFixed(2)}x`
     this.updateBpmDisplay()
 
+    const st = params.pitchSemitones
+    this.pitchSlider.value = String(st)
+    this.pitchValue.textContent = st === 0 ? '0 st' : `${st > 0 ? '+' : ''}${st} st`
+
     this.reverbSlider.value = String(Math.round(params.reverbMix * 100))
     this.reverbValue.textContent = `${Math.round(params.reverbMix * 100)}%`
 
@@ -508,10 +522,28 @@ export class App {
 
   private notifyParamChange(): void { /* hook point for future param-change listeners */ }
 
+  private applyTheme(theme: string): void {
+    this.settingsDrawer.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('theme-chip--active'))
+    const chip = this.settingsDrawer.querySelector<HTMLButtonElement>(`.theme-chip[data-theme="${theme}"]`)
+    chip?.classList.add('theme-chip--active')
+    if (theme === 'prism') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.dataset.theme = theme
+    }
+    this.sphere?.setColorTheme(theme)
+  }
+
   private updateBpmDisplay(): void {
     if (!this._baseBpm) { this.trackBpm.textContent = ''; return }
     const displayed = Math.round(this._baseBpm * this.engine.getParams().playbackRate)
-    this.trackBpm.textContent = `${displayed} BPM`
+    let key = ''
+    if (this._detectedKey) {
+      const shift = this.engine.getParams().pitchSemitones
+      const transposedRoot = ((this._detectedKey.root + shift) % 12 + 12) % 12
+      key = ` · ${NOTE_NAMES[transposedRoot]} ${this._detectedKey.mode}`
+    }
+    this.trackBpm.textContent = `${displayed} BPM${key}`
   }
 
   private togglePlayPause(): void {

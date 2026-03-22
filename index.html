@@ -98,19 +98,19 @@
             <div class="preset-strip" role="group" aria-label="Presets">
               <button class="preset-card" data-preset="lofi">
                 <span class="preset-card-name">Lo-Fi</span>
-                <span class="preset-card-hint">0.75x · 30% verb · warm</span>
+                <span class="preset-card-hint">0.78x · 47% verb · void</span>
               </button>
               <button class="preset-card" data-preset="vaporwave">
                 <span class="preset-card-name">Vaporwave</span>
-                <span class="preset-card-hint">0.50x · 55% verb · chorus</span>
+                <span class="preset-card-hint">0.69x · 74% verb · neon</span>
               </button>
               <button class="preset-card" data-preset="ambient">
                 <span class="preset-card-name">Ambient</span>
-                <span class="preset-card-hint">0.65x · 75% verb · hall</span>
+                <span class="preset-card-hint">0.65x · 70% verb · mono</span>
               </button>
               <button class="preset-card preset-card--hyperpop" data-preset="hyperpop">
                 <span class="preset-card-name">Hyperpop</span>
-                <span class="preset-card-hint">1.15x · hard chorus · bright</span>
+                <span class="preset-card-hint">1.25x · 27% verb · ember</span>
               </button>
               <button class="preset-card preset-card--dim" data-preset="custom">
                 <span class="preset-card-name">Custom</span>
@@ -136,6 +136,16 @@
                 <input type="range" id="speedSlider" class="slider" min="50" max="170" value="100" step="1" aria-label="Playback speed" />
                 <div class="slider-ticks">
                   <span>0.50×</span><span>1.00×</span><span>1.70×</span>
+                </div>
+              </div>
+              <div class="control-group">
+                <div class="control-header">
+                  <label for="pitchSlider">Pitch</label>
+                  <span class="value-badge" id="pitchValue">0 st</span>
+                </div>
+                <input type="range" id="pitchSlider" class="slider slider--pitch" min="-12" max="12" value="0" step="1" aria-label="Pitch shift in semitones" />
+                <div class="slider-ticks">
+                  <span>-12</span><span>0</span><span>+12</span>
                 </div>
               </div>
               <div class="control-group">

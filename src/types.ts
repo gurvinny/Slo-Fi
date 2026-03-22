@@ -23,11 +23,13 @@ export interface AudioParams {
   chorus: ChorusParams
   saturationDrive: number   // 0 to 1
   hzFrequency: number | null  // Solfeggio resonance Hz, null = off
+  pitchSemitones: number    // -12 to +12 semitones (0 = no shift)
 }
 
 export interface PresetDefinition {
   id: string
   name: string
+  theme?: string
   params: AudioParams
 }
 

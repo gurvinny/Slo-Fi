@@ -476,20 +476,14 @@ body::after {
 
 /* ── Player — children are fixed panels, shown after a file loads ────────── */
 .player {
+  display: none;
   opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-              visibility 0s linear 0.6s;
+  transition: opacity 0.65s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .player.visible {
+  display: block;
   opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-              visibility 0s linear 0s;
-  transition-delay: 0.4s, 0s;
 }
 
 /* Top HUD: track name + preset strip, fixed below the header */
@@ -949,6 +943,45 @@ body.is-playing .btn-play::before {
   .landing-ring--1   { width: 300px; height: 300px; }
   .landing-ring--2   { width: 220px; height: 220px; }
   .landing-ring--3   { width: 150px; height: 150px; }
+}
+
+/* ── Site footer — GitHub link ──────────────────────────────────────────── */
+.site-footer {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 48; /* below dropzone (50) so it fades with the landing */
+  pointer-events: auto;
+}
+
+.footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.footer-link:hover {
+  color: var(--text);
+  border-color: rgba(155, 109, 255, 0.35);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+}
+
+/* Hide footer once the player is visible so it doesn't overlap the waveform */
+body.is-playing .site-footer,
+body.is-paused .site-footer {
+  display: none;
 }
 
 /* ── New design tokens for effects chain ───────────────────────────────── */

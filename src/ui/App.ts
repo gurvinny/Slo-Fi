@@ -539,11 +539,21 @@ export class App {
   }
 
   private showPlayer(): void {
+    // Trigger the landing exit animation
     this.dropzone.classList.add('landing-exit')
     window.setTimeout(() => {
       this.dropzone.style.display = 'none'
     }, 520)
-    this.player.classList.add('visible')
+
+    // Phase 1: switch to display:block so waveform canvas gets real CSS dimensions
+    // (waveform.resize() is called right after showPlayer() in loadFile)
+    this.player.style.display = 'block'
     this.player.removeAttribute('aria-hidden')
+
+    // Phase 2: fade the player in after the landing exit is underway
+    window.setTimeout(() => {
+      this.player.style.opacity = ''
+      this.player.classList.add('visible')
+    }, 420)
   }
 }

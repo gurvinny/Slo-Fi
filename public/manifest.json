@@ -4,6 +4,7 @@
   "description": "Professional-grade browser audio slow-down tool with convolution reverb",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#080810",
   "theme_color": "#080810",
   "icons": [
@@ -11,7 +12,13 @@
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }

@@ -38,12 +38,12 @@ Slo-Fi is built entirely on the [Web Audio API](https://developer.mozilla.org/en
 Every audio file travels through the same directed graph of Web Audio nodes:
 
 ```
-┌──────────┐    ┌──────────────┐    ┌──────────────┐    ┌───────────────┐    ┌──────────────┐    ┌─────────┐
-│  Source   │───▶│  Playback    │───▶│  Effects     │───▶│  Convolver    │───▶│  Gain /      │───▶│  Audio  │
-│  Buffer   │    │  Rate Node   │    │  Chain       │    │  Node         │    │  Master Out  │    │  Output │
-└──────────┘    └──────────────┘    └──────────────┘    └───────────────┘    └──────────────┘    └─────────┘
-   File I/O       Time-Stretch        EQ · Chorus ·        Reverb Engine         Volume Ctrl       destination
-                                       Saturation
+┌──────────┐  ┌──────────────┐  ┌───────────────┐  ┌──────────────┐  ┌───────────────┐  ┌──────────────┐  ┌─────────┐
+│  Source   │─▶│  Playback    │─▶│  Effects      │─▶│  Convolver   │─▶│  8D Panner   │─▶│  Gain /      │─▶│  Audio  │
+│  Buffer   │  │  Rate Node   │  │  Chain        │  │  Node        │  │  Node        │  │  Master Out  │  │  Output │
+└──────────┘  └──────────────┘  └───────────────┘  └──────────────┘  └───────────────┘  └──────────────┘  └─────────┘
+  File I/O     Time-Stretch &     EQ · Chorus ·      Reverb Engine     HRTF Spatial       Volume Ctrl       destination
+               Pitch Shift        Saturation                           (optional)
 ```
 
 Each node is a native browser object — no custom DSP running in JavaScript on the main thread. The audio processing happens in a real-time audio worklet thread that can't be blocked by UI updates or garbage collection.
@@ -64,7 +64,7 @@ The entire processing graph lives inside a single `AudioContext` instance, owned
 const ctx = new AudioContext({ latencyHint: 'interactive' });
 const source = ctx.createBufferSource();
 source.buffer = decodedAudio;
-source.playbackRate.value = 0.85; // 85% speed
+source.playbackRate.value = 0.85; // 85% speed — pitch handled separately
 source.connect(effectsChainInput);
 source.start();
 ```
@@ -107,20 +107,61 @@ The chain is fully bypassable — when all effects are at neutral, the nodes are
 
 ---
 
+### 8D Panner — Spatial Audio
+
+When 8D mode is enabled, a `PannerNode` with the `HRTF` panning model is inserted after the convolver. An automation loop updates the panner's position on each animation frame, tracing a circular path in 3D space around the listener. Distance attenuation is disabled so the effect is purely spatial rather than volumetric.
+
+```typescript
+const panner = ctx.createPanner();
+panner.panningModel = 'HRTF';
+panner.distanceModel = 'linear';
+panner.maxDistance = 1; // no volume attenuation
+```
+
+---
+
 ### `AnalyserNode` — Visualisation
 
 Two `AnalyserNode` instances feed the waveform and spectrum visualisers:
 
-- **Waveform** (`src/ui/Waveform.ts`) — reads time-domain data via `getByteTimeDomainData()` and draws it to a `<canvas>` element on every animation frame
-- **Spectrum Analyzer** (`src/ui/SpectrumAnalyzer.ts`) — reads frequency-domain data via `getByteFrequencyData()` with an FFT size of 2048, rendered as a bar chart on `<canvas>`
+- **Waveform** (`src/ui/Waveform.ts`) — reads time-domain data via `getByteTimeDomainData()` and draws it to a `<canvas>` element on every animation frame. Supports drag-to-seek and draggable loop region handles.
+- **Spectrum Analyzer** (`src/ui/SpectrumAnalyzer.ts`) — reads frequency-domain data via `getByteFrequencyData()` with an FFT size of 2048, rendered as a bar chart on `<canvas>`. Peak energy spawns particle sparks. Updates aurora CSS variables in real time (`--aurora-bass`, `--aurora-mid`, `--aurora-treble`).
 
 Both run on `requestAnimationFrame` and only redraw while audio is playing.
 
 ---
 
-### MIDI
+### `BpmDetector` — Beat Analysis
 
-`MidiController.ts` uses the Web MIDI API (`navigator.requestMIDIAccess()`) to listen for MIDI CC messages. Each CC number maps to a named parameter (speed, reverb mix, volume, EQ bands, etc.). Mappings are stored in memory and can be reassigned at any time without restarting playback.
+`src/audio/BpmDetector.ts` reads live FFT data from the `AnalyserNode` to detect onsets in the sub-bass region. Inter-onset intervals are accumulated into a running estimate that converges on the track's BPM. The display value is divided by the current playback speed so the readout always reflects the tempo you hear, not the original.
+
+---
+
+### `KeyDetector` — Harmonic Analysis
+
+`src/audio/KeyDetector.ts` runs once when a file loads, using `OfflineAudioContext` to decode the full buffer offline. It builds a 12-bin chromagram from the frequency data and scores it against major and minor key profiles using the **Krumhansl-Schmuckler algorithm**. The highest-scoring match (root note + mode) is displayed under the track title.
+
+---
+
+### `MobileController` — PWA Integration
+
+`src/ui/MobileController.ts` wires up the browser APIs that make Slo-Fi a first-class mobile app:
+
+| API | What it does |
+|:---|:---|
+| **Media Session API** | Lock screen controls (play, pause, seek) with track metadata display |
+| **Fullscreen API** | Full-screen button for immersive playback |
+| **Vibration API** | Haptic feedback: 12ms on play, 8ms on pause, 4ms on seek |
+| **Visibility change** | Resumes `AudioContext` when the app is foregrounded after backgrounding |
+| **Silence loop** | Keeps iOS audio session alive during background playback |
+
+---
+
+### `AnomalySphere` — The Orb
+
+`src/ui/AnomalySphere.ts` is the Three.js renderer for the 3D audio-reactive orb. A `SphereGeometry` is displaced every frame using 4 layers of simplex 3D noise at different frequencies, scaled by the live bass, mid, and treble energy from the `AnalyserNode`. Post-processing adds `UnrealBloom`, film grain, and chromatic aberration.
+
+A cloud of 350 orbiting particles and 3 energy rings complete the scene. The orb's time warp parameter slows the noise animation in sync with playback speed — at 25% speed, the distortions become large and dreamlike.
 
 <br/>
 
@@ -134,23 +175,26 @@ Both run on `requestAnimationFrame` and only redraw while audio is playing.
 src/
 ├── main.ts                  Application entry point
 ├── types.ts                 Shared TypeScript types
-├── presets.ts               Preset definitions (Lo-Fi, Vaporwave, Ambient, Custom)
+├── presets.ts               Preset definitions (Lo-Fi, Vaporwave, Ambient, Hyperpop, Custom)
 │
 ├── audio/
 │   ├── AudioEngine.ts       AudioContext ownership, node graph, playback control
 │   ├── EffectsChain.ts      EQ, Chorus, Tape Saturation nodes
+│   ├── BpmDetector.ts       Onset detection + real-time BPM calculation
+│   ├── KeyDetector.ts       Chromagram analysis — Krumhansl-Schmuckler key detection
 │   ├── Exporter.ts          WAV export orchestration
-│   ├── MidiController.ts    Web MIDI API input and CC mapping
 │   └── WavEncoder.ts        Raw PCM → WAV file encoding
 │
-├── ui/
-│   ├── App.ts               Main controller — wires DOM to audio engine
-│   ├── Waveform.ts          Time-domain canvas visualiser
-│   ├── SpectrumAnalyzer.ts  Frequency-domain canvas visualiser
-│   ├── EffectsController.ts Effects panel DOM bindings
-│   ├── PresetController.ts  Preset selection UI
-│   ├── ExportController.ts  Export button and progress
-│   └── MidiStatusIndicator.ts MIDI connection status display
+└── ui/
+    ├── App.ts               Main controller — wires DOM to audio engine
+    ├── AnomalySphere.ts     Three.js 3D orb with simplex noise displacement + post-processing
+    ├── StarOverlay.ts       Particle star field behind the orb
+    ├── Waveform.ts          Time-domain canvas visualiser + loop region handles
+    ├── SpectrumAnalyzer.ts  Frequency-domain canvas visualiser + aurora variable driver
+    ├── EffectsController.ts Effects panel DOM bindings
+    ├── PresetController.ts  Preset selection UI + theme switching
+    ├── ExportController.ts  Export button and progress
+    └── MobileController.ts  Media Session, Fullscreen, Haptic, Visibility APIs
 ```
 
 The two top-level modules (`audio/`, `ui/`) have a strict dependency direction — `ui/` depends on `audio/`, and `audio/` never imports from `ui/`. This keeps the audio engine independently testable.
@@ -168,7 +212,7 @@ The two top-level modules (`audio/`, `ui/`) have a strict dependency direction �
 | Audio thread latency | < 10ms (`latencyHint: 'interactive'`) |
 | Memory footprint | ~10 MB per minute of stereo 44.1kHz audio |
 | CPU usage | Minimal — all nodes execute as native C++ in the audio thread |
-| Node graph size | 7–10 nodes (source → rate → effects chain → convolver → gains → destination) |
+| Node graph size | 9–12 nodes (source → rate → effects chain → convolver → 8D panner → gains → destination) |
 | Visualiser frame rate | Capped to `requestAnimationFrame` (~60fps), pauses when audio stops |
 | Build output | Single JS bundle, no runtime dependencies |
 
@@ -206,6 +250,7 @@ Audio processing is entirely client-side. The browser is the only runtime — th
 | No persistent storage | `AudioBuffer` lives in memory only; cleared on tab close |
 | No third-party scripts | All dependencies bundled at build time; no CDN calls at runtime |
 | Strict CSP | Content Security Policy headers block inline scripts and restrict origins |
+| PWA service worker | `sw.js` caches app shell assets only — audio data is never cached or stored |
 
 For reporting a vulnerability, see [SECURITY.md](SECURITY.md).
 

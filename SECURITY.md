@@ -52,7 +52,7 @@ Slo-Fi's security posture is built into the architecture itself. Audio is proces
 | Guarantee | How It's Enforced |
 |:---|:---|
 | **No audio uploads** | Audio is decoded with `AudioContext.decodeAudioData()` from a local `File` object. No `fetch`, `XHR`, or WebSocket is used for audio data at any point. |
-| **No persistent audio storage** | `AudioBuffer` instances live only in memory. No writes to `localStorage`, `IndexedDB`, or the Cache API for audio content. Closing the tab frees all audio memory. |
+| **No persistent audio storage** | `AudioBuffer` instances live only in memory. No writes to `localStorage`, `IndexedDB`, or the Cache API for audio content. The PWA service worker (`sw.js`) caches only static app shell assets — never audio data. Closing the tab frees all audio memory. |
 | **No third-party scripts** | Zero analytics, zero tracking pixels, zero CDN-loaded runtime libraries. All dependencies are bundled and reviewed at build time. |
 | **Content Security Policy** | Strict CSP headers restrict resource origins and block inline script injection. |
 
@@ -68,7 +68,8 @@ This architecture makes Slo-Fi safe to use with sensitive, unreleased, or propri
 
 | Version | Supported |
 |:---:|:---:|
-| 1.0.x | Yes — actively maintained |
+| 2.0.x | Yes — actively maintained |
+| 1.0.x | Yes — security patches only |
 | < 1.0 | No — please upgrade |
 
 Security patches are applied to the latest release only.

@@ -21,6 +21,30 @@ export class EffectsController {
   private satDriveSlider = document.getElementById('satDriveSlider') as HTMLInputElement
   private satDriveValue = document.getElementById('satDriveValue')!
 
+  private eightDToggle     = document.getElementById('eightDToggle')     as HTMLInputElement
+  private eightDSpeedSlider = document.getElementById('eightDSpeedSlider') as HTMLInputElement
+  private eightDSpeedValue  = document.getElementById('eightDSpeedValue')!
+  private eightDSpeedRow    = document.getElementById('eightDSpeedRow')!
+  private eightDSpeedTicks  = document.getElementById('eightDSpeedTicks')!
+  private eightDHint        = document.getElementById('eightDHint')!
+
+  private hzButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.btn-hz'))
+  private hzValue   = document.getElementById('hzValue')!
+  private hzHint    = document.getElementById('hzHint')!
+
+  private readonly HZ_LABELS: Record<string, string> = {
+    off:  'No frequency boost applied',
+    '432': '432 Hz — Natural tuning, relaxation & harmony',
+    '528': '528 Hz — Love frequency, transformation',
+    '639': '639 Hz — Relationship healing, emotional balance',
+    '741': '741 Hz — Expression, intuition & mental clarity',
+    '852': '852 Hz — Spiritual awareness & inner strength',
+    '963': '963 Hz — Divine connection & enlightenment',
+  }
+
+  // Fires when the 8D toggle changes so App.ts can sync the sphere
+  public on8DChange: ((enabled: boolean, speed: number) => void) | null = null
+
   // Fired after any slider change so App.ts can clear the active preset
   public onChanged: (() => void) | null = null
 
@@ -71,6 +95,56 @@ export class EffectsController {
       this.satDriveValue.textContent = `${this.satDriveSlider.value}%`
       this.onChanged?.()
     })
+
+    this.eightDToggle.addEventListener('change', () => {
+      const enabled = this.eightDToggle.checked
+      const speed   = this._get8DSpeed()
+      this.engine.set8DEnabled(enabled)
+      this._show8DSpeedControls(enabled)
+      this.on8DChange?.(enabled, speed)
+      this.onChanged?.()
+    })
+
+    this.eightDSpeedSlider.addEventListener('input', () => {
+      const speed = this._get8DSpeed()
+      this.engine.set8DSpeed(speed)
+      this.eightDSpeedValue.textContent = `${speed.toFixed(1)} Hz`
+      this.on8DChange?.(this.eightDToggle.checked, speed)
+    })
+
+    this.hzButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const raw = btn.dataset.hz
+        const hz = raw === 'off' ? null : parseInt(raw!, 10)
+        this.engine.setHzFrequency(hz)
+        this._updateHzButtons(hz)
+        this.onChanged?.()
+      })
+    })
+  }
+
+  private _updateHzButtons(hz: number | null): void {
+    const target = hz === null ? 'off' : String(hz)
+    this.hzButtons.forEach(btn => {
+      const active = btn.dataset.hz === target
+      btn.classList.toggle('btn-hz--active', active)
+      btn.setAttribute('aria-pressed', String(active))
+    })
+    this.hzValue.textContent = hz === null ? 'Off' : `${hz} Hz`
+    this.hzHint.textContent = this.HZ_LABELS[target] ?? ''
+  }
+
+  private _get8DSpeed(): number {
+    // Slider range 1-20 maps to 0.1-2.0 Hz (divide by 10)
+    return parseFloat(this.eightDSpeedSlider.value) / 10
+  }
+
+  private _show8DSpeedControls(show: boolean): void {
+    const display = show ? '' : 'none'
+    this.eightDSpeedRow.style.display  = display
+    this.eightDSpeedSlider.style.display = display
+    this.eightDSpeedTicks.style.display  = display
+    this.eightDHint.style.display = show ? 'none' : ''
   }
 
   // Syncs slider positions and badges to a given params object.
@@ -93,5 +167,7 @@ export class EffectsController {
     const satPct = Math.round(params.saturationDrive * 100)
     this.satDriveSlider.value = String(satPct)
     this.satDriveValue.textContent = `${satPct}%`
+
+    this._updateHzButtons(params.hzFrequency)
   }
 }

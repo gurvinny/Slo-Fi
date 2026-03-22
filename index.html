@@ -130,43 +130,83 @@
               </div>
             </div>
 
-            <details class="controls-section" id="effectsSection">
-              <summary class="controls-section-header">
-                <span>Effects Chain</span>
-                <span class="controls-section-hint">EQ · Chorus · Saturation</span>
-              </summary>
-              <div class="controls">
-                <div class="control-group">
-                  <div class="control-header"><label for="eqLowSlider">EQ Low</label><span class="value-badge value-badge--green" id="eqLowValue">0 dB</span></div>
-                  <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf" />
-                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
-                </div>
-                <div class="control-group">
-                  <div class="control-header"><label for="eqMidSlider">EQ Mid</label><span class="value-badge value-badge--green" id="eqMidValue">0 dB</span></div>
-                  <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak" />
-                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
-                </div>
-                <div class="control-group">
-                  <div class="control-header"><label for="eqHighSlider">EQ High</label><span class="value-badge value-badge--green" id="eqHighValue">0 dB</span></div>
-                  <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf" />
-                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
-                </div>
-                <div class="control-group">
-                  <div class="control-header"><label for="chorusRateSlider">Chorus Rate</label><span class="value-badge value-badge--orange" id="chorusRateValue">0.8 Hz</span></div>
-                  <input type="range" id="chorusRateSlider" class="slider slider--orange" min="0.1" max="5" value="0.8" step="0.1" aria-label="Chorus rate" />
-                  <div class="slider-ticks"><span>0.1 Hz</span><span>2.5 Hz</span><span>5 Hz</span></div>
-                </div>
-                <div class="control-group">
-                  <div class="control-header"><label for="chorusDepthSlider">Chorus Depth</label><span class="value-badge value-badge--orange" id="chorusDepthValue">0%</span></div>
-                  <input type="range" id="chorusDepthSlider" class="slider slider--orange" min="0" max="100" value="0" step="1" aria-label="Chorus depth" />
-                </div>
-                <div class="control-group">
-                  <div class="control-header"><label for="satDriveSlider">Tape Drive</label><span class="value-badge value-badge--red" id="satDriveValue">0%</span></div>
-                  <input type="range" id="satDriveSlider" class="slider slider--red" min="0" max="100" value="0" step="1" aria-label="Tape drive" />
-                  <div class="slider-ticks"><span>Clean</span><span>Warm</span><span>Driven</span></div>
-                </div>
+          </div>
+
+          <!-- Effects drawer — right side, opens with "Effects" button -->
+          <div id="effectsDrawer" class="controls-drawer controls-drawer--hidden">
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Effects Chain</span>
+              <button id="effectsCloseBtn" class="controls-drawer-btn" title="Close panel" aria-label="Close panel">&times;</button>
+            </div>
+            <div class="controls">
+              <div class="control-group">
+                <div class="control-header"><label for="eqLowSlider">EQ Low</label><span class="value-badge value-badge--green" id="eqLowValue">0 dB</span></div>
+                <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf" />
+                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
               </div>
-            </details>
+              <div class="control-group">
+                <div class="control-header"><label for="eqMidSlider">EQ Mid</label><span class="value-badge value-badge--green" id="eqMidValue">0 dB</span></div>
+                <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak" />
+                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="eqHighSlider">EQ High</label><span class="value-badge value-badge--green" id="eqHighValue">0 dB</span></div>
+                <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf" />
+                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="chorusRateSlider">Chorus Rate</label><span class="value-badge value-badge--orange" id="chorusRateValue">0.8 Hz</span></div>
+                <input type="range" id="chorusRateSlider" class="slider slider--orange" min="0.1" max="5" value="0.8" step="0.1" aria-label="Chorus rate" />
+                <div class="slider-ticks"><span>0.1 Hz</span><span>2.5 Hz</span><span>5 Hz</span></div>
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="chorusDepthSlider">Chorus Depth</label><span class="value-badge value-badge--orange" id="chorusDepthValue">0%</span></div>
+                <input type="range" id="chorusDepthSlider" class="slider slider--orange" min="0" max="100" value="0" step="1" aria-label="Chorus depth" />
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="satDriveSlider">Saturator</label><span class="value-badge value-badge--red" id="satDriveValue">0%</span></div>
+                <input type="range" id="satDriveSlider" class="slider slider--red" min="0" max="100" value="0" step="1" aria-label="Saturator" />
+                <div class="slider-ticks"><span>Clean</span><span>Warm</span><span>Saturated</span></div>
+              </div>
+              <div class="control-group control-group--8d">
+                <label class="toggle-row">
+                  <span class="toggle-label">
+                    <svg class="icon-headphones" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+                    </svg>
+                    8D Audio
+                  </span>
+                  <span class="toggle-wrap">
+                    <input type="checkbox" id="eightDToggle" class="toggle-input" aria-label="8D audio — headphones required" />
+                    <span class="toggle-track"></span>
+                  </span>
+                </label>
+                <p class="control-hint" id="eightDHint">Use headphones for the binaural effect</p>
+                <div class="control-header" id="eightDSpeedRow" style="display:none">
+                  <label for="eightDSpeedSlider">Rotation Speed</label>
+                  <span class="value-badge value-badge--purple" id="eightDSpeedValue">0.5 Hz</span>
+                </div>
+                <input type="range" id="eightDSpeedSlider" class="slider slider--purple" min="1" max="20" value="5" step="1" aria-label="8D rotation speed" style="display:none" />
+                <div class="slider-ticks" id="eightDSpeedTicks" style="display:none"><span>Slow</span><span>0.5 Hz</span><span>Fast</span></div>
+              </div>
+              <div class="control-group control-group--hz">
+                <div class="control-header">
+                  <label>Hz Resonance</label>
+                  <span class="value-badge value-badge--indigo" id="hzValue">Off</span>
+                </div>
+                <div class="btn-hz-group" role="group" aria-label="Hz frequency resonance">
+                  <button class="btn-hz btn-hz--active" data-hz="off"  title="No frequency boost"                                 aria-pressed="true">Off</button>
+                  <button class="btn-hz" data-hz="432" title="432 Hz — Natural tuning, relaxation &amp; harmony"        aria-pressed="false">432</button>
+                  <button class="btn-hz" data-hz="528" title="528 Hz — Love frequency, transformation"                  aria-pressed="false">528</button>
+                  <button class="btn-hz" data-hz="639" title="639 Hz — Relationship healing, emotional balance"         aria-pressed="false">639</button>
+                  <button class="btn-hz" data-hz="741" title="741 Hz — Expression, intuition &amp; mental clarity"     aria-pressed="false">741</button>
+                  <button class="btn-hz" data-hz="852" title="852 Hz — Spiritual awareness &amp; inner strength"       aria-pressed="false">852</button>
+                  <button class="btn-hz" data-hz="963" title="963 Hz — Divine connection &amp; enlightenment"          aria-pressed="false">963</button>
+                </div>
+                <p class="control-hint" id="hzHint">Hover a frequency to learn more</p>
+              </div>
+            </div>
           </div>
 
           <!-- Visual Settings drawer — left side, opens with gear button -->
@@ -313,6 +353,7 @@
                   </svg>
                 </button>
                 <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls">Controls</button>
+                <button id="effectsShowBtn" class="btn-controls-show" aria-label="Show effects">Effects</button>
               </div>
             </div>
           </div>

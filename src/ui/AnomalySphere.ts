@@ -371,6 +371,8 @@ export class AnomalySphere {
   private bassPulse     = true
   private rotationSpeed = 1.0
   private orbBaseScale  = 1.0
+  private _8DEnabled    = false
+  private _8DAngle      = 0    // current panner angle in radians, set by AudioEngine callback
   private particleCount = 500
   private prevBass      = 0   // previous frame bass — used for transient detection
   private _loopPulseAmount = 0  // decays each frame; set to 1 on each loop cycle
@@ -735,10 +737,20 @@ export class AnomalySphere {
     const loopPulseFactor  = this._loopPulseAmount * 0.08
     this.mesh.scale.setScalar(this.orbBaseScale * (1.0 + pulseFactor + loopPulseFactor))
 
-    // Rotation slows with playback speed; user-adjustable rotation speed
-    const rotScale = (0.35 + this.speed * 0.65) * this.rotationSpeed
-    this.mesh.rotation.y += (0.0018 + bVis * 0.006) * rotScale
-    this.mesh.rotation.x += 0.0006 * rotScale
+    // Rotation: when 8D mode is active, the orb tracks the panner angle directly.
+    // Otherwise the normal audio-reactive rotation drives it.
+    if (this._8DEnabled) {
+      // Snap the Y rotation to the panner angle so the orb visually circles
+      // the listener in sync with the binaural sound position.
+      this.mesh.rotation.y = this._8DAngle
+      // Keep a gentle tilt animation on X so the orb stays alive
+      const rotScale = (0.35 + this.speed * 0.65) * this.rotationSpeed
+      this.mesh.rotation.x += 0.0006 * rotScale
+    } else {
+      const rotScale = (0.35 + this.speed * 0.65) * this.rotationSpeed
+      this.mesh.rotation.y += (0.0018 + bVis * 0.006) * rotScale
+      this.mesh.rotation.x += 0.0006 * rotScale
+    }
 
     // Particle color tracks the palette hue
     this.particleUniforms.uBass.value   = bVis
@@ -803,6 +815,9 @@ export class AnomalySphere {
     this.particleCount = Math.max(0, Math.min(3000, n))
     this.rebuildParticleGeo(this.particleCount)
   }
+
+  set8DMode(enabled: boolean): void  { this._8DEnabled = enabled }
+  set8DAngle(angle: number): void   { this._8DAngle = angle }
 
   setReactivity(v: number): void    { this.reactivity = Math.max(0, Math.min(1, v)) }
   setGlow(v: number): void          { this.glowMult = Math.max(0, Math.min(1.5, v)) }

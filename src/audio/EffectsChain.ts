@@ -24,6 +24,9 @@ export class EffectsChain {
   private satNode!: WaveShaperNode
   private satDrive = 0
 
+  // Hz frequency resonance (Solfeggio peaking filter)
+  private hzFilter!: BiquadFilterNode
+
   // rAF handle for debouncing saturation curve updates
   private satRafId: number | null = null
 
@@ -74,6 +77,13 @@ export class EffectsChain {
     this.satNode.oversample = '4x'
     this.satNode.curve = this.buildSatCurve(0)
 
+    // Hz resonance peaking filter (gain=0 = transparent when off)
+    this.hzFilter = ctx.createBiquadFilter()
+    this.hzFilter.type = 'peaking'
+    this.hzFilter.frequency.value = 432
+    this.hzFilter.Q.value = 10
+    this.hzFilter.gain.value = 0
+
     // Output node - just a pass-through gain so callers get a stable node ref
     this.outputNode = ctx.createGain()
     this.outputNode.gain.value = 1.0
@@ -92,9 +102,10 @@ export class EffectsChain {
     this.chorusDryGain.connect(this.chorusMerge)
     this.chorusWetGain.connect(this.chorusMerge)
 
-    // Wire saturation and output
+    // Wire saturation → hz filter → output
     this.chorusMerge.connect(this.satNode)
-    this.satNode.connect(this.outputNode)
+    this.satNode.connect(this.hzFilter)
+    this.hzFilter.connect(this.outputNode)
 
     // Start the LFO - it runs continuously to avoid pitch glitches on start/stop
     if (ctx instanceof AudioContext) {
@@ -114,9 +125,13 @@ export class EffectsChain {
     this.eqMid.gain.value = params.eq.mid
     this.eqHigh.gain.value = params.eq.high
     this.chorusLfo.frequency.value = params.chorus.rate
-    this.chorusLfoGain.gain.value = params.chorus.depth * 0.01
-    this.chorusWetGain.gain.value = params.chorus.depth > 0 ? 0.5 : 0
+    this.chorusLfoGain.gain.value = params.chorus.depth * 0.015
+    this.chorusWetGain.gain.value = params.chorus.depth * 0.6
     this.satNode.curve = this.buildSatCurve(params.saturationDrive)
+    if (params.hzFrequency !== null) {
+      this.hzFilter.frequency.value = params.hzFrequency
+      this.hzFilter.gain.value = 4
+    }
 
     // Start LFO for offline context too
     this.chorusLfo.start()
@@ -142,9 +157,12 @@ export class EffectsChain {
   setChorusDepth(depth: number): void {
     const clamped = Math.max(0, Math.min(1, depth))
     const t = (this.ctx as AudioContext).currentTime
-    this.chorusLfoGain.gain.setTargetAtTime(clamped * 0.01, t, 0.01)
-    // Bring wet gain in when depth > 0, silence it when depth = 0
-    this.chorusWetGain.gain.setTargetAtTime(clamped > 0 ? 0.5 : 0, t, 0.01)
+    // Modulation range: 0 to 15 ms — proportional to depth so the rate slider
+    // has an audible effect even at low depth values.
+    this.chorusLfoGain.gain.setTargetAtTime(clamped * 0.015, t, 0.01)
+    // Wet gain scales proportionally with depth (0 to 60%).
+    // The old binary 0/0.5 jump meant 1% depth sounded the same as 100%.
+    this.chorusWetGain.gain.setTargetAtTime(clamped * 0.6, t, 0.01)
   }
 
   setSaturationDrive(drive: number): void {
@@ -157,24 +175,38 @@ export class EffectsChain {
     })
   }
 
+  setHzFrequency(hz: number | null): void {
+    const t = (this.ctx as AudioContext).currentTime
+    if (hz === null) {
+      this.hzFilter.gain.setTargetAtTime(0, t, 0.01)
+    } else {
+      this.hzFilter.frequency.value = hz
+      this.hzFilter.gain.setTargetAtTime(4, t, 0.01)
+    }
+  }
+
   getOutputNode(): AudioNode {
     return this.outputNode
   }
 
-  // Soft-clip waveshaping curve. drive=0 is a linear passthrough.
+  // Soft-clip waveshaping curve using a normalized tanh transfer function.
+  // drive=0: transparent (effectively linear)
+  // drive=1: clear but musical saturation — no harsh clipping
+  //
+  // Normalization: y = tanh(k*x) / tanh(k) guarantees that x=±1 always
+  // maps to y=±1, so there is zero gain change — only waveform shaping.
+  // The old formula violated this, amplifying quiet signals and crushing
+  // loud ones regardless of the drive setting.
   private buildSatCurve(drive: number): Float32Array<ArrayBuffer> {
     const n = 256
     const curve: Float32Array<ArrayBuffer> = new Float32Array(n)
-    const k = drive * 100
+    // k from ~0 (linear) to 6 (noticeable but never harsh saturation)
+    const k    = drive * 6 + 0.001
+    const norm = Math.tanh(k)
 
     for (let i = 0; i < n; i++) {
       const x = (i * 2) / n - 1  // -1 to +1
-      if (k === 0) {
-        curve[i] = x
-      } else {
-        // Standard soft-clip formula
-        curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x))
-      }
+      curve[i] = Math.tanh(k * x) / norm
     }
 
     return curve

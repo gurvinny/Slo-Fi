@@ -13,6 +13,7 @@ export const PRESETS: PresetDefinition[] = [
       eq: { low: 3, mid: -2, high: -4 },
       chorus: { rate: 0.8, depth: 0.15 },
       saturationDrive: 0.45,
+      hzFrequency: null,
     },
   },
   {
@@ -27,6 +28,7 @@ export const PRESETS: PresetDefinition[] = [
       eq: { low: 2, mid: 0, high: 1 },
       chorus: { rate: 0.3, depth: 0.30 },
       saturationDrive: 0.10,
+      hzFrequency: null,
     },
   },
   {
@@ -41,6 +43,7 @@ export const PRESETS: PresetDefinition[] = [
       eq: { low: 0, mid: -3, high: -2 },
       chorus: { rate: 0.15, depth: 0.40 },
       saturationDrive: 0.0,
+      hzFrequency: null,
     },
   },
   {
@@ -55,6 +58,7 @@ export const PRESETS: PresetDefinition[] = [
       eq: { low: 2, mid: 1, high: 6 },
       chorus: { rate: 4.0, depth: 0.70 },
       saturationDrive: 0.55,
+      hzFrequency: null,
     },
   },
 ]

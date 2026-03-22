@@ -78,6 +78,8 @@ uniform float uBass;
 uniform float uMid;
 uniform float uTreble;
 uniform float uSpeed;   // 0.25-1.0 — slower = dreamier, larger distortion
+uniform float uCrystal; // 0-1 — flattens displacement toward a perfect sphere when paused
+uniform float uSubBass; // isolated 20-80 Hz sub-bass — drives slow ominous 808 rumble
 
 varying vec3 vNormal;
 varying vec3 vWorldPos;
@@ -89,16 +91,18 @@ void main() {
   // Subtle slowAmp so the shape stays orb-like even at 0.25x speed
   float slowAmp = 1.0 + (1.0 - uSpeed) * 0.18;
 
+  // Sub-bass (808 territory): very low spatial frequency = large slow ominous bulge
+  float dSub = snoise(normal * 0.85 + t * 0.10) * uSubBass * 0.28 * slowAmp;
   // Bass gets the biggest bumps; mid adds ripples; treble adds shimmer.
   // Amplitudes are tuned so the orb deforms dramatically but stays readable.
-  float d1   = snoise(normal * 1.4 + t * 0.22) * uBass   * 0.28 * slowAmp;
+  float d1   = snoise(normal * 1.4 + t * 0.22) * uBass   * 0.40 * slowAmp;
   float d2   = snoise(normal * 3.6 + t * 0.50) * uMid    * 0.12;
   float d4   = snoise(normal * 5.8 + t * 0.38) * uMid    * 0.07;
   float d3   = snoise(normal * 9.2 + t * 1.05) * uTreble * 0.05;
   float idle = snoise(normal * 1.9 + t * 0.16) * 0.028;
 
-  // Hard clamp: displacement never exceeds 34% of sphere radius.
-  float disp = clamp(d1 + d2 + d3 + d4 + idle, -0.34, 0.34);
+  // Crystal flattening: displacement irons toward a perfect sphere when paused.
+  float disp = clamp(dSub + d1 + d2 + d3 + d4 + idle, -0.52, 0.52) * (1.0 - uCrystal * 0.90);
   vDisp = disp;
 
   vNormal   = normalize(normalMatrix * normal);
@@ -114,11 +118,15 @@ void main() {
 // Color uniforms rotate each frame so the palette cycles with the beat.
 // uReverb adds iridescent wash — high reverb makes the orb look wet and blurry.
 const FRAGMENT_SHADER = /* glsl */`
+${GLSL_NOISE}
+
 uniform float uBass;
 uniform float uMid;
 uniform float uTreble;
 uniform float uTime;
 uniform float uReverb;  // 0-1 — higher = more iridescent / glowy wash
+uniform float uCrack;   // 0-1 — fracture vein intensity, peaks on hard bass
+uniform float uCrystal; // 0-1 — crystallization, lerps toward 1 when paused
 uniform vec3  uColorA;  // hue 0   — cycles each frame
 uniform vec3  uColorB;  // hue +0.28 offset
 uniform vec3  uColorC;  // hue +0.55 offset
@@ -173,6 +181,23 @@ void main() {
   // Core glow
   float coreGlow = pow(nDotV, 6.0) * 0.20;
   color += coreGlow * mix(uColorB, uColorC, uTreble) * 0.35;
+
+  // Surface crack veins — blazing fracture lines that appear on heavy bass hits
+  if (uCrack > 0.01) {
+    float c1   = snoise(vNormal * 5.5 + uTime * 0.04);
+    float c2   = snoise(vNormal * 11.0 + uTime * 0.025);
+    float vein = abs(fract(c1 * 3.0 + c2 * 0.4) - 0.5) * 2.0;
+    vein = pow(1.0 - smoothstep(0.76, 1.0, vein), 4.0);
+    vec3 crackCol = mix(uColorA, uColorC, 0.5) * 3.2;
+    color += crackCol * vein * uCrack * (0.5 + uBass * 0.9);
+  }
+
+  // Crystallization tint — icy blue-white wash with hardened rim when paused
+  if (uCrystal > 0.01) {
+    vec3 iceColor = vec3(0.70, 0.88, 1.0);
+    color = mix(color, iceColor * (dispBright * 0.8 + 0.25), uCrystal * 0.65);
+    color += fresnel * iceColor * uCrystal * 0.55;
+  }
 
   // Reverb also slightly increases alpha — more verb = more ethereal opacity
   float alpha = 0.40 + fresnel * 0.48 + uBass * 0.07 + uReverb * 0.06;
@@ -247,7 +272,7 @@ varying float vAlpha;
 
 void main() {
   // Bass pushes particles outward from the sphere surface
-  float r = aRadius + uBass * 0.35;
+  float r = aRadius + uBass * 0.50;
   vec3 pos = normalize(position) * r;
 
   // Y-axis orbit at a per-particle rate and phase
@@ -320,7 +345,7 @@ const GRAIN_CA_SHADER = {
       // The offset grows toward the edges and pulses slightly with bass.
       vec2  center = vUv - 0.5;
       float dist   = length(center);
-      float ca     = (0.0018 + uBass * 0.018) * dist;
+      float ca     = (0.0018 + uBass * 0.028) * dist;
       vec2  dir    = normalize(center + 0.0001);
 
       float r = texture2D(tDiffuse, vUv - dir * ca).r;
@@ -337,7 +362,7 @@ const GRAIN_CA_SHADER = {
 
 // ── Damping constants ────────────────────────────────────────────────────────
 // Bass uses asymmetric lerp (fast attack, slow decay) for punchy impact.
-const BASS_LERP_UP   = 0.26   // fast attack — orb snaps to the beat immediately
+const BASS_LERP_UP   = 0.32   // fast attack — orb snaps to the beat immediately
 const BASS_LERP_DOWN = 0.025  // slow decay  — energy lingers after the hit
 const MID_LERP       = 0.040
 const TREBLE_LERP    = 0.060
@@ -345,6 +370,91 @@ const TREBLE_LERP    = 0.060
 const UI_BASS_UP     = 0.32   // near-instant attack so UI hits land on the beat
 const UI_BASS_DOWN   = 0.08   // faster decay than aurora bass (~12 frames)
 const UI_TREBLE_LERP = 0.10
+
+// ── Glitch / scanline corruption pass ────────────────────────────────────────
+// A post-processing ShaderPass that simulates digital video corruption.
+// The screen is divided into thin horizontal bands of random height; a random
+// subset of those bands are offset horizontally, mimicking a corrupt VHS or
+// dropped-frame glitch artefact.
+//
+// Design goals:
+//   • Subtle by default — the band shift is small (max ±2.75% of screen width)
+//     so the effect reads as "interference" rather than pure chaos
+//   • Temporally noisy — band heights and which bands shift are re-seeded every
+//     few frames (6–12 Hz) so the pattern never settles into a repeating loop
+//   • Zero cost when idle — the shader early-exits (uGlitch < 0.001) so there's
+//     no per-pixel work unless the effect is actually firing
+//   • Kick-driven — uGlitch is driven by kickVis in JS, so glitches only appear
+//     on hard transients (loud kick drums / 808 attacks) not sustained bass
+//
+// uGlitch range: 0 (off) → 1 (maximum band shift). In practice it reaches
+// ~0.5 on a strong kick because the kickVis multiplier is conservative.
+const GLITCH_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null }, // input framebuffer from previous pass
+    uGlitch:  { value: 0 },   // 0-1 corruption intensity, driven by kick energy each frame
+    uTime:    { value: 0 },   // elapsed seconds — seeds temporal randomness in the shader
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform float uGlitch;
+    uniform float uTime;
+    varying vec2 vUv;
+
+    // Low-quality but fast hash — adequate for visual noise, not cryptography
+    float rand(vec2 co) {
+      return fract(sin(dot(co, vec2(127.1, 311.7))) * 43758.5453);
+    }
+
+    void main() {
+      // Skip all per-pixel work when glitch is effectively zero (toggle off or
+      // between kicks). This keeps the pass free when glitchEnabled = false.
+      if (uGlitch < 0.001) {
+        gl_FragColor = texture2D(tDiffuse, vUv);
+        return;
+      }
+
+      // Divide screen into horizontal bands of randomised height (1.8%–7.3% of
+      // screen height). The band height changes at ~6 Hz so the grid constantly
+      // re-tiles, preventing any visible periodicity.
+      float band    = 0.018 + rand(vec2(floor(uTime * 6.3), 1.0)) * 0.055;
+      float bandIdx = floor(vUv.y / band);   // integer band index for this pixel
+
+      // Each band gets a per-frame random seed. Seed changes at ~11 Hz — faster
+      // than the band grid so individual bands flicker independently.
+      float seed    = rand(vec2(bandIdx, floor(uTime * 11.7)));
+
+      // Only ~28% of bands shift (seed > 0.72). The rest pass through unchanged.
+      // Shift magnitude is ±(uGlitch × 2.75%) of screen width — intentionally
+      // small so the effect looks like interference rather than full corruption.
+      float shift   = seed > 0.72
+        ? (rand(vec2(bandIdx + 0.3, floor(uTime * 8.0))) - 0.5) * uGlitch * 0.055
+        : 0.0;
+
+      // Sample source with horizontal offset; Y is unchanged so bands stay level
+      gl_FragColor = texture2D(tDiffuse, vec2(vUv.x + shift, vUv.y));
+    }
+  `,
+}
+
+// ── Per-theme color palettes ─────────────────────────────────────────────────
+// Each entry is [A, B, C, D] where each slot is [hue, saturation, lightness].
+// Audio modulates lightness (+bass) and saturation (+treble) at runtime so the
+// palette still pulses with the music while staying completely on-theme.
+const THEME_PALETTES: Record<string, Array<[number, number, number]>> = {
+  void:  [[0.75, 0.88, 0.38], [0.67, 0.78, 0.42], [0.82, 0.72, 0.40], [0.70, 0.62, 0.33]],
+  neon:  [[0.50, 0.95, 0.52], [0.40, 0.90, 0.50], [0.88, 0.95, 0.57], [0.57, 0.90, 0.55]],
+  ember: [[0.03, 0.95, 0.55], [0.09, 0.92, 0.57], [0.00, 0.88, 0.45], [0.14, 0.85, 0.55]],
+  frost: [[0.56, 0.72, 0.65], [0.51, 0.65, 0.70], [0.61, 0.60, 0.68], [0.58, 0.48, 0.78]],
+  mono:  [[0.00, 0.04, 0.55], [0.00, 0.04, 0.65], [0.00, 0.04, 0.70], [0.00, 0.04, 0.45]],
+}
 
 export class AnomalySphere {
   private renderer:  THREE.WebGLRenderer
@@ -369,18 +479,77 @@ export class AnomalySphere {
   private hueOffset  = 0    // rotating palette hue, advanced each frame by beat energy
   private reverb     = 0.2  // current reverb mix (0-1), set via setReverb()
   private speed      = 1.0  // current playback rate (0.25-1), set via setSpeed()
-  private reactivity    = 0.8
+  // Default reactivity starts low so the orb is calm on first load.
+  // The user can raise it via the Reactivity slider in Visual Settings.
+  private reactivity    = 0.40
   private glowMult      = 1.0
   private colorTheme    = 'prism'
-  private themeHueLock  = -1
+  private themeHueLock  = -1    // -1 = prism mode (free hue cycling), 0 = theme locked
   private bassPulse     = true
   private rotationSpeed = 1.0
-  private orbBaseScale  = 1.0
+  // orbBaseScale starts slightly below 1.0 so the orb looks "small and contained"
+  // before the music kicks in; bass/kick energy drives it outward from there.
+  private orbBaseScale  = 0.72
   private _8DEnabled    = false
   private _8DAngle      = 0    // current panner angle in radians, set by AudioEngine callback
   private particleCount = 500
-  private prevBass      = 0   // previous frame bass — used for transient detection
+  private prevBass      = 0   // previous frame bass — used for wide-band transient detection
+  // ── Sub-bass / 808 channel ────────────────────────────────────────────────
+  // Isolated 20–80 Hz band that tracks the fundamental frequency of 808 bass
+  // hits and sub-bass synths. Heavily compressed rap/hip-hop often has very
+  // little variation in the full bass band (20–250 Hz) but the 808 region still
+  // moves frame-to-frame, so this gives the orb something to react to.
+  private subBass       = 0
+  private prevSubBass   = 0   // previous frame sub-bass for transient detection
+  // ── Adaptive range expansion ──────────────────────────────────────────────
+  // Tracks the observed dynamic range of the current track.  For tracks with
+  // heavy mastering / limiting (where raw bass barely varies), remapping
+  // bassFloor→bassCeiling to 0→1 makes the orb feel alive even when the
+  // waveform looks like a solid rectangle in a DAW.
+  private bassFloor     = 0   // slow-rising floor: ignores brief dips, tracks silence
+  private bassCeiling   = 0.4 // fast-rising ceiling: immediately captures peaks
+  // ── Kick detection via spectral flux ─────────────────────────────────────
+  // Instead of reacting to sustained bass energy (which is constant on compressed
+  // tracks), we measure the per-frame *positive increase* in the 40–150 Hz bin
+  // range.  This fires sharply on each kick drum attack regardless of compression,
+  // then decays before the next hit.  kickEnergy drives all motion-related
+  // visuals (bloom, scale, rotation, cracks, lightning) so the orb pulses exactly
+  // on the beat rather than glowing at a constant medium level.
+  private kickEnergy    = 0   // smoothed spectral flux, 40-150 Hz, scaled ×2.8 in kickVis
+  private prevFreqData: Uint8Array | null = null  // previous FFT frame for flux delta
   private _loopPulseAmount = 0  // decays each frame; set to 1 on each loop cycle
+
+  // ── Orb effect: lightning tendrils ─────────────────────────────────────────
+  // Short jagged THREE.Line arcs spawn at the orb surface and shoot outward on
+  // kick transients. Each arc has a lifespan counter; opacity fades linearly as
+  // life drains so they flash and vanish rather than hard-cutting. AdditiveBlending
+  // means overlapping arcs brighten each other, giving a cluster-strike feel.
+  private lightningArcs: Array<{ mesh: THREE.Line; life: number; maxLife: number }> = []
+  private lightningMat!: THREE.LineBasicMaterial  // shared base material, cloned per arc
+  private lightningEnabled = true   // default ON; toggled by UI switch
+
+  // ── Orb effect: glitch corruption ──────────────────────────────────────────
+  // Post-processing scanline-shift pass. glitchAmount is lerped toward
+  // glitchRaw each frame (fast attack, moderate decay). The GLITCH_SHADER
+  // reads uGlitch each frame so the amount tracks the energy smoothly.
+  // Default OFF — can be distracting on subtle music, so the user opts in.
+  private glitchPass!: ShaderPass
+  private glitchAmount = 0          // current smoothed glitch intensity (0-1)
+  private glitchEnabled = false     // default OFF; toggled by UI switch
+
+  // ── Orb effect: pause crystallization ──────────────────────────────────────
+  // When playback stops, crystalAmount lerps to 1.0 over a few seconds, driving
+  // two shader uniforms: uCrystal flattens vertex displacement (orb becomes a
+  // smooth sphere) and tints the fragment shader icy blue-white. On resume it
+  // slowly melts back. Looks like the orb freezes in place when music stops.
+  private crystalAmount = 0         // 0 = molten/active, 1 = fully crystallised
+  private crystalEnabled = true     // default ON; toggled by UI switch
+
+  // ── Orb effect: surface crack veins ────────────────────────────────────────
+  // Blazing fracture lines rendered in the fragment shader via snoise-based
+  // Voronoi-like pattern. They emerge on heavy kick hits (kickVis > 0.30) and
+  // fade rapidly so they look like momentary stress fractures in the surface.
+  private crackEnabled = true       // default ON; toggled by UI switch
 
   // Visual fade for smooth pause/play transitions
   private visualFade = 0.4   // current rendered brightness (0-1)
@@ -400,16 +569,19 @@ export class AnomalySphere {
 
   // Sphere uniforms typed for direct access
   private uniforms: {
-    uTime:   THREE.IUniform<number>
-    uBass:   THREE.IUniform<number>
-    uMid:    THREE.IUniform<number>
-    uTreble: THREE.IUniform<number>
-    uReverb: THREE.IUniform<number>
-    uSpeed:  THREE.IUniform<number>
-    uColorA: THREE.IUniform<THREE.Color>
-    uColorB: THREE.IUniform<THREE.Color>
-    uColorC: THREE.IUniform<THREE.Color>
-    uColorD: THREE.IUniform<THREE.Color>
+    uTime:    THREE.IUniform<number>
+    uBass:    THREE.IUniform<number>
+    uMid:     THREE.IUniform<number>
+    uTreble:  THREE.IUniform<number>
+    uReverb:  THREE.IUniform<number>
+    uSpeed:   THREE.IUniform<number>
+    uSubBass: THREE.IUniform<number>
+    uCrack:   THREE.IUniform<number>
+    uCrystal: THREE.IUniform<number>
+    uColorA:  THREE.IUniform<THREE.Color>
+    uColorB:  THREE.IUniform<THREE.Color>
+    uColorC:  THREE.IUniform<THREE.Color>
+    uColorD:  THREE.IUniform<THREE.Color>
   }
 
   // Particle cloud around the orb
@@ -466,16 +638,19 @@ export class AnomalySphere {
     const geo = new THREE.IcosahedronGeometry(1, 6)
 
     this.uniforms = {
-      uTime:   { value: 0 },
-      uBass:   { value: 0 },
-      uMid:    { value: 0 },
-      uTreble: { value: 0 },
-      uReverb: { value: this.reverb },
-      uSpeed:  { value: this.speed },
-      uColorA: { value: new THREE.Color('#9b6dff') },
-      uColorB: { value: new THREE.Color('#00d4aa') },
-      uColorC: { value: new THREE.Color('#ff6eb4') },
-      uColorD: { value: new THREE.Color('#ffaa44') },
+      uTime:    { value: 0 },
+      uBass:    { value: 0 },
+      uMid:     { value: 0 },
+      uTreble:  { value: 0 },
+      uReverb:  { value: this.reverb },
+      uSpeed:   { value: this.speed },
+      uSubBass: { value: 0 },
+      uCrack:   { value: 0 },
+      uCrystal: { value: 0 },
+      uColorA:  { value: new THREE.Color('#9b6dff') },
+      uColorB:  { value: new THREE.Color('#00d4aa') },
+      uColorC:  { value: new THREE.Color('#ff6eb4') },
+      uColorD:  { value: new THREE.Color('#ffaa44') },
     }
 
     const mat = new THREE.ShaderMaterial({
@@ -493,6 +668,7 @@ export class AnomalySphere {
     // ── Particle cloud + star field ──────────────────────────────────────────
     this.initParticles()
     this.initStars()
+    this.initLightning()
 
     // ── Post-processing ─────────────────────────────────────────────────────
     this.composer = new EffectComposer(this.renderer)
@@ -508,6 +684,9 @@ export class AnomalySphere {
 
     this.grainPass = new ShaderPass(GRAIN_CA_SHADER)
     this.composer.addPass(this.grainPass)
+
+    this.glitchPass = new ShaderPass(GLITCH_SHADER)
+    this.composer.addPass(this.glitchPass)
 
     this.composer.addPass(new OutputPass())
 
@@ -667,15 +846,82 @@ export class AnomalySphere {
     if (this.playing) {
       this.analyser.getByteFrequencyData(this.freqData)
 
-      // Heavy damping: values creep toward the target slowly
+      // ── Band energy — three primary frequency channels ──────────────────────
+      // Each channel uses asymmetric lerp (fast attack / slow decay) so the
+      // sphere jumps to a hit immediately but settles languidly afterwards,
+      // giving the illusion of inertia / liquid weight.
       const rawBass   = this.bandEnergy(20,   250)
       const rawMid    = this.bandEnergy(250,  4000)
       const rawTreble = this.bandEnergy(4000, 20000)
+      // Isolated 20–80 Hz channel dedicated to 808 / sub-bass fundamentals.
+      // Heavy limiting compresses the full 20–250 Hz band to near-constant level,
+      // but the sub region still rises and falls with each 808 hit.
+      const rawSubBass = this.bandEnergy(20, 80)
 
+      // Bass uses the globally-tuned asymmetric lerp constants so it snaps
+      // fast on attack and lingers on decay (punchy but weighty feel).
       const bassLerp = rawBass > this.bass ? BASS_LERP_UP : BASS_LERP_DOWN
-      this.bass   += (rawBass - this.bass) * bassLerp
-      this.mid    += (rawMid    - this.mid)    * MID_LERP
-      this.treble += (rawTreble - this.treble) * TREBLE_LERP
+      this.bass    += (rawBass    - this.bass)    * bassLerp
+      // Sub-bass: fast attack (0.38) so 808 strikes register immediately,
+      // very slow decay (0.028) so the energy holds through the long tail.
+      this.subBass += (rawSubBass - this.subBass) * (rawSubBass > this.subBass ? 0.38 : 0.028)
+      this.mid     += (rawMid    - this.mid)    * MID_LERP
+      this.treble  += (rawTreble - this.treble) * TREBLE_LERP
+
+      // ── Adaptive floor / ceiling ────────────────────────────────────────────
+      // bassFloor rises very slowly (α = 0.0006 ≈ 1 000+ frames to settle),
+      // settling at 70% of the long-term bass level.  This ignores momentary
+      // silence and tracks the "noise floor" of the track.
+      // bassCeiling chases peaks quickly (α = 0.04 on the way up) and falls
+      // slowly (α = 0.003) so transient peaks don't immediately collapse the
+      // ceiling back down.
+      // Together, floor→ceiling defines the "active range" of this specific track.
+      // normalizedBass later remaps this range to 0→1 so the orb always uses its
+      // full motion envelope regardless of how hard the master was compressed.
+      this.bassFloor   += ((rawBass * 0.7) - this.bassFloor)   * 0.0006
+      this.bassCeiling += (rawBass - this.bassCeiling) * (rawBass > this.bassCeiling ? 0.04 : 0.003)
+      // Hard minimum gap of 0.12 so the range never collapses to near-zero during
+      // a silent section and cause a division-by-near-zero blow-up below.
+      this.bassCeiling  = Math.max(this.bassCeiling, this.bassFloor + 0.12)
+
+      // ── Kick detection via spectral flux (40–150 Hz) ────────────────────────
+      // Spectral flux = sum of per-bin *positive* differences between consecutive
+      // FFT frames.  Negative differences (frequencies that fell) are ignored —
+      // we only care about energy arriving, not leaving.
+      //
+      // Why 40–150 Hz?  This window captures:
+      //   • Kick drum fundamental (50–100 Hz)
+      //   • 808 bass drum attack transient (60–150 Hz)
+      //   • Sub-bass note onset without too much bleed from the mid range
+      //
+      // The raw flux is normalised by the bin count × max byte value (255) to
+      // produce a 0–1 figure per frame, then scaled ×8 so a typical kick drum
+      // pushes it toward 1.0 even on a compressed track where absolute values
+      // are high but *changes* between frames are small.
+      //
+      // kickEnergy is then smoothed with a very fast attack (0.55) so the orb
+      // responds within one or two frames of the onset, and a moderate decay
+      // (0.12) that holds the energy for ~8 frames (~130 ms at 60 fps) before
+      // it fades — long enough to feel substantial, short enough not to bleed
+      // into the next kick.
+      const kickLo = this.freqToBin(40)
+      const kickHi = this.freqToBin(150)
+      let kickFlux = 0
+      if (this.prevFreqData) {
+        for (let i = kickLo; i <= kickHi; i++) {
+          const d = (this.freqData[i] ?? 0) - this.prevFreqData[i]
+          if (d > 0) kickFlux += d   // accumulate only rising bins
+        }
+        // Normalise to 0-1 and apply ×8 gain to compensate for compression
+        kickFlux = Math.min(kickFlux / ((kickHi - kickLo + 1) * 255) * 8.0, 1.0)
+      }
+      // Asymmetric smoothing: fast attack (0.55), moderate decay (0.12)
+      this.kickEnergy += (kickFlux - this.kickEnergy) * (kickFlux > this.kickEnergy ? 0.55 : 0.12)
+
+      // Lazy-allocate the previous-frame buffer on the first playing frame.
+      // After allocation, copy current frame so next frame has something to diff.
+      if (!this.prevFreqData) this.prevFreqData = new Uint8Array(this.freqData.length)
+      this.prevFreqData.set(this.freqData)
 
       // Fast-attack UI pulse values for site-wide reactivity
       const uiBassLerp = rawBass > this.uiBass ? UI_BASS_UP : UI_BASS_DOWN
@@ -685,19 +931,38 @@ export class AnomalySphere {
       this.onEnergyUpdate?.(this.bass, this.mid, this.treble, this.uiBass, this.uiTreble)
     } else {
       // Decay toward zero so the sphere calms down after stopping
-      this.bass   *= 0.96
-      this.mid    *= 0.96
-      this.treble *= 0.96
-      this.uiBass   *= 0.92
-      this.uiTreble *= 0.92
+      this.bass       *= 0.96
+      this.subBass    *= 0.96
+      this.mid        *= 0.96
+      this.treble     *= 0.96
+      this.kickEnergy *= 0.90
+      this.uiBass     *= 0.92
+      this.uiTreble   *= 0.92
     }
 
     // ── Reactivity scaling ───────────────────────────────────────────────────
-    // bVis/mVis/tVis are the "visual" energy values — scaled by reactivity so
-    // the user can dial back how much the orb responds without muting the audio.
-    const bVis = this.bass   * this.reactivity
-    const mVis = this.mid    * this.reactivity
-    const tVis = this.treble * this.reactivity
+    // bVis — broad bass visual energy, used for colour modulation and particles.
+    //   Blends 40% raw bass + 60% adaptively normalised bass so the orb responds
+    //   to both absolute loudness (raw) and relative dynamics within the track
+    //   (normalised).  Normalised component ensures the orb stays lively even
+    //   when a compressor has pushed the entire track to near-maximum level.
+    const range          = Math.max(this.bassCeiling - this.bassFloor, 0.12)
+    const normalizedBass = Math.max(0, (this.bass - this.bassFloor) / range)
+    const expandedBass   = this.bass * 0.40 + normalizedBass * 0.60
+    const bVis    = Math.min(expandedBass  * this.reactivity, 1.4)
+
+    // kickVis — motion driver derived from kick/808 spectral flux.
+    //   The ×2.8 pre-scale compensates for spectral flux values being naturally
+    //   smaller than band-averaged energy; it ensures a strong kick drum reaches
+    //   near 1.0 even at the default reactivity of 0.40.
+    //   kickVis drives: vertex displacement (uBass), bloom, scale pulse, rotation,
+    //   crack veins, glitch, and lightning.  This makes ALL motion effects respond
+    //   to individual kick transients rather than sustained bass level.
+    const kickVis = Math.min(this.kickEnergy * this.reactivity * 2.8, 1.4)
+
+    // mVis / tVis — mid and treble visual levels; used for colour and particles only.
+    const mVis    = this.mid    * this.reactivity
+    const tVis    = this.treble * this.reactivity
 
     // ── Spectral color mapping ───────────────────────────────────────────────
     const bN = Math.min(bVis, 1)
@@ -705,48 +970,59 @@ export class AnomalySphere {
     const tN = Math.min(tVis, 1)
     const energy = Math.min((bN + mN + tN) / 1.5, 1)
 
+    // Sub-bass transient catches 808 attacks that the full-band bassTransient misses
+    // in compressed tracks (where the wide-band bass barely moves frame to frame).
+    const subBassTransient = Math.max(0, this.subBass - this.prevSubBass)
+    const bassTransient = Math.max(
+      Math.max(0, this.bass - this.prevBass),
+      subBassTransient * 0.75,
+    )
+
     if (this.themeHueLock < 0) {
-      // Prism mode: hue drifts constantly + jumps on bass transients so the
-      // palette visibly cycles with the music rather than sitting on one hue.
+      // Prism mode: hue advances with song energy so colors visibly cycle
+      // fast during loud sections and drift slowly during quiet passages.
 
-      // 1) Constant slow drift — full rainbow every ~55 s at 60 fps
-      this.hueOffset = (this.hueOffset + 0.0003) % 1
+      // 1) Base drift + energy-scaled acceleration
+      this.hueOffset = (this.hueOffset + 0.0012 + energy * 0.004) % 1
 
-      // 2) Bass transient → forward hue jump on every kick/hit
-      const bassTransient = Math.max(0, this.bass - this.prevBass)
+      // 2) Bass transient → sharp hue jump on every kick
       if (bassTransient > 0.04) {
-        this.hueOffset = (this.hueOffset + bassTransient * 0.55) % 1
+        this.hueOffset = (this.hueOffset + bassTransient * 1.2) % 1
       }
 
-      // 3) Mid energy pushes hue more gently
-      this.hueOffset = (this.hueOffset + mN * 0.0006) % 1
+      // 3) Mid energy nudges hue forward continuously
+      this.hueOffset = (this.hueOffset + mN * 0.0008) % 1
+
+      const sat   = 0.78 + energy * 0.18
+      const light = 0.40 + energy * 0.14
+      const nudge = energy * 0.06
+
+      this.uniforms.uColorA.value.setHSL( this.hueOffset,                      sat,        light)
+      this.uniforms.uColorB.value.setHSL((this.hueOffset + 0.25 + nudge) % 1,  sat,        light + 0.06)
+      this.uniforms.uColorC.value.setHSL((this.hueOffset + 0.55 + nudge) % 1,  sat + 0.06, light + 0.12)
+      this.uniforms.uColorD.value.setHSL((this.hueOffset + 0.78 - nudge) % 1,  sat,        light - 0.04)
     } else {
-      // Locked theme: oscillate around the lock hue driven by the music so
-      // the orb still reacts, but stays in the right colour family.
-      const target = (this.themeHueLock + bN * 0.08 - tN * 0.06 + 1) % 1
-      const diff   = target - this.hueOffset
-      const short  = diff - Math.round(diff)
-      this.hueOffset = ((this.hueOffset + short * 0.08) + 1) % 1
+      // Theme mode: set colors directly from the theme palette so the orb
+      // completely changes character per preset. Audio modulates lightness
+      // (bass brightens) and saturation (treble vivifies) without drifting
+      // away from the theme's hue identity.
+      const p = THEME_PALETTES[this.colorTheme] ?? THEME_PALETTES.void
+      const lBoost = bN * 0.15
+      const sBoost = tN * 0.10
+      const hShift = bN * 0.03 - tN * 0.02
+      this.uniforms.uColorA.value.setHSL((p[0][0] + hShift + 1) % 1, Math.min(1, p[0][1] + sBoost), Math.min(0.90, p[0][2] + lBoost))
+      this.uniforms.uColorB.value.setHSL((p[1][0] + hShift + 1) % 1, Math.min(1, p[1][1] + sBoost), Math.min(0.90, p[1][2] + lBoost))
+      this.uniforms.uColorC.value.setHSL((p[2][0] + hShift + 1) % 1, Math.min(1, p[2][1] + sBoost), Math.min(0.90, p[2][2] + lBoost))
+      this.uniforms.uColorD.value.setHSL((p[3][0] + hShift + 1) % 1, Math.min(1, p[3][1] + sBoost), Math.min(0.90, p[3][2] + lBoost))
     }
 
-    this.prevBass = this.bass
-
-    // The 4 palette colours are ALWAYS 90° apart so mixing in the shader
-    // produces clearly different colours rather than a single-hue blend.
-    // Energy slightly widens the spread and boosts saturation/lightness.
-    const isMono = this.colorTheme === 'mono'
-    const sat    = isMono ? 0.04 : 0.78 + energy * 0.18
-    const light  = 0.40 + energy * 0.14
-    const nudge  = energy * 0.04   // tiny spread nudge at loud passages
-
-    this.uniforms.uColorA.value.setHSL( this.hueOffset,                      sat,        light)
-    this.uniforms.uColorB.value.setHSL((this.hueOffset + 0.25 + nudge) % 1,  sat,        light + 0.06)
-    this.uniforms.uColorC.value.setHSL((this.hueOffset + 0.55 + nudge) % 1,  sat + 0.06, light + 0.12)
-    this.uniforms.uColorD.value.setHSL((this.hueOffset + 0.78 - nudge) % 1,  sat,        light - 0.04)
+    this.prevBass    = this.bass
+    this.prevSubBass = this.subBass
 
     // Update sphere uniforms — use visual (reactivity-scaled) values
-    this.uniforms.uTime.value   = elapsed
-    this.uniforms.uBass.value   = bVis
+    this.uniforms.uTime.value    = elapsed
+    this.uniforms.uSubBass.value = Math.min(this.subBass * this.reactivity * 1.4, 1.0)
+    this.uniforms.uBass.value    = kickVis
     this.uniforms.uMid.value    = mVis
     this.uniforms.uTreble.value = tVis
     this.uniforms.uReverb.value = this.reverb
@@ -761,11 +1037,11 @@ export class AnomalySphere {
     // Bloom spikes on bass hits; intro adds a brief acceptance surge (sin arc)
     // peaks at the midpoint of the reveal, fades out as the orb settles
     const introSurge = Math.sin(introClamp * Math.PI) * 0.55
-    this.bloom.strength = (Math.min(0.20 + this.reverb * 0.28 + bVis * 0.50, 0.90) + introSurge) * this.glowMult * this.visualFade * introClamp
+    this.bloom.strength = (Math.min(0.20 + this.reverb * 0.28 + kickVis * 0.72, 1.10) + introSurge) * this.glowMult * this.visualFade * introClamp
 
     // Mesh scale: intro reveal + base size + optional bass pulse + loop pulse
     // introProgress uses ease-out-back so the orb slightly overshoots before settling
-    const pulseFactor = this.bassPulse ? bVis * 0.22 : 0
+    const pulseFactor = (this.bassPulse ? kickVis * 0.44 : 0) + kickVis * 0.14
     this._loopPulseAmount *= 0.985   // ~1.5 s decay at 60 fps
     const loopPulseFactor  = this._loopPulseAmount * 0.08
     this.mesh.scale.setScalar(this.orbBaseScale * (1.0 + pulseFactor + loopPulseFactor) * this.introProgress)
@@ -781,7 +1057,7 @@ export class AnomalySphere {
       this.mesh.rotation.x += 0.0006 * rotScale
     } else {
       const rotScale = (0.35 + this.speed * 0.65) * this.rotationSpeed
-      this.mesh.rotation.y += (0.0018 + bVis * 0.006) * rotScale
+      this.mesh.rotation.y += (0.0018 + kickVis * 0.010) * rotScale
       this.mesh.rotation.x += 0.0006 * rotScale
     }
 
@@ -796,9 +1072,78 @@ export class AnomalySphere {
     this.starUniforms.uTime.value   = elapsed
     this.starUniforms.uTreble.value = tVis
 
-    // Update film grain / CA pass uniforms
+    // Film grain uses bVis (broad bass) rather than kickVis so the grain texture
+    // stays continuously present during sustained bass passages, not just on hits.
     this.grainPass.uniforms['uTime'].value = elapsed
     this.grainPass.uniforms['uBass'].value = bVis
+
+    // ── Effect: crystallization ──────────────────────────────────────────────
+    // crystalAmount drives two shader uniforms: uCrystal.
+    //   • In the vertex shader it multiplies displacement by (1 - uCrystal×0.9),
+    //     flattening the surface toward a perfect sphere as the value rises.
+    //   • In the fragment shader it lerps surface colour toward icy blue-white.
+    // On pause: target = 1.0, lerp factor 0.005 → reaches ~0.63 in ~100 frames
+    //           (~1.7 s), giving a slow "freezing" feel.
+    // On play:  target = 0.0, lerp factor 0.010 → melts back in ~50 frames (~0.8 s),
+    //           slightly faster so the orb snaps back to life quickly.
+    // When the toggle is turned off, crystalAmount drains at ×0.95/frame so it
+    // transitions smoothly rather than hard-jumping to zero.
+    if (this.crystalEnabled) {
+      const crystalTarget = this.playing ? 0.0 : 1.0
+      this.crystalAmount += (crystalTarget - this.crystalAmount) * (this.playing ? 0.010 : 0.005)
+    } else {
+      // Drain smoothly when disabled mid-session (toggle flipped while paused)
+      this.crystalAmount += (0 - this.crystalAmount) * 0.05
+    }
+    this.uniforms.uCrystal.value = this.crystalAmount
+
+    // ── Effect: surface crack veins ──────────────────────────────────────────
+    // crackRaw maps kickVis 0.30→0.80 to 0→1 (linear ramp).
+    //   — Below 0.30 (light hits): no veins
+    //   — 0.30–0.80 (moderate hits): veins grow proportionally
+    //   — Above 0.80 (hard hits): veins fully saturate
+    // Smoothing: fast attack (0.28) so veins appear instantly on a kick;
+    // slow decay (0.10) so they fade over ~10 frames (~170 ms at 60 fps).
+    // When the toggle is turned off, the uniform drains at ×0.85/frame.
+    if (this.crackEnabled) {
+      const crackRaw = Math.max(0, kickVis - 0.30) / 0.50
+      this.uniforms.uCrack.value += (crackRaw - this.uniforms.uCrack.value) * (crackRaw > this.uniforms.uCrack.value ? 0.28 : 0.10)
+    } else {
+      this.uniforms.uCrack.value *= 0.85
+    }
+
+    // ── Effect: glitch / scanline corruption ─────────────────────────────────
+    // Glitch only fires above 50% kickVis (strong kicks / hard 808 hits).
+    // The (kickVis - 0.50) × 2.5 ramp means a kickVis of 0.90 produces
+    // glitchRaw = 1.0, while lighter kicks below the threshold produce nothing.
+    // This intentionally high threshold keeps glitch as a punctuation mark
+    // rather than a constant state — it should feel like a system shock, not noise.
+    // Attack: 0.22 (fast snap). Decay: 0.10 (moderate — ~10 frame fade).
+    // Default OFF: the toggle must be turned on in Visual Settings.
+    // When off, glitchAmount drains at ×0.80/frame — faster drain keeps the
+    // screen clean immediately after the toggle is switched off.
+    if (this.glitchEnabled) {
+      const glitchRaw = kickVis > 0.50 ? Math.min(1.0, (kickVis - 0.50) * 2.5) : 0.0
+      this.glitchAmount += (glitchRaw - this.glitchAmount) * (glitchRaw > this.glitchAmount ? 0.22 : 0.10)
+    } else {
+      this.glitchAmount *= 0.80   // drain quickly so the screen clears on toggle-off
+    }
+    this.glitchPass.uniforms['uGlitch'].value = this.glitchAmount
+    this.glitchPass.uniforms['uTime'].value   = elapsed
+
+    // Lightning tendrils
+    if (this.lightningEnabled) {
+      this.updateLightning(kickVis, bassTransient)
+    } else {
+      // Drain any arcs already in flight
+      for (let i = this.lightningArcs.length - 1; i >= 0; i--) {
+        const arc = this.lightningArcs[i]
+        this.scene.remove(arc.mesh)
+        arc.mesh.geometry.dispose()
+        ;(arc.mesh.material as THREE.LineBasicMaterial).dispose()
+      }
+      this.lightningArcs = []
+    }
 
     this.composer.render()
   }
@@ -858,6 +1203,10 @@ export class AnomalySphere {
   setBassPulse(v: boolean): void    { this.bassPulse = v }
   setRotationSpeed(v: number): void { this.rotationSpeed = Math.max(0, Math.min(3, v)) }
   setOrbSize(v: number): void       { this.orbBaseScale = Math.max(0.4, Math.min(1.8, v)) }
+  setLightning(v: boolean): void    { this.lightningEnabled = v }
+  setGlitch(v: boolean): void       { this.glitchEnabled = v }
+  setCrack(v: boolean): void        { this.crackEnabled = v }
+  setCrystal(v: boolean): void      { this.crystalEnabled = v }
 
   setWireframe(v: boolean): void {
     ;(this.mesh.material as THREE.ShaderMaterial).wireframe = v
@@ -867,18 +1216,76 @@ export class AnomalySphere {
   // All other themes lock the hue to a specific color family.
   setColorTheme(theme: string): void {
     this.colorTheme = theme
-    const hueMap: Record<string, number> = {
-      void:  0.72,   // deep violet-indigo
-      neon:  0.50,   // cyan-blue
-      ember: 0.05,   // red-orange
-      frost: 0.62,   // ice blue
-      mono:  0.0,    // hue irrelevant — saturation is collapsed in loop
+    this.themeHueLock = theme === 'prism' ? -1 : 0
+  }
+
+  private initLightning(): void {
+    this.lightningMat = new THREE.LineBasicMaterial({
+      color:       0xffffff,
+      transparent: true,
+      opacity:     0.9,
+      blending:    THREE.AdditiveBlending,
+      depthWrite:  false,
+    })
+    this.lightningArcs = []
+  }
+
+  private spawnLightningArc(): void {
+    const theta = Math.random() * Math.PI * 2
+    const phi   = Math.acos(2 * Math.random() - 1)
+    const dir   = new THREE.Vector3(
+      Math.sin(phi) * Math.cos(theta),
+      Math.cos(phi),
+      Math.sin(phi) * Math.sin(theta),
+    )
+    const points: THREE.Vector3[] = []
+    let cur = dir.clone().multiplyScalar(1.05)
+    points.push(cur.clone())
+    const segs = 6 + Math.floor(Math.random() * 5)
+    for (let i = 0; i < segs; i++) {
+      const step   = dir.clone().multiplyScalar(0.16 + Math.random() * 0.14)
+      const jitter = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.28,
+        (Math.random() - 0.5) * 0.28,
+        (Math.random() - 0.5) * 0.28,
+      )
+      cur = cur.clone().add(step).add(jitter)
+      points.push(cur.clone())
     }
-    this.themeHueLock = theme === 'prism' ? -1 : (hueMap[theme] ?? -1)
+    const geo  = new THREE.BufferGeometry().setFromPoints(points)
+    const mat  = this.lightningMat.clone() as THREE.LineBasicMaterial
+    mat.color.copy(this.uniforms.uColorA.value).lerp(this.uniforms.uColorC.value, Math.random())
+    const line = new THREE.Line(geo, mat)
+    this.scene.add(line)
+    this.lightningArcs.push({ mesh: line, life: 28, maxLife: 28 })
+  }
+
+  private updateLightning(kickVis: number, bassTransient: number): void {
+    if ((kickVis > 0.25 || bassTransient > 0.06) && this.lightningArcs.length < 8) {
+      const count = 1 + Math.floor(kickVis * 3)
+      for (let i = 0; i < count; i++) this.spawnLightningArc()
+    }
+    for (let i = this.lightningArcs.length - 1; i >= 0; i--) {
+      const arc = this.lightningArcs[i]
+      arc.life--
+      ;(arc.mesh.material as THREE.LineBasicMaterial).opacity = (arc.life / arc.maxLife) * 0.90
+      if (arc.life <= 0) {
+        this.scene.remove(arc.mesh)
+        arc.mesh.geometry.dispose()
+        ;(arc.mesh.material as THREE.LineBasicMaterial).dispose()
+        this.lightningArcs.splice(i, 1)
+      }
+    }
   }
 
   destroy(): void {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId)
+    for (const arc of this.lightningArcs) {
+      this.scene.remove(arc.mesh)
+      arc.mesh.geometry.dispose()
+      ;(arc.mesh.material as THREE.LineBasicMaterial).dispose()
+    }
+    this.lightningArcs = []
     this.renderer.dispose()
   }
 }

@@ -92,6 +92,10 @@ export class App {
   private rotationSpeedValue   = document.getElementById('rotationSpeedValue')!
   private bassPulseToggle      = document.getElementById('bassPulseToggle') as HTMLInputElement
   private wireframeToggle      = document.getElementById('wireframeToggle') as HTMLInputElement
+  private lightningToggle      = document.getElementById('lightningToggle') as HTMLInputElement
+  private crackToggle          = document.getElementById('crackToggle') as HTMLInputElement
+  private crystalToggle        = document.getElementById('crystalToggle') as HTMLInputElement
+  private glitchToggle         = document.getElementById('glitchToggle') as HTMLInputElement
   private starsSlider          = document.getElementById('starsSlider') as HTMLInputElement
   private starsValue           = document.getElementById('starsValue')!
 
@@ -373,6 +377,20 @@ export class App {
     // Visual settings — wireframe toggle
     this.wireframeToggle.addEventListener('change', () => {
       this.sphere?.setWireframe(this.wireframeToggle.checked)
+    })
+
+    // Visual settings — orb effect toggles
+    this.lightningToggle.addEventListener('change', () => {
+      this.sphere?.setLightning(this.lightningToggle.checked)
+    })
+    this.crackToggle.addEventListener('change', () => {
+      this.sphere?.setCrack(this.crackToggle.checked)
+    })
+    this.crystalToggle.addEventListener('change', () => {
+      this.sphere?.setCrystal(this.crystalToggle.checked)
+    })
+    this.glitchToggle.addEventListener('change', () => {
+      this.sphere?.setGlitch(this.glitchToggle.checked)
     })
 
     // Visual settings — star brightness

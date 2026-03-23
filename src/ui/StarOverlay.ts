@@ -128,7 +128,13 @@ export class StarOverlay {
   }
 
   private loop(now: number): void {
-    this.rafId = requestAnimationFrame((t) => this.loop(t))
+    // Only reschedule via rAF while playing. When paused, setInterval drives
+    // frames at ~15 fps and loop() must NOT re-arm rAF or multiple loops stack.
+    if (this.playing) {
+      this.rafId = requestAnimationFrame((t) => this.loop(t))
+    } else {
+      this.rafId = null
+    }
 
     if (this.lastTime < 0) this.lastTime = now
     const dt = Math.min(now - this.lastTime, 50)

@@ -6,6 +6,11 @@ const HAPTIC_PLAY  = [12]
 const HAPTIC_PAUSE = [8]
 const HAPTIC_SEEK  = [4]
 
+// True on iOS/Android where the AudioContext is suspended when the page is
+// hidden. On macOS/Windows/Linux desktop browsers the context keeps running,
+// so the background gain-fade and session-pause logic must be skipped there.
+const IS_MOBILE_PLATFORM = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
 // MobileController owns all mobile-specific browser APIs:
 //   - Media Session API: populates the OS lock screen / notification transport
 //   - Fullscreen API: enters and exits browser fullscreen
@@ -29,6 +34,7 @@ export class MobileController {
 
   private _onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') {
+      if (!IS_MOBILE_PLATFORM) return
       // Fade master gain to zero before iOS suspends the AudioContext so
       // there is no harsh click when the app goes to the background.
       this._engine.prepareForBackground()

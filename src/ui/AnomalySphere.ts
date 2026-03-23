@@ -9,7 +9,28 @@
 // invisible — the orb appears to float seamlessly over the page.
 // Additional effects: 350-particle cloud and 3 energy rings react to the music.
 
-import * as THREE from 'three'
+import {
+  WebGLRenderer,
+  Scene,
+  PerspectiveCamera,
+  Mesh,
+  Clock,
+  Line,
+  LineBasicMaterial,
+  Points,
+  Color,
+  Vector2,
+  Vector3,
+  IcosahedronGeometry,
+  ShaderMaterial,
+  BufferGeometry,
+  BufferAttribute,
+  Texture,
+  FrontSide,
+  AdditiveBlending,
+  ACESFilmicToneMapping,
+} from 'three'
+import type { IUniform } from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
@@ -319,7 +340,7 @@ void main() {
 // stronger at the image edges and more intense when the bass hits hard.
 const GRAIN_CA_SHADER = {
   uniforms: {
-    tDiffuse:  { value: null as THREE.Texture | null },
+    tDiffuse:  { value: null as Texture | null },
     uTime:     { value: 0 },
     uBass:     { value: 0 },
   },
@@ -391,7 +412,7 @@ const UI_TREBLE_LERP = 0.10
 // ~0.5 on a strong kick because the kickVis multiplier is conservative.
 const GLITCH_SHADER = {
   uniforms: {
-    tDiffuse: { value: null as THREE.Texture | null }, // input framebuffer from previous pass
+    tDiffuse: { value: null as Texture | null }, // input framebuffer from previous pass
     uGlitch:  { value: 0 },   // 0-1 corruption intensity, driven by kick energy each frame
     uTime:    { value: 0 },   // elapsed seconds — seeds temporal randomness in the shader
   },
@@ -457,14 +478,14 @@ const THEME_PALETTES: Record<string, Array<[number, number, number]>> = {
 }
 
 export class AnomalySphere {
-  private renderer:  THREE.WebGLRenderer
-  private scene:     THREE.Scene
-  private camera:    THREE.PerspectiveCamera
-  private mesh:      THREE.Mesh
+  private renderer:  WebGLRenderer
+  private scene:     Scene
+  private camera:    PerspectiveCamera
+  private mesh:      Mesh
   private composer:  EffectComposer
   private bloom:     UnrealBloomPass
   private grainPass: ShaderPass
-  private clock:     THREE.Clock
+  private clock:     Clock
 
   private analyser: AnalyserNode
   private freqData: Uint8Array<ArrayBuffer>
@@ -520,12 +541,12 @@ export class AnomalySphere {
   private _loopPulseAmount = 0  // decays each frame; set to 1 on each loop cycle
 
   // ── Orb effect: lightning tendrils ─────────────────────────────────────────
-  // Short jagged THREE.Line arcs spawn at the orb surface and shoot outward on
+  // Short jagged Line arcs spawn at the orb surface and shoot outward on
   // kick transients. Each arc has a lifespan counter; opacity fades linearly as
   // life drains so they flash and vanish rather than hard-cutting. AdditiveBlending
   // means overlapping arcs brighten each other, giving a cluster-strike feel.
-  private lightningArcs: Array<{ mesh: THREE.Line; life: number; maxLife: number }> = []
-  private lightningMat!: THREE.LineBasicMaterial  // shared base material, cloned per arc
+  private lightningArcs: Array<{ mesh: Line; life: number; maxLife: number }> = []
+  private lightningMat!: LineBasicMaterial  // shared base material, cloned per arc
   private lightningEnabled = true   // default ON; toggled by UI switch
 
   // ── Orb effect: glitch corruption ──────────────────────────────────────────
@@ -560,37 +581,37 @@ export class AnomalySphere {
   private introStartTime = -1   // clock time on first rendered frame
 
   // Star field
-  private stars!: THREE.Points
+  private stars!: Points
   private starUniforms!: {
-    uTime:       THREE.IUniform<number>
-    uTreble:     THREE.IUniform<number>
-    uBrightness: THREE.IUniform<number>
+    uTime:       IUniform<number>
+    uTreble:     IUniform<number>
+    uBrightness: IUniform<number>
   }
 
   // Sphere uniforms typed for direct access
   private uniforms: {
-    uTime:    THREE.IUniform<number>
-    uBass:    THREE.IUniform<number>
-    uMid:     THREE.IUniform<number>
-    uTreble:  THREE.IUniform<number>
-    uReverb:  THREE.IUniform<number>
-    uSpeed:   THREE.IUniform<number>
-    uSubBass: THREE.IUniform<number>
-    uCrack:   THREE.IUniform<number>
-    uCrystal: THREE.IUniform<number>
-    uColorA:  THREE.IUniform<THREE.Color>
-    uColorB:  THREE.IUniform<THREE.Color>
-    uColorC:  THREE.IUniform<THREE.Color>
-    uColorD:  THREE.IUniform<THREE.Color>
+    uTime:    IUniform<number>
+    uBass:    IUniform<number>
+    uMid:     IUniform<number>
+    uTreble:  IUniform<number>
+    uReverb:  IUniform<number>
+    uSpeed:   IUniform<number>
+    uSubBass: IUniform<number>
+    uCrack:   IUniform<number>
+    uCrystal: IUniform<number>
+    uColorA:  IUniform<Color>
+    uColorB:  IUniform<Color>
+    uColorC:  IUniform<Color>
+    uColorD:  IUniform<Color>
   }
 
   // Particle cloud around the orb
-  private particles!: THREE.Points
+  private particles!: Points
   private particleUniforms!: {
-    uBass:          THREE.IUniform<number>
-    uTreble:        THREE.IUniform<number>
-    uTime:          THREE.IUniform<number>
-    uParticleColor: THREE.IUniform<THREE.Color>
+    uBass:          IUniform<number>
+    uTreble:        IUniform<number>
+    uTime:          IUniform<number>
+    uParticleColor: IUniform<Color>
   }
 
   private container: HTMLElement  // stored so resize() doesn't need parentElement
@@ -604,17 +625,17 @@ export class AnomalySphere {
   constructor(container: HTMLElement, analyser: AnalyserNode) {
     this.analyser  = analyser
     this.freqData  = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>
-    this.clock     = new THREE.Clock()
+    this.clock     = new Clock()
     this.container = container
 
     // ── Renderer ────────────────────────────────────────────────────────────
     // Match the page background exactly so removing the CSS box makes the
     // renderer area seamless — the orb appears to float over the page.
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
+    this.renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3))
-    this.renderer.setClearColor(new THREE.Color('#080810'), 1)
+    this.renderer.setClearColor(new Color('#080810'), 1)
     // ACESFilmic gracefully compresses HDR bloom values instead of clipping to white
-    this.renderer.toneMapping         = THREE.ACESFilmicToneMapping
+    this.renderer.toneMapping         = ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 0.50
 
     // Size to something non-zero right away so the composer doesn't start at 1x1
@@ -629,13 +650,13 @@ export class AnomalySphere {
     container.appendChild(canvas)
 
     // ── Scene + camera ───────────────────────────────────────────────────────
-    this.scene  = new THREE.Scene()
-    this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 100)
+    this.scene  = new Scene()
+    this.camera = new PerspectiveCamera(60, 1, 0.1, 100)
     this.camera.position.z = 4.2
 
     // ── Sphere geometry + material ───────────────────────────────────────────
     // Detail level 6 → ~10k vertices for smooth high-frequency displacement
-    const geo = new THREE.IcosahedronGeometry(1, 6)
+    const geo = new IcosahedronGeometry(1, 6)
 
     this.uniforms = {
       uTime:    { value: 0 },
@@ -647,22 +668,22 @@ export class AnomalySphere {
       uSubBass: { value: 0 },
       uCrack:   { value: 0 },
       uCrystal: { value: 0 },
-      uColorA:  { value: new THREE.Color('#9b6dff') },
-      uColorB:  { value: new THREE.Color('#00d4aa') },
-      uColorC:  { value: new THREE.Color('#ff6eb4') },
-      uColorD:  { value: new THREE.Color('#ffaa44') },
+      uColorA:  { value: new Color('#9b6dff') },
+      uColorB:  { value: new Color('#00d4aa') },
+      uColorC:  { value: new Color('#ff6eb4') },
+      uColorD:  { value: new Color('#ffaa44') },
     }
 
-    const mat = new THREE.ShaderMaterial({
+    const mat = new ShaderMaterial({
       uniforms:       this.uniforms,
       vertexShader:   VERTEX_SHADER,
       fragmentShader: FRAGMENT_SHADER,
       transparent:    true,
-      side:           THREE.FrontSide,
+      side:           FrontSide,
     })
 
     mat.wireframe = true   // default on
-    this.mesh = new THREE.Mesh(geo, mat)
+    this.mesh = new Mesh(geo, mat)
     this.scene.add(this.mesh)
 
     // ── Particle cloud + star field ──────────────────────────────────────────
@@ -675,7 +696,7 @@ export class AnomalySphere {
     this.composer.addPass(new RenderPass(this.scene, this.camera))
 
     this.bloom = new UnrealBloomPass(
-      new THREE.Vector2(300, 300),
+      new Vector2(300, 300),
       0.45,  // base strength — dimmer; reverb raises this at runtime
       0.38,
       0.22,
@@ -704,19 +725,19 @@ export class AnomalySphere {
       uBass:          { value: 0 },
       uTreble:        { value: 0 },
       uTime:          { value: 0 },
-      uParticleColor: { value: new THREE.Color('#b08aff') },
+      uParticleColor: { value: new Color('#b08aff') },
     }
 
-    const mat = new THREE.ShaderMaterial({
+    const mat = new ShaderMaterial({
       uniforms:       this.particleUniforms,
       vertexShader:   PARTICLE_VERT,
       fragmentShader: PARTICLE_FRAG,
       transparent:    true,
       depthWrite:     false,
-      blending:       THREE.AdditiveBlending,
+      blending:       AdditiveBlending,
     })
 
-    this.particles = new THREE.Points(new THREE.BufferGeometry(), mat)
+    this.particles = new Points(new BufferGeometry(), mat)
     this.scene.add(this.particles)
     this.rebuildParticleGeo(this.particleCount)
   }
@@ -746,10 +767,10 @@ export class AnomalySphere {
     }
 
     const geo = this.particles.geometry
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geo.setAttribute('aSize',    new THREE.BufferAttribute(sizes, 1))
-    geo.setAttribute('aPhase',   new THREE.BufferAttribute(phases, 1))
-    geo.setAttribute('aRadius',  new THREE.BufferAttribute(radii, 1))
+    geo.setAttribute('position', new BufferAttribute(positions, 3))
+    geo.setAttribute('aSize',    new BufferAttribute(sizes, 1))
+    geo.setAttribute('aPhase',   new BufferAttribute(phases, 1))
+    geo.setAttribute('aRadius',  new BufferAttribute(radii, 1))
     geo.computeBoundingSphere()
   }
 
@@ -777,11 +798,11 @@ export class AnomalySphere {
       sizes[i]  = 0.6 + Math.random() * 1.8   // px size before perspective
     }
 
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geo.setAttribute('aPhase',   new THREE.BufferAttribute(phases, 1))
-    geo.setAttribute('aSpeed',   new THREE.BufferAttribute(speeds, 1))
-    geo.setAttribute('aSize',    new THREE.BufferAttribute(sizes,  1))
+    const geo = new BufferGeometry()
+    geo.setAttribute('position', new BufferAttribute(positions, 3))
+    geo.setAttribute('aPhase',   new BufferAttribute(phases, 1))
+    geo.setAttribute('aSpeed',   new BufferAttribute(speeds, 1))
+    geo.setAttribute('aSize',    new BufferAttribute(sizes,  1))
 
     this.starUniforms = {
       uTime:       { value: 0 },
@@ -789,16 +810,16 @@ export class AnomalySphere {
       uBrightness: { value: 0.9 },
     }
 
-    const mat = new THREE.ShaderMaterial({
+    const mat = new ShaderMaterial({
       uniforms:       this.starUniforms,
       vertexShader:   STAR_VERT,
       fragmentShader: STAR_FRAG,
       transparent:    true,
       depthWrite:     false,
-      blending:       THREE.AdditiveBlending,
+      blending:       AdditiveBlending,
     })
 
-    this.stars = new THREE.Points(geo, mat)
+    this.stars = new Points(geo, mat)
     this.scene.add(this.stars)
   }
 
@@ -1140,7 +1161,7 @@ export class AnomalySphere {
         const arc = this.lightningArcs[i]
         this.scene.remove(arc.mesh)
         arc.mesh.geometry.dispose()
-        ;(arc.mesh.material as THREE.LineBasicMaterial).dispose()
+        ;(arc.mesh.material as LineBasicMaterial).dispose()
       }
       this.lightningArcs = []
     }
@@ -1209,7 +1230,7 @@ export class AnomalySphere {
   setCrystal(v: boolean): void      { this.crystalEnabled = v }
 
   setWireframe(v: boolean): void {
-    ;(this.mesh.material as THREE.ShaderMaterial).wireframe = v
+    ;(this.mesh.material as ShaderMaterial).wireframe = v
   }
 
   // Change the color theme. 'prism' = fully audio-reactive hue cycling.
@@ -1220,11 +1241,11 @@ export class AnomalySphere {
   }
 
   private initLightning(): void {
-    this.lightningMat = new THREE.LineBasicMaterial({
+    this.lightningMat = new LineBasicMaterial({
       color:       0xffffff,
       transparent: true,
       opacity:     0.9,
-      blending:    THREE.AdditiveBlending,
+      blending:    AdditiveBlending,
       depthWrite:  false,
     })
     this.lightningArcs = []
@@ -1233,18 +1254,18 @@ export class AnomalySphere {
   private spawnLightningArc(): void {
     const theta = Math.random() * Math.PI * 2
     const phi   = Math.acos(2 * Math.random() - 1)
-    const dir   = new THREE.Vector3(
+    const dir   = new Vector3(
       Math.sin(phi) * Math.cos(theta),
       Math.cos(phi),
       Math.sin(phi) * Math.sin(theta),
     )
-    const points: THREE.Vector3[] = []
+    const points: Vector3[] = []
     let cur = dir.clone().multiplyScalar(1.05)
     points.push(cur.clone())
     const segs = 6 + Math.floor(Math.random() * 5)
     for (let i = 0; i < segs; i++) {
       const step   = dir.clone().multiplyScalar(0.16 + Math.random() * 0.14)
-      const jitter = new THREE.Vector3(
+      const jitter = new Vector3(
         (Math.random() - 0.5) * 0.28,
         (Math.random() - 0.5) * 0.28,
         (Math.random() - 0.5) * 0.28,
@@ -1252,10 +1273,10 @@ export class AnomalySphere {
       cur = cur.clone().add(step).add(jitter)
       points.push(cur.clone())
     }
-    const geo  = new THREE.BufferGeometry().setFromPoints(points)
-    const mat  = this.lightningMat.clone() as THREE.LineBasicMaterial
+    const geo  = new BufferGeometry().setFromPoints(points)
+    const mat  = this.lightningMat.clone() as LineBasicMaterial
     mat.color.copy(this.uniforms.uColorA.value).lerp(this.uniforms.uColorC.value, Math.random())
-    const line = new THREE.Line(geo, mat)
+    const line = new Line(geo, mat)
     this.scene.add(line)
     this.lightningArcs.push({ mesh: line, life: 28, maxLife: 28 })
   }
@@ -1268,11 +1289,11 @@ export class AnomalySphere {
     for (let i = this.lightningArcs.length - 1; i >= 0; i--) {
       const arc = this.lightningArcs[i]
       arc.life--
-      ;(arc.mesh.material as THREE.LineBasicMaterial).opacity = (arc.life / arc.maxLife) * 0.90
+      ;(arc.mesh.material as LineBasicMaterial).opacity = (arc.life / arc.maxLife) * 0.90
       if (arc.life <= 0) {
         this.scene.remove(arc.mesh)
         arc.mesh.geometry.dispose()
-        ;(arc.mesh.material as THREE.LineBasicMaterial).dispose()
+        ;(arc.mesh.material as LineBasicMaterial).dispose()
         this.lightningArcs.splice(i, 1)
       }
     }
@@ -1283,7 +1304,7 @@ export class AnomalySphere {
     for (const arc of this.lightningArcs) {
       this.scene.remove(arc.mesh)
       arc.mesh.geometry.dispose()
-      ;(arc.mesh.material as THREE.LineBasicMaterial).dispose()
+      ;(arc.mesh.material as LineBasicMaterial).dispose()
     }
     this.lightningArcs = []
     this.renderer.dispose()

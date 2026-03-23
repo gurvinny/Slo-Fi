@@ -3,7 +3,7 @@ import { detectBpm } from '../audio/BpmDetector'
 import { detectKey, NOTE_NAMES } from '../audio/KeyDetector'
 import type { DetectedKey } from '../audio/KeyDetector'
 import { Waveform } from './Waveform'
-import { AnomalySphere } from './AnomalySphere'
+import type { AnomalySphere } from './AnomalySphere'
 import { StarOverlay } from './StarOverlay'
 import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
@@ -117,13 +117,14 @@ export class App {
     // Wire up mobile APIs: Media Session, Fullscreen, Vibration, and
     // AudioContext background recovery via visibilitychange.
     this._mobile = new MobileController(this.engine)
-    this._mobile.onExternalPlay  = () => { this.setPlayingState(true);  this.sphere?.start() }
-    this._mobile.onExternalPause = () => { this.setPlayingState(false); this.sphere?.stop()  }
+    this._mobile.onExternalPlay  = () => { this.setPlayingState(true);  this.sphere?.start(); this.starOverlay.resume() }
+    this._mobile.onExternalPause = () => { this.setPlayingState(false); this.sphere?.stop();  this.starOverlay.pause() }
     this._mobile.onExternalStop  = () => {
       this.setPlayingState(false)
       this.waveform.setProgress(0)
       this.currentTimeEl.textContent = '0:00'
       this.sphere?.stop()
+      this.starOverlay.pause()
       this._mobile.stopSilenceLoop()
     }
     const fsBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement | null
@@ -209,6 +210,7 @@ export class App {
       this.setPlayingState(false)
       this.waveform.setProgress(0)
       this.sphere?.stop()
+      this.starOverlay.pause()
       this._mobile?.stopSilenceLoop()
     }
     this.engine.onTimeUpdate = (current, duration) => {
@@ -256,6 +258,7 @@ export class App {
       this.waveform.setProgress(0)
       this.currentTimeEl.textContent = '0:00'
       this.sphere?.stop()
+      this.starOverlay.pause()
       this._mobile?.stopSilenceLoop()
     })
     this.rewindBtn.addEventListener('click', () => {
@@ -426,6 +429,7 @@ export class App {
           this.setPlayingState(false)
           this.waveform.setProgress(0)
           this.sphere?.stop()
+          this.starOverlay.pause()
           break
         case 'l':
         case 'L':
@@ -506,6 +510,7 @@ export class App {
 
     if (!this.sphere && this.engine.analyserNode) {
       try {
+        const { AnomalySphere } = await import('./AnomalySphere')
         this.sphere = new AnomalySphere(
           document.getElementById('anomaly') as HTMLElement,
           this.engine.analyserNode,
@@ -580,6 +585,7 @@ export class App {
       this.engine.pause()
       this.setPlayingState(false)
       this.sphere?.stop()
+      this.starOverlay.pause()
       this._mobile.hapticPause()
       this._mobile.updatePlaybackState(false)
       // Keep the silence loop running during pause so the iOS audio session
@@ -588,6 +594,7 @@ export class App {
       this.engine.play()
       this.setPlayingState(true)
       this.sphere?.start()
+      this.starOverlay.resume()
       this._mobile.hapticPlay()
       this._mobile.updatePlaybackState(true)
       this._mobile.ensureSilenceLoop()

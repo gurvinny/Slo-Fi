@@ -1,6 +1,8 @@
 import { EffectsChain } from './EffectsChain'
 import type { AudioParams } from '../types'
 
+export const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024
+
 // Builds an exponential-decay noise IR that models room acoustics.
 // Extracted to module scope so Exporter.ts can use it without importing AudioEngine.
 export function buildIR(ctx: BaseAudioContext, decay: number, size: number): AudioBuffer {
@@ -210,8 +212,7 @@ export class AudioEngine {
 
   async loadFile(file: File): Promise<void> {
     // Basic security checks before handing to AudioContext
-    const maxBytes = 300 * 1024 * 1024  // 300 MB cap
-    if (file.size > maxBytes) throw new Error('File is too large (max 300 MB)')
+    if (file.size > MAX_FILE_SIZE_BYTES) throw new Error(`File is too large (max ${MAX_FILE_SIZE_BYTES / (1024 * 1024)} MB)`)
 
     await this.ensureContext()
     this.stop()

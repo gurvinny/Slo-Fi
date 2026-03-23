@@ -440,13 +440,25 @@ export class App {
   }
 
   private async loadFile(file: File): Promise<void> {
+    const content = this.dropzone.querySelector<HTMLElement>('.dropzone-content')!
+    const title   = this.dropzone.querySelector<HTMLElement>('.dropzone-title')!
+
+    const showDropzoneError = (message: string): void => {
+      title.textContent = message
+      content.classList.add('error')
+      setTimeout(() => {
+        title.textContent = 'Drop your audio file here'
+        content.classList.remove('error')
+      }, 3000)
+    }
+
     if (file.type && !file.type.startsWith('audio/')) {
-      alert('Please drop an audio file.')
+      showDropzoneError('Please drop an audio file.')
       return
     }
 
     this.dropzone.classList.add('loading')
-    this.dropzone.querySelector('.dropzone-title')!.textContent = 'Decoding audio...'
+    title.textContent = 'Decoding audio...'
 
     try {
       await this.engine.loadFile(file)
@@ -487,8 +499,7 @@ export class App {
 
     } catch (err) {
       console.error('Failed to decode audio:', err)
-      alert('Could not decode this audio file. Please try a different format.')
-      this.dropzone.querySelector('.dropzone-title')!.textContent = 'Drop your audio file here'
+      showDropzoneError('Could not decode this file. Try a different format.')
     } finally {
       this.dropzone.classList.remove('loading')
     }

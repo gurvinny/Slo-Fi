@@ -19,6 +19,8 @@
   --teal: #00d4aa;
   --teal-dim: rgba(0, 212, 170, 0.15);
 
+  --error-color: #ff5f7e;
+
   --radius: 10px;
   --radius-sm: 6px;
 
@@ -263,6 +265,18 @@ body::after {
 .dropzone.loading {
   pointer-events: none;
   opacity: 0.7;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.dropzone.loading .dropzone-icon {
+  animation: spin 1s linear infinite;
+}
+
+.dropzone-content.error .dropzone-title {
+  color: var(--error-color);
 }
 
 /* The glass card centered in the full-page overlay */

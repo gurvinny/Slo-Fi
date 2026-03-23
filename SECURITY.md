@@ -54,9 +54,29 @@ Slo-Fi's security posture is built into the architecture itself. Audio is proces
 | **No audio uploads** | Audio is decoded with `AudioContext.decodeAudioData()` from a local `File` object. No `fetch`, `XHR`, or WebSocket is used for audio data at any point. |
 | **No persistent audio storage** | `AudioBuffer` instances live only in memory. No writes to `localStorage`, `IndexedDB`, or the Cache API for audio content. The PWA service worker (`sw.js`) caches only static app shell assets — never audio data. Closing the tab frees all audio memory. |
 | **No third-party scripts** | Zero analytics, zero tracking pixels, zero CDN-loaded runtime libraries. All dependencies are bundled and reviewed at build time. |
-| **Content Security Policy** | Strict CSP headers restrict resource origins and block inline script injection. |
+| **Content Security Policy** | A strict CSP is enforced via `public/_headers` on Cloudflare Pages. It restricts resource origins, blocks inline script injection, and prevents framing (`frame-ancestors 'none'`). |
 
 This architecture makes Slo-Fi safe to use with sensitive, unreleased, or proprietary audio material.
+
+<br/>
+
+---
+
+<br/>
+
+## HTTP Security Headers
+
+All HTTP responses from the Cloudflare Pages deployment are governed by `public/_headers`. The full set of enforced headers and their rationale:
+
+| Header | Value | Rationale |
+|:---|:---|:---|
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'` | Restricts all resource origins to same-site. `style-src 'unsafe-inline'` is required for runtime CSS custom property writes via `element.style.setProperty()`. `connect-src 'self'` is required for the PWA service worker to cache static assets. `frame-ancestors 'none'` prevents clickjacking. |
+| `X-Frame-Options` | `DENY` | Legacy clickjacking protection for browsers that do not honour CSP `frame-ancestors`. |
+| `X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing attacks on served assets. |
+| `Referrer-Policy` | `no-referrer` | No `Referer` header is sent on any navigation away from the app. |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), display-capture=()` | Explicitly disables browser APIs Slo-Fi never uses. Closes the attack surface for those APIs should a script injection ever occur. Web Audio (`AudioContext`) is not gated by `Permissions-Policy` and is unaffected. |
+| `Cross-Origin-Opener-Policy` | `same-origin` | Isolates the browsing context; prevents cross-origin windows from holding a reference to this page. |
+| `Cross-Origin-Resource-Policy` | `same-origin` | Prevents other origins from loading Slo-Fi's served resources. |
 
 <br/>
 

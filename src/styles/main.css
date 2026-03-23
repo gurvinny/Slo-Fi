@@ -39,6 +39,13 @@
 
   /* Aurora hue-shift per theme — applied as filter on the aurora layers */
   --aurora-filter: none;
+
+  /* Button glass tokens */
+  --btn-glass-bg:         rgba(10, 10, 15, 0.40);
+  --btn-glass-border:     rgba(255, 255, 255, 0.09);
+  --btn-glass-edge:       rgba(255, 255, 255, 0.13);
+  --btn-glass-blur:       16px;
+  --btn-tilt-perspective: 300px;
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */
@@ -146,6 +153,9 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
   .btn-play::before { animation: none !important; }
+  .btn-play::after  { animation: none !important; }
+  body.is-paused .btn-play { animation: none; }
+  .btn-icon:hover   { transform: none; }
   .landing-scan-line,
   .landing-ring { animation: none; }
   .landing-badge { animation: none; opacity: 1; }
@@ -690,11 +700,18 @@ body.is-playing #iconPause    { opacity: 1; }
   align-items: center;
   justify-content: center;
   border: none;
-  background: var(--surface-2);
+  background: var(--btn-glass-bg);
+  backdrop-filter: blur(var(--btn-glass-blur));
+  -webkit-backdrop-filter: blur(var(--btn-glass-blur));
   border-radius: 50%;
   cursor: pointer;
   color: var(--text-dim);
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  /* top+left catchlight simulates a polished glass edge catching the starfield */
+  box-shadow:
+    inset 1px 1px 0 var(--btn-glass-edge),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.25);
+  transition: background 0.15s, color 0.15s, box-shadow 0.2s,
+              border-color 0.15s, transform 0.15s ease;
   outline: none;
 }
 
@@ -705,39 +722,97 @@ body.is-playing #iconPause    { opacity: 1; }
 .btn-icon {
   width: 40px;
   height: 40px;
-  border: 1px solid var(--border);
-  transition: background 0.15s, color 0.15s, box-shadow 0.2s, border-color 0.15s, transform 0.12s;
+  border: 1px solid var(--btn-glass-border);
+  transition: background 0.15s, color 0.15s, box-shadow 0.2s,
+              border-color 0.15s, transform 0.12s;
 }
 
+/* Subtle spatial tilt — feels like a physical hardware button sitting in 3D space */
 .btn-icon:hover {
-  background: var(--surface-3);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
+  border-color: var(--btn-glass-edge);
+  transform: perspective(var(--btn-tilt-perspective)) rotateX(6deg) rotateY(6deg);
+}
+
+/* Heavy studio mechanism snapping into place */
+.btn-icon:active {
+  transform: scale(0.95);
+  box-shadow:
+    inset 2px 3px 6px rgba(0, 0, 0, 0.55),
+    inset 1px 1px 0 var(--btn-glass-edge);
 }
 
 .btn-play {
   position: relative;
+  overflow: visible;
   width: 58px;
   height: 58px;
-  background: var(--accent);
+  background: var(--btn-glass-bg);
   color: #fff;
-  box-shadow: 0 4px 20px var(--accent-glow);
+  /* bass-reactive scale — no JS needed, --ui-bass is written per-frame by App.ts */
+  transform: scale(calc(1 + var(--ui-bass) * 0.10));
+  /* treble-reactive outer glow via calc */
+  box-shadow:
+    0 4px 20px var(--accent-glow),
+    0 0 calc(8px + var(--ui-treble) * 24px) var(--accent-glow),
+    inset 1px 1px 0 var(--btn-glass-edge);
+  /* transform intentionally excluded — it is driven per-frame and needs no easing lag */
   transition: box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-              background 0.4s ease,
-              transform 0.15s ease;
+              background 0.4s ease;
 }
 
 body.is-playing .btn-play {
-  box-shadow: 0 4px 32px var(--accent-glow), 0 0 18px var(--accent-dim);
+  box-shadow:
+    0 4px 32px var(--accent-glow),
+    0 0 calc(12px + var(--ui-treble) * 32px) var(--accent-glow),
+    inset 1px 1px 0 var(--btn-glass-edge);
 }
 
 .btn-play:hover {
-  background: var(--accent-bright);
-  box-shadow: 0 4px 28px var(--accent-glow);
-  transform: scale(1.04);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 4px 28px var(--accent-glow),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.18);
 }
 
+.btn-play:hover::after {
+  opacity: 0.75;
+}
+
+/* preserve bass reactivity during the press gesture */
 .btn-play:active {
-  transform: scale(0.97);
+  transform: scale(calc(0.97 + var(--ui-bass) * 0.10));
+}
+
+/* Registered property so the conic-gradient angle can interpolate in spin animation */
+@property --btn-aurora-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes btn-aurora-spin {
+  from { --btn-aurora-angle: 0deg; }
+  to   { --btn-aurora-angle: 360deg; }
+}
+
+/* Slow idle breathing when paused — only box-shadow pulses, no transform conflict */
+@keyframes btn-breathe {
+  0%, 100% {
+    box-shadow:
+      0 4px 20px var(--accent-glow),
+      0 0 6px var(--accent-dim),
+      inset 1px 1px 0 var(--btn-glass-edge);
+    opacity: 0.92;
+  }
+  50% {
+    box-shadow:
+      0 6px 36px var(--accent-glow),
+      0 0 22px var(--accent-dim),
+      inset 1px 1px 0 var(--btn-glass-edge);
+    opacity: 1;
+  }
 }
 
 /* Pulsing halo ring while playing */
@@ -763,6 +838,47 @@ body.is-playing .btn-play {
 
 body.is-playing .btn-play::before {
   animation: pulse-ring 1.8s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+
+/* Aurora gradient layer — sits below the icon, clipped to the circle */
+.btn-play::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  /* radial fallback for browsers without conic-gradient + @property support */
+  background: radial-gradient(
+    circle at 38% 32%,
+    var(--accent-bright) 0%,
+    var(--accent)        40%,
+    var(--teal)          100%
+  );
+  opacity: 0.45;
+  mix-blend-mode: soft-light;
+  clip-path: circle(50% at 50% 50%);
+  transition: opacity 0.3s ease;
+}
+
+/* Rotating aurora conic for modern browsers */
+@supports (background: conic-gradient(from 1deg, red, blue)) {
+  .btn-play::after {
+    background: conic-gradient(
+      from var(--btn-aurora-angle),
+      var(--accent)        0%,
+      var(--teal)          28%,
+      var(--accent-bright) 50%,
+      var(--teal)          72%,
+      var(--accent)        100%
+    );
+    animation: btn-aurora-spin 6s linear infinite;
+  }
+}
+
+/* Idle breathing when paused — --ui-bass is 0, so the calc scale rests at 1.0 */
+body.is-paused .btn-play {
+  animation: btn-breathe 3s ease-in-out infinite;
 }
 
 /* Stop button — teal identity */
@@ -1233,23 +1349,37 @@ body.is-paused .site-footer {
 .btn-export {
   color: var(--teal);
   border-color: var(--teal-dim);
+  box-shadow:
+    inset 1px 1px 0 var(--btn-glass-edge),
+    0 0 6px var(--teal-dim);
 }
 
 .btn-export:hover {
-  background: var(--teal-dim);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--teal);
   border-color: var(--teal);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 14px var(--teal-dim);
+  filter: drop-shadow(0 0 5px var(--teal-dim));
+  transform: perspective(var(--btn-tilt-perspective)) rotateX(6deg) rotateY(6deg);
 }
 
+/* Mechanically depressed — icon ignites with the current theme color */
 .btn-loop--active {
-  color: var(--teal);
-  border-color: var(--teal);
-  background: rgba(0, 212, 170, 0.12);
-  box-shadow: 0 0 8px rgba(0, 212, 170, 0.25);
+  box-shadow:
+    inset 0 2px 12px var(--accent-dim),
+    inset 0 1px 4px rgba(0, 0, 0, 0.60),
+    0 0 16px var(--accent-dim);
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--accent);
+  filter: drop-shadow(0 0 6px var(--accent));
 }
 
 .btn-loop--active:hover {
-  background: rgba(0, 212, 170, 0.20);
+  background: rgba(255, 255, 255, 0.04);
+  filter: drop-shadow(0 0 8px var(--accent));
 }
 
 .export-status {

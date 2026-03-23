@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && node scripts/precache-sw.mjs",
+    "build": "node scripts/generate-icons.mjs && tsc && vite build && node scripts/precache-sw.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },

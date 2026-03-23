@@ -35,6 +35,8 @@ export class StarOverlay {
 
   private treble  = 0
   private rafId: number | null = null
+  private playing = true
+  private throttleId: ReturnType<typeof setInterval> | null = null
 
   // Logical size (CSS pixels)
   private w = 0
@@ -64,6 +66,28 @@ export class StarOverlay {
 
   // Called from App.ts via sphere.onEnergyUpdate
   setTreble(v: number): void { this.treble = v }
+
+  pause(): void {
+    if (!this.playing) return
+    this.playing = false
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId)
+      this.rafId = null
+    }
+    // Drop to ~15 fps for ambient twinkle while audio is paused
+    this.throttleId = setInterval(() => this.loop(performance.now()), 67)
+  }
+
+  resume(): void {
+    if (this.playing) return
+    this.playing = true
+    if (this.throttleId !== null) {
+      clearInterval(this.throttleId)
+      this.throttleId = null
+    }
+    this.lastTime = -1
+    requestAnimationFrame((t) => this.loop(t))
+  }
 
   private resize(): void {
     this.w   = window.innerWidth
@@ -149,12 +173,14 @@ export class StarOverlay {
       }
     }
 
-    // ── Shooting star timer ─────────────────────────────────────────────────
-    this.shotTimer += dt
-    if (this.shotTimer >= this.nextShotIn) {
-      this.spawnShot()
-      this.shotTimer  = 0
-      this.nextShotIn = 3000 + Math.random() * 7000   // 3-10 s interval
+    // ── Shooting star timer (only while audio is playing) ───────────────────
+    if (this.playing) {
+      this.shotTimer += dt
+      if (this.shotTimer >= this.nextShotIn) {
+        this.spawnShot()
+        this.shotTimer  = 0
+        this.nextShotIn = 3000 + Math.random() * 7000   // 3-10 s interval
+      }
     }
 
     // ── Shooting stars ──────────────────────────────────────────────────────

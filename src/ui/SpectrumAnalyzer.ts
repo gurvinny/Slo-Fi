@@ -77,6 +77,20 @@ export class SpectrumAnalyzer {
     this.drawIdle()
   }
 
+  // Freeze the last drawn frame without clearing particles or drawing idle state.
+  pause(): void {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId)
+      this.rafId = null
+    }
+  }
+
+  // Restart the animation loop after a pause().
+  resume(): void {
+    if (this.rafId !== null) return
+    this.loop()
+  }
+
   private loop(): void {
     this.analyser.getByteFrequencyData(this.freqData)
     this.draw()

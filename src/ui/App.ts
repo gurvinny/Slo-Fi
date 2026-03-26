@@ -113,6 +113,7 @@ export class App {
     this.wireControlsPanel()
     this.wireEffectsPanel()
     this.wireSettingsPanel()
+    this.initAriaValueText()
 
     // Wire up mobile APIs: Media Session, Fullscreen, Vibration, and
     // AudioContext background recovery via visibilitychange.
@@ -291,6 +292,7 @@ export class App {
       const rate = parseInt(this.speedSlider.value) / 100
       this.engine.setPlaybackRate(rate)
       this.speedValue.textContent = `${rate.toFixed(2)}x`
+      this.speedSlider.setAttribute('aria-valuetext', `${rate.toFixed(2)}x`)
       this.sphere?.setSpeed(rate)
       this.presets.clearActive()
       this.updateBpmDisplay()
@@ -301,6 +303,7 @@ export class App {
       const st = parseInt(this.pitchSlider.value)
       this.engine.setPitch(st)
       this.pitchValue.textContent = st === 0 ? '0 st' : `${st > 0 ? '+' : ''}${st} st`
+      this.pitchSlider.setAttribute('aria-valuetext', st === 0 ? '0 semitones' : `${st > 0 ? '+' : ''}${st} semitones`)
       this.presets.clearActive()
       this.updateBpmDisplay()
     })
@@ -310,6 +313,7 @@ export class App {
       const mix = parseInt(this.reverbSlider.value) / 100
       this.engine.setReverbMix(mix)
       this.reverbValue.textContent = `${this.reverbSlider.value}%`
+      this.reverbSlider.setAttribute('aria-valuetext', `${this.reverbSlider.value}%`)
       this.sphere?.setReverb(mix)
       this.presets.clearActive()
     })
@@ -319,6 +323,7 @@ export class App {
       const decay = parseInt(this.decaySlider.value) / 10
       this.engine.setReverbDecay(decay)
       this.decayValue.textContent = `${decay.toFixed(1)}s`
+      this.decaySlider.setAttribute('aria-valuetext', `${decay.toFixed(1)} seconds`)
       this.presets.clearActive()
     })
 
@@ -327,6 +332,7 @@ export class App {
       const size = parseInt(this.roomSlider.value) / 100
       this.engine.setReverbRoomSize(size)
       this.roomValue.textContent = `${this.roomSlider.value}%`
+      this.roomSlider.setAttribute('aria-valuetext', `${this.roomSlider.value}%`)
       this.presets.clearActive()
     })
 
@@ -335,6 +341,7 @@ export class App {
       const vol = parseInt(this.volumeSlider.value) / 100
       this.engine.setVolume(vol)
       this.volumeValue.textContent = `${this.volumeSlider.value}%`
+      this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
     })
 
     // Visual settings — particle count
@@ -556,6 +563,22 @@ export class App {
 
   private notifyParamChange(): void { /* hook point for future param-change listeners */ }
 
+  private initAriaValueText(): void {
+    const rate = parseInt(this.speedSlider.value) / 100
+    this.speedSlider.setAttribute('aria-valuetext', `${rate.toFixed(2)}x`)
+
+    const st = parseInt(this.pitchSlider.value)
+    this.pitchSlider.setAttribute('aria-valuetext', st === 0 ? '0 semitones' : `${st > 0 ? '+' : ''}${st} semitones`)
+
+    this.reverbSlider.setAttribute('aria-valuetext', `${this.reverbSlider.value}%`)
+
+    const decay = parseInt(this.decaySlider.value) / 10
+    this.decaySlider.setAttribute('aria-valuetext', `${decay.toFixed(1)} seconds`)
+
+    this.roomSlider.setAttribute('aria-valuetext', `${this.roomSlider.value}%`)
+    this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
+  }
+
   private applyTheme(theme: string): void {
     this.settingsDrawer.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('theme-chip--active'))
     const chip = this.settingsDrawer.querySelector<HTMLButtonElement>(`.theme-chip[data-theme="${theme}"]`)
@@ -577,7 +600,11 @@ export class App {
       const transposedRoot = ((this._detectedKey.root + shift) % 12 + 12) % 12
       key = ` · ${NOTE_NAMES[transposedRoot]} ${this._detectedKey.mode}`
     }
-    this.trackBpm.textContent = `${displayed} BPM${key}`
+    const text = `${displayed} BPM${key}`
+    this.trackBpm.textContent = text
+    // Announce BPM/key changes to screen readers via the sr-only live region
+    const statusEl = document.getElementById('trackStatus')
+    if (statusEl) statusEl.textContent = text
   }
 
   private togglePlayPause(): void {

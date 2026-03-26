@@ -617,6 +617,8 @@ export class AnomalySphere {
   private container: HTMLElement  // stored so resize() doesn't need parentElement
   private rafId:   number | null = null
   private playing  = false
+  private _reducedMotion: boolean
+  private _motionMQ: MediaQueryList
 
   // Called each frame with smoothed bass/mid/treble for the aurora, plus
   // fast-attack uiBass/uiTreble for snappy site-wide UI reactivity.
@@ -647,6 +649,8 @@ export class AnomalySphere {
     canvas.style.inset    = '0'
     canvas.style.width    = '100%'
     canvas.style.height   = '100%'
+    canvas.setAttribute('aria-hidden', 'true')
+    canvas.setAttribute('tabindex', '-1')
     container.appendChild(canvas)
 
     // ── Scene + camera ───────────────────────────────────────────────────────
@@ -710,6 +714,14 @@ export class AnomalySphere {
     this.composer.addPass(this.glitchPass)
 
     this.composer.addPass(new OutputPass())
+
+    // ── Reduced motion ───────────────────────────────────────────────────────
+    // If the OS reduced-motion preference is set, the loop still runs (for the
+    // static glowing sphere) but all displacement and animation uniforms are
+    // zeroed so the geometry stays a perfect sphere.
+    this._motionMQ = window.matchMedia('(prefers-reduced-motion: reduce)')
+    this._reducedMotion = this._motionMQ.matches
+    this._motionMQ.addEventListener('change', (e) => { this._reducedMotion = e.matches })
 
     // ── Start loop + defer first resize ─────────────────────────────────────
     window.addEventListener('resize', () => this.resize())
@@ -850,6 +862,20 @@ export class AnomalySphere {
     this.rafId = requestAnimationFrame(() => this.loop())
 
     const elapsed = this.clock.getElapsedTime()
+
+    // Under reduced motion: render the orb as a static glowing sphere with
+    // no vertex displacement or beat-driven animation. The bloom and color
+    // still render so the orb remains visible, just motionless.
+    if (this._reducedMotion) {
+      this.uniforms.uTime.value    = elapsed
+      this.uniforms.uBass.value    = 0
+      this.uniforms.uMid.value     = 0
+      this.uniforms.uTreble.value  = 0
+      this.uniforms.uSubBass.value = 0
+      this.bloom.strength = 0.25 * this.glowMult
+      this.composer.render()
+      return
+    }
 
     // Intro animation: orb grows from a point over ~1.5 s with ease-out-back
     // (slight overshoot → spring feel, like the orb is accepting the file)

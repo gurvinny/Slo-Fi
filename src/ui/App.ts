@@ -79,6 +79,21 @@ export class App {
   private settingsCloseBtn = document.getElementById('settingsCloseBtn')!
   private settingsShowBtn  = document.getElementById('settingsShowBtn')!
 
+  // Help modal refs
+  private helpModal    = document.getElementById('help-modal') as HTMLDialogElement
+  private helpBtn      = document.getElementById('helpBtn')!
+  private helpCloseBtn = document.getElementById('helpCloseBtn')!
+
+  // Playlist state
+  private playlist: File[]        = []
+  private currentTrackIndex       = -1
+  private playlistDrawer          = document.getElementById('playlistDrawer')!
+  private playlistCloseBtn        = document.getElementById('playlistCloseBtn')!
+  private playlistShowBtn         = document.getElementById('playlistShowBtn')!
+  private playlistAddBtn          = document.getElementById('playlistAddBtn')!
+  private playlistList            = document.getElementById('playlistList')!
+  private playlistCount           = document.getElementById('playlistCount')!
+
   // Visual settings controls
   private particleCountSlider  = document.getElementById('particleCountSlider') as HTMLInputElement
   private particleCountValue   = document.getElementById('particleCountValue')!
@@ -113,6 +128,9 @@ export class App {
     this.wireControlsPanel()
     this.wireEffectsPanel()
     this.wireSettingsPanel()
+    this.wireHelpModal()
+    this.wirePlaylistPanel()
+    this.initAriaValueText()
 
     // Wire up mobile APIs: Media Session, Fullscreen, Vibration, and
     // AudioContext background recovery via visibilitychange.
@@ -129,6 +147,99 @@ export class App {
     }
     const fsBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement | null
     if (fsBtn) this._mobile.bindFullscreenBtn(fsBtn)
+  }
+
+  private wirePlaylistPanel(): void {
+    this.playlistCloseBtn.addEventListener('click', () =>
+      this.playlistDrawer.classList.add('controls-drawer--hidden'))
+    this.playlistShowBtn.addEventListener('click', () =>
+      this.playlistDrawer.classList.remove('controls-drawer--hidden'))
+    // "Add files" button reuses the hidden fileInput so no extra dialog is needed
+    this.playlistAddBtn.addEventListener('click', () => this.fileInput.click())
+  }
+
+  private addFilesToPlaylist(files: File[]): void {
+    const audio = files.filter(f => !f.type || f.type.startsWith('audio/'))
+    if (!audio.length) return
+    this.playlist.push(...audio)
+    this.renderPlaylist()
+    if (this.currentTrackIndex === -1) {
+      void this.switchTrack(0)
+    }
+  }
+
+  private async switchTrack(index: number, autoPlay = false): Promise<void> {
+    if (index < 0 || index >= this.playlist.length) return
+    this.currentTrackIndex = index
+    this.renderPlaylist()
+    // Orb fade-dim: zero reactivity briefly so the orb dims before the new
+    // buffer loads, then restore after the load settles (~150ms)
+    const reactVal = parseInt(this.orbReactivitySlider.value) / 100
+    this.sphere?.setReactivity(0)
+    await this.loadFile(this.playlist[index])
+    window.setTimeout(() => this.sphere?.setReactivity(reactVal), 150)
+    if (autoPlay) {
+      this.engine.play()
+      this.setPlayingState(true)
+      this.sphere?.start()
+      this.starOverlay.resume()
+      this._mobile?.ensureSilenceLoop()
+      this._mobile?.updatePlaybackState(true)
+    }
+  }
+
+  private removeTrack(index: number): void {
+    this.playlist.splice(index, 1)
+    if (!this.playlist.length) {
+      this.currentTrackIndex = -1
+      this.engine.stop()
+      this.setPlayingState(false)
+      this.renderPlaylist()
+      return
+    }
+    if (index === this.currentTrackIndex) {
+      void this.switchTrack(Math.min(index, this.playlist.length - 1))
+    } else if (index < this.currentTrackIndex) {
+      this.currentTrackIndex--
+    }
+    this.renderPlaylist()
+  }
+
+  private renderPlaylist(): void {
+    this.playlistList.innerHTML = ''
+    const count = this.playlist.length
+    this.playlistCount.textContent = `${count} track${count !== 1 ? 's' : ''}`
+    this.playlist.forEach((file, i) => {
+      const li   = document.createElement('li')
+      const name = document.createElement('span')
+      const btn  = document.createElement('button')
+
+      li.className = 'playlist-item'
+      if (i === this.currentTrackIndex) li.setAttribute('aria-current', 'true')
+
+      name.className = 'playlist-item-name'
+      name.textContent = file.name.replace(/\.[^.]+$/, '')
+      name.title = file.name
+
+      btn.className = 'playlist-item-remove'
+      btn.setAttribute('aria-label', `Remove ${file.name}`)
+      btn.textContent = '×'
+      btn.addEventListener('click', (e) => { e.stopPropagation(); this.removeTrack(i) })
+
+      li.addEventListener('click', () => void this.switchTrack(i))
+      li.append(name, btn)
+      this.playlistList.appendChild(li)
+    })
+  }
+
+  private wireHelpModal(): void {
+    this.helpBtn.addEventListener('click', () => this.helpModal.showModal())
+    this.helpCloseBtn.addEventListener('click', () => this.helpModal.close())
+    // Click outside the dialog content to close (the <dialog> element fills the
+    // viewport; a click on it but not on its child content means the backdrop)
+    this.helpModal.addEventListener('click', (e) => {
+      if (e.target === this.helpModal) this.helpModal.close()
+    })
   }
 
   private wireControlsPanel(): void {
@@ -212,6 +323,11 @@ export class App {
       this.sphere?.stop()
       this.starOverlay.pause()
       this._mobile?.stopSilenceLoop()
+      // Auto-advance to next track and start playback immediately
+      const next = this.currentTrackIndex + 1
+      if (next < this.playlist.length) {
+        void this.switchTrack(next, true)
+      }
     }
     this.engine.onTimeUpdate = (current, duration) => {
       this.currentTimeEl.textContent = formatTime(current)
@@ -242,12 +358,16 @@ export class App {
     this.dropzone.addEventListener('drop', (e) => {
       e.preventDefault()
       this.dropzone.classList.remove('drag-over')
-      const file = e.dataTransfer?.files[0]
-      if (file) this.loadFile(file)
+      const files = e.dataTransfer?.files
+      if (files && files.length > 0) this.addFilesToPlaylist(Array.from(files))
     })
     this.fileInput.addEventListener('change', () => {
-      const file = this.fileInput.files?.[0]
-      if (file) this.loadFile(file)
+      const files = this.fileInput.files
+      if (files && files.length > 0) {
+        this.addFilesToPlaylist(Array.from(files))
+        // Reset so the same file(s) can be added again later
+        this.fileInput.value = ''
+      }
     })
 
     // Transport
@@ -291,6 +411,7 @@ export class App {
       const rate = parseInt(this.speedSlider.value) / 100
       this.engine.setPlaybackRate(rate)
       this.speedValue.textContent = `${rate.toFixed(2)}x`
+      this.speedSlider.setAttribute('aria-valuetext', `${rate.toFixed(2)}x`)
       this.sphere?.setSpeed(rate)
       this.presets.clearActive()
       this.updateBpmDisplay()
@@ -301,6 +422,7 @@ export class App {
       const st = parseInt(this.pitchSlider.value)
       this.engine.setPitch(st)
       this.pitchValue.textContent = st === 0 ? '0 st' : `${st > 0 ? '+' : ''}${st} st`
+      this.pitchSlider.setAttribute('aria-valuetext', st === 0 ? '0 semitones' : `${st > 0 ? '+' : ''}${st} semitones`)
       this.presets.clearActive()
       this.updateBpmDisplay()
     })
@@ -310,6 +432,7 @@ export class App {
       const mix = parseInt(this.reverbSlider.value) / 100
       this.engine.setReverbMix(mix)
       this.reverbValue.textContent = `${this.reverbSlider.value}%`
+      this.reverbSlider.setAttribute('aria-valuetext', `${this.reverbSlider.value}%`)
       this.sphere?.setReverb(mix)
       this.presets.clearActive()
     })
@@ -319,6 +442,7 @@ export class App {
       const decay = parseInt(this.decaySlider.value) / 10
       this.engine.setReverbDecay(decay)
       this.decayValue.textContent = `${decay.toFixed(1)}s`
+      this.decaySlider.setAttribute('aria-valuetext', `${decay.toFixed(1)} seconds`)
       this.presets.clearActive()
     })
 
@@ -327,6 +451,7 @@ export class App {
       const size = parseInt(this.roomSlider.value) / 100
       this.engine.setReverbRoomSize(size)
       this.roomValue.textContent = `${this.roomSlider.value}%`
+      this.roomSlider.setAttribute('aria-valuetext', `${this.roomSlider.value}%`)
       this.presets.clearActive()
     })
 
@@ -335,6 +460,7 @@ export class App {
       const vol = parseInt(this.volumeSlider.value) / 100
       this.engine.setVolume(vol)
       this.volumeValue.textContent = `${this.volumeSlider.value}%`
+      this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
     })
 
     // Visual settings — particle count
@@ -406,8 +532,15 @@ export class App {
 
   private wireKeyboard(): void {
     document.addEventListener('keydown', (e) => {
-      if (!this.engine.hasBuffer) return
       const tag = (e.target as HTMLElement).tagName
+      // ? key opens help regardless of whether a file is loaded
+      if (e.key === '?' && tag !== 'INPUT') {
+        e.preventDefault()
+        this.helpModal.showModal()
+        return
+      }
+
+      if (!this.engine.hasBuffer) return
       if (tag === 'INPUT') return
 
       switch (e.key) {
@@ -556,6 +689,22 @@ export class App {
 
   private notifyParamChange(): void { /* hook point for future param-change listeners */ }
 
+  private initAriaValueText(): void {
+    const rate = parseInt(this.speedSlider.value) / 100
+    this.speedSlider.setAttribute('aria-valuetext', `${rate.toFixed(2)}x`)
+
+    const st = parseInt(this.pitchSlider.value)
+    this.pitchSlider.setAttribute('aria-valuetext', st === 0 ? '0 semitones' : `${st > 0 ? '+' : ''}${st} semitones`)
+
+    this.reverbSlider.setAttribute('aria-valuetext', `${this.reverbSlider.value}%`)
+
+    const decay = parseInt(this.decaySlider.value) / 10
+    this.decaySlider.setAttribute('aria-valuetext', `${decay.toFixed(1)} seconds`)
+
+    this.roomSlider.setAttribute('aria-valuetext', `${this.roomSlider.value}%`)
+    this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
+  }
+
   private applyTheme(theme: string): void {
     this.settingsDrawer.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('theme-chip--active'))
     const chip = this.settingsDrawer.querySelector<HTMLButtonElement>(`.theme-chip[data-theme="${theme}"]`)
@@ -577,7 +726,11 @@ export class App {
       const transposedRoot = ((this._detectedKey.root + shift) % 12 + 12) % 12
       key = ` · ${NOTE_NAMES[transposedRoot]} ${this._detectedKey.mode}`
     }
-    this.trackBpm.textContent = `${displayed} BPM${key}`
+    const text = `${displayed} BPM${key}`
+    this.trackBpm.textContent = text
+    // Announce BPM/key changes to screen readers via the sr-only live region
+    const statusEl = document.getElementById('trackStatus')
+    if (statusEl) statusEl.textContent = text
   }
 
   private togglePlayPause(): void {

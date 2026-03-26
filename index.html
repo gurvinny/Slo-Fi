@@ -6,7 +6,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Slo-Fi" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:375px) and (device-height:667px) and (-webkit-device-pixel-ratio:2)" href="/icons/splash/splash-750x1334.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:390px) and (device-height:844px) and (-webkit-device-pixel-ratio:3)" href="/icons/splash/splash-1170x2532.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3)" href="/icons/splash/splash-1290x2796.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:820px) and (device-height:1180px) and (-webkit-device-pixel-ratio:2)" href="/icons/splash/splash-1640x2360.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:1024px) and (device-height:1366px) and (-webkit-device-pixel-ratio:2)" href="/icons/splash/splash-2048x2732.png" />
     <meta name="description" content="Professional-grade audio slow-down tool with convolution reverb. Runs entirely in your browser — no uploads, no tracking." />
     <meta name="theme-color" content="#080810" />
     <title>Slo-Fi — Your Browser Is the Studio</title>
@@ -42,6 +47,10 @@
     }
     @keyframes _loader-spin {
       to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .page-loader-icon { animation: none; }
+      .page-loader-inner { animation: none; }
     }
   </style>
   </head>
@@ -126,7 +135,7 @@
             </div>
           </div>
 
-          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,audio/*" aria-hidden="true" tabindex="-1" />
+          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,audio/*" multiple aria-hidden="true" tabindex="-1" />
         </div>
 
         <!-- Player HUD — shown after file loads, children use fixed positioning -->
@@ -139,6 +148,7 @@
               <div class="track-bpm" id="trackBpm"></div>
               <div class="track-meta" id="trackMeta">—</div>
             </div>
+            <div id="trackStatus" aria-live="polite" aria-atomic="true" class="sr-only"></div>
             <div class="preset-strip" role="group" aria-label="Presets">
               <button class="preset-card" data-preset="lofi">
                 <span class="preset-card-name">Lo-Fi</span>
@@ -160,6 +170,19 @@
                 <span class="preset-card-name">Custom</span>
                 <span class="preset-card-hint">your settings</span>
               </button>
+            </div>
+          </div>
+
+          <!-- Playlist drawer — right side, opens with "Playlist" button -->
+          <div id="playlistDrawer" class="controls-drawer controls-drawer--hidden">
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Playlist</span>
+              <span id="playlistCount" class="playlist-count">0 tracks</span>
+              <button id="playlistCloseBtn" class="controls-drawer-btn" aria-label="Close playlist">&times;</button>
+            </div>
+            <ol id="playlistList" class="playlist-list" aria-label="Track list" aria-live="polite"></ol>
+            <div class="playlist-footer">
+              <button id="playlistAddBtn" class="btn-playlist-add" aria-label="Add more files to playlist">+ Add files</button>
             </div>
           </div>
 
@@ -483,8 +506,10 @@
                     <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
                   </svg>
                 </button>
+                <button id="playlistShowBtn" class="btn-controls-show" aria-label="Show playlist">Playlist</button>
                 <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls">Controls</button>
                 <button id="effectsShowBtn" class="btn-controls-show" aria-label="Show effects">Effects</button>
+                <button id="helpBtn" class="btn-controls-show btn-help" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
               </div>
             </div>
           </div>
@@ -504,6 +529,24 @@
         gurvinny
       </a>
     </footer>
+
+    <!-- Keyboard shortcut help overlay — opened with ? key or help button -->
+    <dialog id="help-modal" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div class="help-modal-inner">
+        <div class="help-modal-header">
+          <h2 class="help-modal-title">Keyboard Shortcuts</h2>
+          <button id="helpCloseBtn" class="help-modal-close" aria-label="Close shortcuts">&times;</button>
+        </div>
+        <dl class="shortcut-grid">
+          <div class="shortcut-row"><dt><kbd>Space</kbd></dt><dd>Play / Pause</dd></div>
+          <div class="shortcut-row"><dt><kbd>L</kbd></dt><dd>Toggle loop</dd></div>
+          <div class="shortcut-row"><dt><kbd>S</kbd></dt><dd>Stop &amp; rewind</dd></div>
+          <div class="shortcut-row"><dt><kbd>&#8592;</kbd></dt><dd>Rewind 5 s</dd></div>
+          <div class="shortcut-row"><dt><kbd>&#8594;</kbd></dt><dd>Forward 5 s</dd></div>
+          <div class="shortcut-row"><dt><kbd>?</kbd></dt><dd>Show this help</dd></div>
+        </dl>
+      </div>
+    </dialog>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -135,7 +135,7 @@
             </div>
           </div>
 
-          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,audio/*" aria-hidden="true" tabindex="-1" />
+          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,audio/*" multiple aria-hidden="true" tabindex="-1" />
         </div>
 
         <!-- Player HUD — shown after file loads, children use fixed positioning -->
@@ -171,6 +171,16 @@
                 <span class="preset-card-hint">your settings</span>
               </button>
             </div>
+          </div>
+
+          <!-- Playlist drawer — right side, opens with "Playlist" button -->
+          <div id="playlistDrawer" class="controls-drawer controls-drawer--hidden">
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Playlist</span>
+              <span id="playlistCount" class="playlist-count">0 tracks</span>
+              <button id="playlistCloseBtn" class="controls-drawer-btn" aria-label="Close playlist">&times;</button>
+            </div>
+            <ol id="playlistList" class="playlist-list" aria-label="Track list" aria-live="polite"></ol>
           </div>
 
           <!-- Audio Controls drawer — right side, opens with "Controls" button -->
@@ -493,6 +503,7 @@
                     <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
                   </svg>
                 </button>
+                <button id="playlistShowBtn" class="btn-controls-show" aria-label="Show playlist">Playlist</button>
                 <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls">Controls</button>
                 <button id="effectsShowBtn" class="btn-controls-show" aria-label="Show effects">Effects</button>
                 <button id="helpBtn" class="btn-controls-show btn-help" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>

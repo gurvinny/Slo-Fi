@@ -84,6 +84,15 @@ export class App {
   private helpBtn      = document.getElementById('helpBtn')!
   private helpCloseBtn = document.getElementById('helpCloseBtn')!
 
+  // Playlist state
+  private playlist: File[]        = []
+  private currentTrackIndex       = -1
+  private playlistDrawer          = document.getElementById('playlistDrawer')!
+  private playlistCloseBtn        = document.getElementById('playlistCloseBtn')!
+  private playlistShowBtn         = document.getElementById('playlistShowBtn')!
+  private playlistList            = document.getElementById('playlistList')!
+  private playlistCount           = document.getElementById('playlistCount')!
+
   // Visual settings controls
   private particleCountSlider  = document.getElementById('particleCountSlider') as HTMLInputElement
   private particleCountValue   = document.getElementById('particleCountValue')!
@@ -119,6 +128,7 @@ export class App {
     this.wireEffectsPanel()
     this.wireSettingsPanel()
     this.wireHelpModal()
+    this.wirePlaylistPanel()
     this.initAriaValueText()
 
     // Wire up mobile APIs: Media Session, Fullscreen, Vibration, and
@@ -136,6 +146,79 @@ export class App {
     }
     const fsBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement | null
     if (fsBtn) this._mobile.bindFullscreenBtn(fsBtn)
+  }
+
+  private wirePlaylistPanel(): void {
+    this.playlistCloseBtn.addEventListener('click', () =>
+      this.playlistDrawer.classList.add('controls-drawer--hidden'))
+    this.playlistShowBtn.addEventListener('click', () =>
+      this.playlistDrawer.classList.remove('controls-drawer--hidden'))
+  }
+
+  private addFilesToPlaylist(files: File[]): void {
+    const audio = files.filter(f => !f.type || f.type.startsWith('audio/'))
+    if (!audio.length) return
+    this.playlist.push(...audio)
+    this.renderPlaylist()
+    if (this.currentTrackIndex === -1) {
+      void this.switchTrack(0)
+    }
+  }
+
+  private async switchTrack(index: number): Promise<void> {
+    if (index < 0 || index >= this.playlist.length) return
+    this.currentTrackIndex = index
+    this.renderPlaylist()
+    // Orb fade-dim: zero reactivity briefly so the orb dims before the new
+    // buffer loads, then restore after the load settles (~150ms)
+    const reactVal = parseInt(this.orbReactivitySlider.value) / 100
+    this.sphere?.setReactivity(0)
+    await this.loadFile(this.playlist[index])
+    window.setTimeout(() => this.sphere?.setReactivity(reactVal), 150)
+  }
+
+  private removeTrack(index: number): void {
+    this.playlist.splice(index, 1)
+    if (!this.playlist.length) {
+      this.currentTrackIndex = -1
+      this.engine.stop()
+      this.setPlayingState(false)
+      this.renderPlaylist()
+      return
+    }
+    if (index === this.currentTrackIndex) {
+      void this.switchTrack(Math.min(index, this.playlist.length - 1))
+    } else if (index < this.currentTrackIndex) {
+      this.currentTrackIndex--
+    }
+    this.renderPlaylist()
+  }
+
+  private renderPlaylist(): void {
+    this.playlistList.innerHTML = ''
+    const count = this.playlist.length
+    this.playlistCount.textContent = `${count} track${count !== 1 ? 's' : ''}`
+    this.playlist.forEach((file, i) => {
+      const li   = document.createElement('li')
+      const name = document.createElement('span')
+      const btn  = document.createElement('button')
+
+      li.className = 'playlist-item'
+      if (i === this.currentTrackIndex) li.setAttribute('aria-current', 'true')
+
+      name.className = 'playlist-item-name'
+      name.textContent = file.name.replace(/\.[^.]+$/, '')
+      name.title = file.name
+
+      btn.className = 'playlist-item-remove'
+      btn.setAttribute('aria-label', `Remove ${file.name}`)
+      btn.textContent = '×'
+      btn.addEventListener('click', (e) => { e.stopPropagation(); this.removeTrack(i) })
+
+      li.addEventListener('click', () => void this.switchTrack(i))
+      li.append(name, btn)
+      this.playlistList.appendChild(li)
+    })
   }
 
   private wireHelpModal(): void {
@@ -229,6 +312,13 @@ export class App {
       this.sphere?.stop()
       this.starOverlay.pause()
       this._mobile?.stopSilenceLoop()
+      // Auto-advance to next track in playlist
+      const next = this.currentTrackIndex + 1
+      if (next < this.playlist.length) {
+        window.setTimeout(() => {
+          void this.switchTrack(next).then(() => this.togglePlayPause())
+        }, 300)
+      }
     }
     this.engine.onTimeUpdate = (current, duration) => {
       this.currentTimeEl.textContent = formatTime(current)
@@ -259,12 +349,16 @@ export class App {
     this.dropzone.addEventListener('drop', (e) => {
       e.preventDefault()
       this.dropzone.classList.remove('drag-over')
-      const file = e.dataTransfer?.files[0]
-      if (file) this.loadFile(file)
+      const files = e.dataTransfer?.files
+      if (files && files.length > 0) this.addFilesToPlaylist(Array.from(files))
     })
     this.fileInput.addEventListener('change', () => {
-      const file = this.fileInput.files?.[0]
-      if (file) this.loadFile(file)
+      const files = this.fileInput.files
+      if (files && files.length > 0) {
+        this.addFilesToPlaylist(Array.from(files))
+        // Reset so the same file(s) can be added again later
+        this.fileInput.value = ''
+      }
     })
 
     // Transport

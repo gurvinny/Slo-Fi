@@ -85,7 +85,7 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 | ✅ | [#21](https://github.com/gurvinny/Slo-Fi/issues/21) | **8D Audio Effect + Hz Resonance** | Binaural `PannerNode` with `HRTF` model automating a circular rotation path. Optional Solfeggio Hz frequency tuning (e.g. 432 Hz). |
 | ✅ | — | **Key Detection** | Offline chromagram analysis using the Krumhansl-Schmuckler algorithm. Detects major/minor key across all 12 roots. Displays under track title. |
 | ✅ | — | **Pitch Control** | ±12 semitone pitch shift, fully independent of playback speed. Decouple tempo and key to shape the vibe exactly. |
-| ⏳ | [#18](https://github.com/gurvinny/Slo-Fi/issues/18) | **Faster-than-Realtime Export** | `OfflineAudioContext` rendering — a 10-minute track exports in seconds with the full effects chain reproduced faithfully. Deferred to v2.1. |
+| ✅ | [#18](https://github.com/gurvinny/Slo-Fi/issues/18) | **Faster-than-Realtime Export** | `OfflineAudioContext` rendering — a 10-minute track exports in seconds with the full effects chain reproduced faithfully. |
 
 <br/>
 
@@ -143,11 +143,7 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 
 ## v2.0 — Complete
 
-All 12 planned v2.0 issues shipped. One item deferred to v2.1:
-
-| Issue | Area | Feature |
-|:---:|:---|:---|
-| [#18](https://github.com/gurvinny/Slo-Fi/issues/18) | Audio Engine | Faster-than-realtime export via `OfflineAudioContext` |
+All 13 planned v2.0 issues shipped. The milestone is closed.
 
 <br/>
 

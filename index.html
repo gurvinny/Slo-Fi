@@ -495,6 +495,7 @@
                 </button>
                 <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls">Controls</button>
                 <button id="effectsShowBtn" class="btn-controls-show" aria-label="Show effects">Effects</button>
+                <button id="helpBtn" class="btn-controls-show btn-help" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
               </div>
             </div>
           </div>
@@ -514,6 +515,24 @@
         gurvinny
       </a>
     </footer>
+
+    <!-- Keyboard shortcut help overlay — opened with ? key or help button -->
+    <dialog id="help-modal" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div class="help-modal-inner">
+        <div class="help-modal-header">
+          <h2 class="help-modal-title">Keyboard Shortcuts</h2>
+          <button id="helpCloseBtn" class="help-modal-close" aria-label="Close shortcuts">&times;</button>
+        </div>
+        <dl class="shortcut-grid">
+          <div class="shortcut-row"><dt><kbd>Space</kbd></dt><dd>Play / Pause</dd></div>
+          <div class="shortcut-row"><dt><kbd>L</kbd></dt><dd>Toggle loop</dd></div>
+          <div class="shortcut-row"><dt><kbd>S</kbd></dt><dd>Stop &amp; rewind</dd></div>
+          <div class="shortcut-row"><dt><kbd>&#8592;</kbd></dt><dd>Rewind 5 s</dd></div>
+          <div class="shortcut-row"><dt><kbd>&#8594;</kbd></dt><dd>Forward 5 s</dd></div>
+          <div class="shortcut-row"><dt><kbd>?</kbd></dt><dd>Show this help</dd></div>
+        </dl>
+      </div>
+    </dialog>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

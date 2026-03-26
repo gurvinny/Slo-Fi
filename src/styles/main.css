@@ -2316,3 +2316,96 @@ body.is-paused .site-footer {
   }
 }
 
+/* ── Help button ────────────────────────────────────────────────────────── */
+.btn-help {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 28px;
+}
+
+/* ── Keyboard shortcut help modal ───────────────────────────────────────── */
+#help-modal {
+  border: 1px solid var(--accent-subtle, rgba(155, 109, 255, 0.3));
+  border-radius: var(--radius, 12px);
+  background: rgba(8, 8, 18, 0.96);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  color: var(--text, rgba(240, 240, 255, 0.92));
+  padding: 0;
+  max-width: 460px;
+  width: calc(100vw - 40px);
+  box-shadow: 0 0 0 1px rgba(155, 109, 255, 0.12), 0 20px 60px rgba(0, 0, 0, 0.75);
+}
+#help-modal::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+.help-modal-inner {
+  padding: 0;
+}
+.help-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(155, 109, 255, 0.15);
+}
+.help-modal-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent, #9b6dff);
+}
+.help-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  opacity: 0.65;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+}
+.help-modal-close:hover { opacity: 1; }
+.help-modal-close:focus-visible {
+  outline: 2px solid var(--accent, #9b6dff);
+  outline-offset: 2px;
+}
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  padding: 14px 20px 20px;
+  margin: 0;
+}
+.shortcut-row {
+  display: contents;
+}
+.shortcut-row dt {
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+}
+.shortcut-row dd {
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  margin: 0;
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+.shortcut-row dt kbd {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  border: 1px solid rgba(155, 109, 255, 0.35);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 0.78rem;
+  background: rgba(155, 109, 255, 0.10);
+  color: var(--accent, #9b6dff);
+  white-space: nowrap;
+}
+

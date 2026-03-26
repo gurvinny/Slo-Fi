@@ -79,6 +79,11 @@ export class App {
   private settingsCloseBtn = document.getElementById('settingsCloseBtn')!
   private settingsShowBtn  = document.getElementById('settingsShowBtn')!
 
+  // Help modal refs
+  private helpModal    = document.getElementById('help-modal') as HTMLDialogElement
+  private helpBtn      = document.getElementById('helpBtn')!
+  private helpCloseBtn = document.getElementById('helpCloseBtn')!
+
   // Visual settings controls
   private particleCountSlider  = document.getElementById('particleCountSlider') as HTMLInputElement
   private particleCountValue   = document.getElementById('particleCountValue')!
@@ -113,6 +118,7 @@ export class App {
     this.wireControlsPanel()
     this.wireEffectsPanel()
     this.wireSettingsPanel()
+    this.wireHelpModal()
     this.initAriaValueText()
 
     // Wire up mobile APIs: Media Session, Fullscreen, Vibration, and
@@ -130,6 +136,16 @@ export class App {
     }
     const fsBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement | null
     if (fsBtn) this._mobile.bindFullscreenBtn(fsBtn)
+  }
+
+  private wireHelpModal(): void {
+    this.helpBtn.addEventListener('click', () => this.helpModal.showModal())
+    this.helpCloseBtn.addEventListener('click', () => this.helpModal.close())
+    // Click outside the dialog content to close (the <dialog> element fills the
+    // viewport; a click on it but not on its child content means the backdrop)
+    this.helpModal.addEventListener('click', (e) => {
+      if (e.target === this.helpModal) this.helpModal.close()
+    })
   }
 
   private wireControlsPanel(): void {
@@ -413,8 +429,15 @@ export class App {
 
   private wireKeyboard(): void {
     document.addEventListener('keydown', (e) => {
-      if (!this.engine.hasBuffer) return
       const tag = (e.target as HTMLElement).tagName
+      // ? key opens help regardless of whether a file is loaded
+      if (e.key === '?' && tag !== 'INPUT') {
+        e.preventDefault()
+        this.helpModal.showModal()
+        return
+      }
+
+      if (!this.engine.hasBuffer) return
       if (tag === 'INPUT') return
 
       switch (e.key) {

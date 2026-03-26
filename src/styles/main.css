@@ -2371,6 +2371,26 @@ body.is-paused .site-footer {
   outline: 2px solid var(--accent, #9b6dff);
   outline-offset: 2px;
 }
+.playlist-footer {
+  padding: 10px 16px 14px;
+  border-top: 1px solid rgba(155, 109, 255, 0.08);
+}
+.btn-playlist-add {
+  width: 100%;
+  padding: 7px 12px;
+  background: rgba(155, 109, 255, 0.10);
+  border: 1px solid rgba(155, 109, 255, 0.25);
+  border-radius: 6px;
+  color: var(--accent, #9b6dff);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-playlist-add:hover { background: rgba(155, 109, 255, 0.18); }
+.btn-playlist-add:focus-visible {
+  outline: 2px solid var(--accent, #9b6dff);
+  outline-offset: 2px;
+}
 
 /* ── Help button ────────────────────────────────────────────────────────── */
 .btn-help {

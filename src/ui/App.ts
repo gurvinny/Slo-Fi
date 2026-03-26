@@ -90,6 +90,7 @@ export class App {
   private playlistDrawer          = document.getElementById('playlistDrawer')!
   private playlistCloseBtn        = document.getElementById('playlistCloseBtn')!
   private playlistShowBtn         = document.getElementById('playlistShowBtn')!
+  private playlistAddBtn          = document.getElementById('playlistAddBtn')!
   private playlistList            = document.getElementById('playlistList')!
   private playlistCount           = document.getElementById('playlistCount')!
 
@@ -153,6 +154,8 @@ export class App {
       this.playlistDrawer.classList.add('controls-drawer--hidden'))
     this.playlistShowBtn.addEventListener('click', () =>
       this.playlistDrawer.classList.remove('controls-drawer--hidden'))
+    // "Add files" button reuses the hidden fileInput so no extra dialog is needed
+    this.playlistAddBtn.addEventListener('click', () => this.fileInput.click())
   }
 
   private addFilesToPlaylist(files: File[]): void {

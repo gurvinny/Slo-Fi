@@ -508,9 +508,9 @@ export class AnomalySphere {
   private themeHueLock  = -1    // -1 = prism mode (free hue cycling), 0 = theme locked
   private bassPulse     = true
   private rotationSpeed = 1.0
-  // orbBaseScale starts slightly below 1.0 so the orb looks "small and contained"
+  // orbBaseScale starts noticeably below 1.0 so the orb looks small and contained
   // before the music kicks in; bass/kick energy drives it outward from there.
-  private orbBaseScale  = 0.72
+  private orbBaseScale  = 0.55
   private _8DEnabled    = false
   private _8DAngle      = 0    // current panner angle in radians, set by AudioEngine callback
   private particleCount = 500
@@ -725,6 +725,9 @@ export class AnomalySphere {
 
     // ── Start loop + defer first resize ─────────────────────────────────────
     window.addEventListener('resize', () => this.resize())
+    // orientationchange fires before the browser has applied the new viewport
+    // dimensions, so defer resize by 150 ms to let the layout settle first.
+    window.addEventListener('orientationchange', () => { setTimeout(() => this.resize(), 150) })
     this.loop()
     requestAnimationFrame(() => this.resize())
   }

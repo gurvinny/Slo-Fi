@@ -141,6 +141,9 @@
         <!-- Player HUD — shown after file loads, children use fixed positioning -->
         <div id="player" class="player" aria-hidden="true" style="display:none;opacity:0">
 
+          <!-- Help button: fixed top-right, accessible from anywhere in the player -->
+          <button id="helpBtn" class="btn btn-icon btn-help" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
+
           <!-- Top HUD: track info + preset strip -->
           <div class="player-top">
             <div class="track-info">
@@ -509,7 +512,6 @@
                 <button id="playlistShowBtn" class="btn-controls-show" aria-label="Show playlist">Playlist</button>
                 <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls">Controls</button>
                 <button id="effectsShowBtn" class="btn-controls-show" aria-label="Show effects">Effects</button>
-                <button id="helpBtn" class="btn-controls-show btn-help" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
               </div>
             </div>
           </div>

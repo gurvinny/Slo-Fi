@@ -135,7 +135,7 @@ export class App {
     // Wire up mobile APIs: Media Session, Fullscreen, Vibration, and
     // AudioContext background recovery via visibilitychange.
     this._mobile = new MobileController(this.engine)
-    this._mobile.onExternalPlay  = () => { this.setPlayingState(true);  this.sphere?.start(); this.starOverlay.resume() }
+    this._mobile.onExternalPlay  = () => { this.setPlayingState(true);  this.sphere?.start(); this.starOverlay.resume(); void this._mobile.acquireWakeLock() }
     this._mobile.onExternalPause = () => { this.setPlayingState(false); this.sphere?.stop();  this.starOverlay.pause() }
     this._mobile.onExternalStop  = () => {
       this.setPlayingState(false)
@@ -144,6 +144,7 @@ export class App {
       this.sphere?.stop()
       this.starOverlay.pause()
       this._mobile.stopSilenceLoop()
+      this._mobile.releaseWakeLock()
     }
     const fsBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement | null
     if (fsBtn) this._mobile.bindFullscreenBtn(fsBtn)
@@ -185,6 +186,7 @@ export class App {
       this.starOverlay.resume()
       this._mobile?.ensureSilenceLoop()
       this._mobile?.updatePlaybackState(true)
+      void this._mobile?.acquireWakeLock()
     }
   }
 
@@ -327,6 +329,9 @@ export class App {
       const next = this.currentTrackIndex + 1
       if (next < this.playlist.length) {
         void this.switchTrack(next, true)
+      } else {
+        // No more tracks — release the wake lock so the screen can sleep.
+        this._mobile?.releaseWakeLock()
       }
     }
     this.engine.onTimeUpdate = (current, duration) => {
@@ -380,6 +385,7 @@ export class App {
       this.sphere?.stop()
       this.starOverlay.pause()
       this._mobile?.stopSilenceLoop()
+      this._mobile?.releaseWakeLock()
     })
     this.rewindBtn.addEventListener('click', () => {
       this.engine.seek(Math.max(0, this.engine.currentTime - 5))
@@ -751,6 +757,7 @@ export class App {
       this._mobile.hapticPlay()
       this._mobile.updatePlaybackState(true)
       this._mobile.ensureSilenceLoop()
+      void this._mobile.acquireWakeLock()
     }
   }
 

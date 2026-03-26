@@ -216,6 +216,9 @@ export class AudioEngine {
 
     await this.ensureContext()
     this.stop()
+    // Release the old decoded buffer before allocating the new one so iOS
+    // doesn't hold both simultaneously and trigger a memory-pressure reload.
+    this.buffer = null
     const arrayBuffer = await file.arrayBuffer()
     this.buffer = await this.context!.decodeAudioData(arrayBuffer)
     this._startOffset = 0

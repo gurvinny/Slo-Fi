@@ -168,7 +168,7 @@ export class App {
     }
   }
 
-  private async switchTrack(index: number): Promise<void> {
+  private async switchTrack(index: number, autoPlay = false): Promise<void> {
     if (index < 0 || index >= this.playlist.length) return
     this.currentTrackIndex = index
     this.renderPlaylist()
@@ -178,6 +178,14 @@ export class App {
     this.sphere?.setReactivity(0)
     await this.loadFile(this.playlist[index])
     window.setTimeout(() => this.sphere?.setReactivity(reactVal), 150)
+    if (autoPlay) {
+      this.engine.play()
+      this.setPlayingState(true)
+      this.sphere?.start()
+      this.starOverlay.resume()
+      this._mobile?.ensureSilenceLoop()
+      this._mobile?.updatePlaybackState(true)
+    }
   }
 
   private removeTrack(index: number): void {
@@ -315,12 +323,10 @@ export class App {
       this.sphere?.stop()
       this.starOverlay.pause()
       this._mobile?.stopSilenceLoop()
-      // Auto-advance to next track in playlist
+      // Auto-advance to next track and start playback immediately
       const next = this.currentTrackIndex + 1
       if (next < this.playlist.length) {
-        window.setTimeout(() => {
-          void this.switchTrack(next).then(() => this.togglePlayPause())
-        }, 300)
+        void this.switchTrack(next, true)
       }
     }
     this.engine.onTimeUpdate = (current, duration) => {

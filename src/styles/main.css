@@ -1118,7 +1118,7 @@ body.is-paused .btn-play {
      Row 2: total time + fullscreen + settings + Controls + Effects. */
   .transport-row {
     flex-wrap: wrap;
-    padding: 6px 12px 2px;
+    padding: 4px 10px 2px;
     gap: 4px 6px;
   }
 
@@ -1132,8 +1132,8 @@ body.is-paused .btn-play {
     flex-basis: 100%;
     margin-left: 0;
     justify-content: center;
-    gap: 8px;
-    padding-bottom: 4px;
+    gap: 6px;
+    padding-bottom: max(4px, env(safe-area-inset-bottom, 4px));
   }
 
   /* Landing page: scale down rings and text on mobile */
@@ -2400,12 +2400,16 @@ body.is-paused .site-footer {
   outline-offset: 2px;
 }
 
-/* ── Help button ────────────────────────────────────────────────────────── */
+/* ── Help button: fixed top-right corner ────────────────────────────────── */
 .btn-help {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  z-index: 55;
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
-  min-width: 28px;
+  min-width: 36px;
 }
 
 /* ── Keyboard shortcut help modal ───────────────────────────────────────── */

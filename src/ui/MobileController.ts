@@ -32,6 +32,23 @@ export class MobileController {
   // Reference to the engine's keepalive audio element (set after first play).
   private _silentAudio: HTMLAudioElement | null = null
 
+  // Screen Wake Lock — keeps the browser tab alive during extended playback.
+  // The sentinel is released automatically when the tab is hidden, so we
+  // re-acquire it each time the tab becomes visible and music is playing.
+  private _wakeLock: WakeLockSentinel | null = null
+
+  async acquireWakeLock(): Promise<void> {
+    if (!('wakeLock' in navigator)) return
+    try {
+      this._wakeLock = await navigator.wakeLock.request('screen')
+    } catch { /* denied or unsupported — non-fatal */ }
+  }
+
+  releaseWakeLock(): void {
+    this._wakeLock?.release().catch(() => {})
+    this._wakeLock = null
+  }
+
   private _onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') {
       if (!IS_MOBILE_PLATFORM) return
@@ -48,6 +65,8 @@ export class MobileController {
       this._engine.resumeFromBackground()
       // Also restart the silence loop in case iOS paused the audio element
       if (this._engine.isPlaying) this.ensureSilenceLoop()
+      // Re-acquire wake lock — it is automatically released on tab hide.
+      if (this._engine.isPlaying) void this.acquireWakeLock()
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState =
           this._engine.isPlaying ? 'playing' : 'paused'
@@ -137,6 +156,7 @@ export class MobileController {
   destroy(): void {
     document.removeEventListener('visibilitychange', this._onVisibilityChange)
     this.stopSilenceLoop()
+    this.releaseWakeLock()
     if (!('mediaSession' in navigator)) return
     const actions: MediaSessionAction[] = ['play', 'pause', 'stop', 'seekto', 'previoustrack', 'nexttrack']
     for (const action of actions) {

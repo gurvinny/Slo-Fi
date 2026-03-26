@@ -15,7 +15,7 @@
 <p>
   <a href="#v10--complete">v1.0 — Complete</a> •
   <a href="#v20--anomaly">v2.0 — Anomaly</a> •
-  <a href="#pending-for-v20">Pending</a>
+  <a href="#v20--complete">v2.0 — Complete</a>
 </p>
 
 </div>
@@ -85,7 +85,7 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 | ✅ | [#21](https://github.com/gurvinny/Slo-Fi/issues/21) | **8D Audio Effect + Hz Resonance** | Binaural `PannerNode` with `HRTF` model automating a circular rotation path. Optional Solfeggio Hz frequency tuning (e.g. 432 Hz). |
 | ✅ | — | **Key Detection** | Offline chromagram analysis using the Krumhansl-Schmuckler algorithm. Detects major/minor key across all 12 roots. Displays under track title. |
 | ✅ | — | **Pitch Control** | ±12 semitone pitch shift, fully independent of playback speed. Decouple tempo and key to shape the vibe exactly. |
-| ⏳ | [#18](https://github.com/gurvinny/Slo-Fi/issues/18) | **Faster-than-Realtime Export** | `OfflineAudioContext` rendering — a 10-minute track exports in seconds with the full effects chain reproduced faithfully. |
+| ⏳ | [#18](https://github.com/gurvinny/Slo-Fi/issues/18) | **Faster-than-Realtime Export** | `OfflineAudioContext` rendering — a 10-minute track exports in seconds with the full effects chain reproduced faithfully. Deferred to v2.1. |
 
 <br/>
 
@@ -94,7 +94,7 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 | Status | Issue | Feature | Description |
 |:---:|:---:|:---|:---|
 | ✅ | [#20](https://github.com/gurvinny/Slo-Fi/issues/20) | **Hyperpop Preset** | Pitched-up, heavily distorted, tight gated reverb, maxed chorus. Built for the chaotic hyper-compressed sound of hyperpop production. |
-| ⏳ | [#19](https://github.com/gurvinny/Slo-Fi/issues/19) | **Multi-File Session** | Load multiple audio files simultaneously. Switch between tracks instantly — all in-memory, nothing uploaded. |
+| ✅ | [#19](https://github.com/gurvinny/Slo-Fi/issues/19) | **Multi-File Playlist** | Load multiple audio files simultaneously. Switch between tracks instantly with auto-advance — all in-memory, nothing uploaded. |
 
 <br/>
 
@@ -102,9 +102,9 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 
 | Status | Issue | Feature | Description |
 |:---:|:---:|:---|:---|
-| ⏳ | [#17](https://github.com/gurvinny/Slo-Fi/issues/17) | **WCAG 2.1 AA Accessibility** | Full keyboard navigation, ARIA roles, visible focus rings, and colour contrast ratios meeting the AA standard throughout the glass UI. |
-| ⏳ | [#44](https://github.com/gurvinny/Slo-Fi/issues/44) | **Prefers-Reduced-Motion Support** | Honour the `prefers-reduced-motion` media query across all CSS animations and Three.js transitions. |
-| ⏳ | [#46](https://github.com/gurvinny/Slo-Fi/issues/46) | **Keyboard Shortcut Help Overlay** | In-app overlay listing all keyboard shortcuts. Discoverable, dismissable, no external docs required. |
+| ✅ | [#17](https://github.com/gurvinny/Slo-Fi/issues/17) | **WCAG 2.1 AA Accessibility** | Full keyboard navigation, ARIA roles, visible focus rings, and colour contrast ratios meeting the AA standard throughout the glass UI. |
+| ✅ | [#44](https://github.com/gurvinny/Slo-Fi/issues/44) | **Prefers-Reduced-Motion Support** | Honour the `prefers-reduced-motion` media query across all CSS animations and Three.js transitions. |
+| ✅ | [#46](https://github.com/gurvinny/Slo-Fi/issues/46) | **Keyboard Shortcut Help Overlay** | In-app overlay listing all keyboard shortcuts. Discoverable, dismissable, no external docs required. |
 
 <br/>
 
@@ -112,7 +112,7 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 
 | Status | Issue | Feature | Description |
 |:---:|:---:|:---|:---|
-| ⏳ | [#45](https://github.com/gurvinny/Slo-Fi/issues/45) | **iOS PWA Homescreen Assets** | Apple-specific meta tags, splash screen images, and homescreen icon assets for a polished iOS install experience. |
+| ✅ | [#45](https://github.com/gurvinny/Slo-Fi/issues/45) | **iOS PWA Homescreen Assets** | Apple-specific meta tags, splash screen images, and homescreen icon assets for a polished iOS install experience. |
 
 <br/>
 
@@ -120,10 +120,10 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 
 | Status | Issue | Feature | Description |
 |:---:|:---:|:---|:---|
-| ⏳ | [#40](https://github.com/gurvinny/Slo-Fi/issues/40) | **Tree-shake Three.js + Lazy-load Orb** | Import only the Three.js modules in use and defer `AnomalySphere` initialisation until after first file load to reduce initial bundle weight. |
-| ⏳ | [#41](https://github.com/gurvinny/Slo-Fi/issues/41) | **Throttle Visualiser RAF When Paused** | Pause `requestAnimationFrame` loops for the waveform and spectrum analyser when audio is not playing to eliminate idle CPU usage. |
-| ⏳ | [#42](https://github.com/gurvinny/Slo-Fi/issues/42) | **Pre-cache Assets in Service Worker** | Cache built JS/CSS assets in `sw.js` at install time so the app shell loads instantly on repeat visits, even offline. |
-| ⏳ | [#43](https://github.com/gurvinny/Slo-Fi/issues/43) | **Lighthouse CI** | Add Lighthouse to GitHub Actions to track performance, accessibility, PWA, and best-practices scores on every PR. |
+| ✅ | [#40](https://github.com/gurvinny/Slo-Fi/issues/40) | **Tree-shake Three.js + Lazy-load Orb** | Import only the Three.js modules in use and defer `AnomalySphere` initialisation until after first file load to reduce initial bundle weight. |
+| ✅ | [#41](https://github.com/gurvinny/Slo-Fi/issues/41) | **Throttle Visualiser RAF When Paused** | Pause `requestAnimationFrame` loops for the waveform and spectrum analyser when audio is not playing to eliminate idle CPU usage. |
+| ✅ | [#42](https://github.com/gurvinny/Slo-Fi/issues/42) | **Pre-cache Assets in Service Worker** | Cache built JS/CSS assets in `sw.js` at install time so the app shell loads instantly on repeat visits, even offline. |
+| ✅ | [#43](https://github.com/gurvinny/Slo-Fi/issues/43) | **Lighthouse CI** | Add Lighthouse to GitHub Actions to track performance, accessibility, PWA, and best-practices scores on every PR. |
 
 <br/>
 
@@ -131,9 +131,9 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 
 | Status | Issue | Feature | Description |
 |:---:|:---:|:---|:---|
-| ⏳ | [#37](https://github.com/gurvinny/Slo-Fi/issues/37) | **HTTP Security Headers** | Enforce `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and related headers via a Cloudflare Pages `_headers` file. |
-| ⏳ | [#38](https://github.com/gurvinny/Slo-Fi/issues/38) | **File Size Guard + Decode Progress UI** | Reject audio files above a configurable size threshold before decode begins and show a progress indicator for large files during `decodeAudioData`. |
-| ⏳ | [#39](https://github.com/gurvinny/Slo-Fi/issues/39) | **Permissions-Policy Header** | Add a `Permissions-Policy` header to restrict browser APIs (camera, microphone, geolocation, etc.) that Slo-Fi never uses. |
+| ✅ | [#37](https://github.com/gurvinny/Slo-Fi/issues/37) | **HTTP Security Headers** | Enforce `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and related headers via a Cloudflare Pages `_headers` file. |
+| ✅ | [#38](https://github.com/gurvinny/Slo-Fi/issues/38) | **File Size Guard + Decode Progress UI** | Reject audio files above a configurable size threshold before decode begins and show a progress indicator for large files during `decodeAudioData`. |
+| ✅ | [#39](https://github.com/gurvinny/Slo-Fi/issues/39) | **Permissions-Policy Header** | Add a `Permissions-Policy` header to restrict browser APIs (camera, microphone, geolocation, etc.) that Slo-Fi never uses. |
 
 <br/>
 
@@ -141,25 +141,13 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 
 <br/>
 
-## Pending for v2.0
+## v2.0 — Complete
 
-13 open issues remain:
+All 12 planned v2.0 issues shipped. One item deferred to v2.1:
 
 | Issue | Area | Feature |
 |:---:|:---|:---|
-| [#17](https://github.com/gurvinny/Slo-Fi/issues/17) | Accessibility | WCAG 2.1 AA accessibility pass |
 | [#18](https://github.com/gurvinny/Slo-Fi/issues/18) | Audio Engine | Faster-than-realtime export via `OfflineAudioContext` |
-| [#19](https://github.com/gurvinny/Slo-Fi/issues/19) | Audio Engine | Multi-file session loading |
-| [#37](https://github.com/gurvinny/Slo-Fi/issues/37) | Infra | HTTP security headers via `_headers` file |
-| [#38](https://github.com/gurvinny/Slo-Fi/issues/38) | Audio / UI | File size guard + decode progress UI |
-| [#39](https://github.com/gurvinny/Slo-Fi/issues/39) | Infra | Permissions-Policy header |
-| [#40](https://github.com/gurvinny/Slo-Fi/issues/40) | Performance | Tree-shake Three.js + lazy-load orb |
-| [#41](https://github.com/gurvinny/Slo-Fi/issues/41) | Performance | Throttle visualiser RAF when paused |
-| [#42](https://github.com/gurvinny/Slo-Fi/issues/42) | PWA | Pre-cache assets in service worker |
-| [#43](https://github.com/gurvinny/Slo-Fi/issues/43) | Infra | Lighthouse CI on GitHub Actions |
-| [#44](https://github.com/gurvinny/Slo-Fi/issues/44) | Accessibility | Prefers-reduced-motion support |
-| [#45](https://github.com/gurvinny/Slo-Fi/issues/45) | Mobile / PWA | iOS PWA homescreen assets |
-| [#46](https://github.com/gurvinny/Slo-Fi/issues/46) | UI | Keyboard shortcut help overlay |
 
 <br/>
 

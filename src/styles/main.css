@@ -701,8 +701,6 @@ body.is-playing #iconPause    { opacity: 1; }
   justify-content: center;
   border: none;
   background: var(--btn-glass-bg);
-  backdrop-filter: blur(var(--btn-glass-blur));
-  -webkit-backdrop-filter: blur(var(--btn-glass-blur));
   border-radius: 50%;
   cursor: pointer;
   color: var(--text-dim);
@@ -785,34 +783,16 @@ body.is-playing .btn-play {
   transform: scale(calc(0.97 + var(--ui-bass) * 0.10));
 }
 
-/* Registered property so the conic-gradient angle can interpolate in spin animation */
-@property --btn-aurora-angle {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
-
+/* Aurora spin — rotate the element so the gradient is painted once (GPU composited) */
 @keyframes btn-aurora-spin {
-  from { --btn-aurora-angle: 0deg; }
-  to   { --btn-aurora-angle: 360deg; }
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
-/* Slow idle breathing when paused — only box-shadow pulses, no transform conflict */
+/* Slow idle breathing when paused — opacity only, no repaint-triggering box-shadow mutation */
 @keyframes btn-breathe {
-  0%, 100% {
-    box-shadow:
-      0 4px 20px var(--accent-glow),
-      0 0 6px var(--accent-dim),
-      inset 1px 1px 0 var(--btn-glass-edge);
-    opacity: 0.92;
-  }
-  50% {
-    box-shadow:
-      0 6px 36px var(--accent-glow),
-      0 0 22px var(--accent-dim),
-      inset 1px 1px 0 var(--btn-glass-edge);
-    opacity: 1;
-  }
+  0%, 100% { opacity: 0.82; }
+  50%       { opacity: 1;    }
 }
 
 /* Pulsing halo ring while playing */
@@ -861,11 +841,11 @@ body.is-playing .btn-play::before {
   transition: opacity 0.3s ease;
 }
 
-/* Rotating aurora conic for modern browsers */
+/* Rotating aurora conic for modern browsers — gradient is static, element rotates (GPU composited) */
 @supports (background: conic-gradient(from 1deg, red, blue)) {
   .btn-play::after {
     background: conic-gradient(
-      from var(--btn-aurora-angle),
+      from 0deg,
       var(--accent)        0%,
       var(--teal)          28%,
       var(--accent-bright) 50%,
@@ -873,6 +853,7 @@ body.is-playing .btn-play::before {
       var(--accent)        100%
     );
     animation: btn-aurora-spin 6s linear infinite;
+    will-change: transform;
   }
 }
 

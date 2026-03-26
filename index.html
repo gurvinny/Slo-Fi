@@ -2,258 +2,551 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Slo-Fi" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:375px) and (device-height:667px) and (-webkit-device-pixel-ratio:2)" href="/icons/splash/splash-750x1334.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:390px) and (device-height:844px) and (-webkit-device-pixel-ratio:3)" href="/icons/splash/splash-1170x2532.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3)" href="/icons/splash/splash-1290x2796.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:820px) and (device-height:1180px) and (-webkit-device-pixel-ratio:2)" href="/icons/splash/splash-1640x2360.png" />
+    <link rel="apple-touch-startup-image" media="(device-width:1024px) and (device-height:1366px) and (-webkit-device-pixel-ratio:2)" href="/icons/splash/splash-2048x2732.png" />
     <meta name="description" content="Professional-grade audio slow-down tool with convolution reverb. Runs entirely in your browser — no uploads, no tracking." />
     <meta name="theme-color" content="#080810" />
     <title>Slo-Fi — Your Browser Is the Studio</title>
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    #page-loader {
+      position: fixed;
+      inset: 0;
+      background: #080810;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s ease;
+    }
+    #page-loader.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .page-loader-icon {
+      color: #9b6dff;
+      filter: drop-shadow(0 0 10px rgba(155, 109, 255, 0.45));
+      animation: _loader-pulse 1.4s ease-in-out infinite;
+    }
+    .page-loader-inner {
+      transform-origin: 14px 14px;
+      animation: _loader-spin 4s linear infinite;
+    }
+    @keyframes _loader-pulse {
+      0%, 100% { opacity: 0.45; transform: scale(0.91); }
+      50%       { opacity: 1;    transform: scale(1.06); }
+    }
+    @keyframes _loader-spin {
+      to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .page-loader-icon { animation: none; }
+      .page-loader-inner { animation: none; }
+    }
+  </style>
   </head>
   <body>
+    <div id="page-loader" aria-hidden="true">
+      <svg class="page-loader-icon" width="48" height="48" viewBox="0 0 28 28" fill="none">
+        <polygon points="14,2 26,8 26,20 14,26 2,20 2,8"
+          fill="currentColor" fill-opacity="0.06"
+          stroke="currentColor" stroke-width="1.5"/>
+        <polygon class="page-loader-inner"
+          points="14,7 21,11 21,17 14,21 7,17 7,11"
+          stroke="currentColor" stroke-width="0.9" opacity="0.55"
+          transform="rotate(30, 14, 14)"/>
+        <circle cx="14" cy="14" r="2" fill="currentColor"/>
+      </svg>
+    </div>
     <div id="app">
+
+      <!-- Full-page orb canvas — fixed behind all UI, fades to transparent at edges -->
+      <div id="anomaly" class="anomaly-bg" aria-hidden="true"></div>
+
+      <!-- Header: minimal fixed top bar -->
       <header class="header">
         <div class="header-inner">
           <div class="logo">
-            <svg class="logo-icon" width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="#9b6dff" stroke-width="1.5"/>
-              <polygon points="14,7 21,11 21,17 14,21 7,17 7,11" fill="none" stroke="#9b6dff" stroke-width="1" opacity="0.5"/>
-              <circle cx="14" cy="14" r="2.5" fill="#9b6dff"/>
+            <svg class="logo-icon" width="26" height="26" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-width="1.5"/>
+              <polygon points="14,7 21,11 21,17 14,21 7,17 7,11" stroke="currentColor" stroke-width="0.9" opacity="0.5" transform="rotate(30, 14, 14)"/>
+              <circle cx="14" cy="14" r="2" fill="currentColor"/>
             </svg>
             <span class="logo-text">Slo‑Fi</span>
           </div>
           <p class="tagline">professional audio time-stretcher</p>
-          <span id="midiStatus" class="status-dot status-dot--unavailable" title="MIDI: not supported in this browser" aria-label="MIDI status" role="status"></span>
         </div>
       </header>
 
       <main class="main">
-        <!-- Drop Zone -->
+
+        <!-- Drop zone / Landing page — full-page overlay shown before a file is loaded -->
         <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio file or click to browse">
-          <div class="dropzone-content">
-            <svg class="dropzone-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M24 4 L44 14 L44 34 L24 44 L4 34 L4 14 Z" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.4"/>
-              <path d="M24 14 L34 19 L34 29 L24 34 L14 29 L14 19 Z" stroke="currentColor" stroke-width="1" fill="none" opacity="0.3"/>
-              <path d="M20 24 L24 20 L28 24 M24 20 L24 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <p class="dropzone-title">Drop your audio file here</p>
-            <p class="dropzone-hint">or click to browse &nbsp;·&nbsp; mp3 &nbsp;wav &nbsp;flac &nbsp;ogg &nbsp;aac</p>
+
+          <!-- Orbit rings — decorative CSS-animated concentric rings -->
+          <div class="landing-rings" aria-hidden="true">
+            <div class="landing-ring landing-ring--1"></div>
+            <div class="landing-ring landing-ring--2"></div>
+            <div class="landing-ring landing-ring--3"></div>
           </div>
-          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,audio/*" aria-hidden="true" tabindex="-1" />
+
+          <!-- Scan line sweep -->
+          <div class="landing-scan-line" aria-hidden="true"></div>
+
+          <!-- Hero content: title, feature badges, and drop card -->
+          <div class="landing-hero">
+            <div class="landing-title-block">
+              <h1 class="landing-logo-text">Slo&#8209;Fi</h1>
+              <p class="landing-tagline">Your browser is the studio.</p>
+            </div>
+
+            <ul class="landing-features" aria-label="Key features">
+              <li class="landing-badge">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1" y="9" width="2" height="6" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="2" height="10" rx="1" fill="currentColor"/><rect x="8" y="2" width="2" height="13" rx="1" fill="currentColor"/><rect x="11.5" y="5" width="2" height="10" rx="1" fill="currentColor"/></svg>
+                Time-stretch any audio
+              </li>
+              <li class="landing-badge">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="4" y="7" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Zero uploads &mdash; 100% private
+              </li>
+              <li class="landing-badge">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 5h2v6H2zM6 3h2v10H6zM10 6h2v4h-2zM14 4h0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                Reverb &middot; EQ &middot; Effects chain
+              </li>
+            </ul>
+
+            <div class="dropzone-content">
+              <svg class="dropzone-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M24 4 L44 14 L44 34 L24 44 L4 34 L4 14 Z" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.4"/>
+                <path d="M24 14 L34 19 L34 29 L24 34 L14 29 L14 19 Z" stroke="currentColor" stroke-width="1" fill="none" opacity="0.3"/>
+                <path d="M20 24 L24 20 L28 24 M24 20 L24 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <p class="dropzone-title">Drop your audio file here</p>
+              <p class="dropzone-hint">or click to browse &nbsp;&middot;&nbsp; mp3 &nbsp;wav &nbsp;flac &nbsp;ogg &nbsp;aac</p>
+            </div>
+          </div>
+
+          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,audio/*" multiple aria-hidden="true" tabindex="-1" />
         </div>
 
-        <!-- Player (hidden until file loaded) -->
-        <div id="player" class="player" aria-hidden="true">
-          <!-- Track info -->
-          <div class="track-info">
-            <div class="track-name" id="trackName">—</div>
-            <div class="track-meta" id="trackMeta">—</div>
+        <!-- Player HUD — shown after file loads, children use fixed positioning -->
+        <div id="player" class="player" aria-hidden="true" style="display:none;opacity:0">
+
+          <!-- Top HUD: track info + preset strip -->
+          <div class="player-top">
+            <div class="track-info">
+              <div class="track-name" id="trackName">—</div>
+              <div class="track-bpm" id="trackBpm"></div>
+              <div class="track-meta" id="trackMeta">—</div>
+            </div>
+            <div id="trackStatus" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+            <div class="preset-strip" role="group" aria-label="Presets">
+              <button class="preset-card" data-preset="lofi">
+                <span class="preset-card-name">Lo-Fi</span>
+                <span class="preset-card-hint">0.78x · 47% verb · void</span>
+              </button>
+              <button class="preset-card" data-preset="vaporwave">
+                <span class="preset-card-name">Vaporwave</span>
+                <span class="preset-card-hint">0.69x · 74% verb · neon</span>
+              </button>
+              <button class="preset-card" data-preset="ambient">
+                <span class="preset-card-name">Ambient</span>
+                <span class="preset-card-hint">0.65x · 70% verb · mono</span>
+              </button>
+              <button class="preset-card preset-card--hyperpop" data-preset="hyperpop">
+                <span class="preset-card-name">Hyperpop</span>
+                <span class="preset-card-hint">1.25x · 27% verb · ember</span>
+              </button>
+              <button class="preset-card preset-card--dim" data-preset="custom">
+                <span class="preset-card-name">Custom</span>
+                <span class="preset-card-hint">your settings</span>
+              </button>
+            </div>
           </div>
 
-          <!-- Preset cards - each shows the preset name and its key parameters -->
-          <div class="preset-strip" role="group" aria-label="Presets">
-            <button class="preset-card" data-preset="lofi">
-              <span class="preset-card-name">Lo-Fi</span>
-              <span class="preset-card-hint">0.75x · 30% verb · warm</span>
-            </button>
-            <button class="preset-card" data-preset="vaporwave">
-              <span class="preset-card-name">Vaporwave</span>
-              <span class="preset-card-hint">0.50x · 55% verb · chorus</span>
-            </button>
-            <button class="preset-card" data-preset="ambient">
-              <span class="preset-card-name">Ambient</span>
-              <span class="preset-card-hint">0.65x · 75% verb · hall</span>
-            </button>
-            <button class="preset-card preset-card--dim" data-preset="custom">
-              <span class="preset-card-name">Custom</span>
-              <span class="preset-card-hint">your settings</span>
-            </button>
+          <!-- Playlist drawer — right side, opens with "Playlist" button -->
+          <div id="playlistDrawer" class="controls-drawer controls-drawer--hidden">
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Playlist</span>
+              <span id="playlistCount" class="playlist-count">0 tracks</span>
+              <button id="playlistCloseBtn" class="controls-drawer-btn" aria-label="Close playlist">&times;</button>
+            </div>
+            <ol id="playlistList" class="playlist-list" aria-label="Track list" aria-live="polite"></ol>
+            <div class="playlist-footer">
+              <button id="playlistAddBtn" class="btn-playlist-add" aria-label="Add more files to playlist">+ Add files</button>
+            </div>
           </div>
 
-          <!-- Waveform -->
-          <div class="waveform-wrap">
-            <canvas id="waveform" class="waveform" role="slider" aria-label="Seek position" tabindex="0"></canvas>
-          </div>
-
-          <!-- Spectrum analyzer -->
-          <div class="spectrum-wrap">
-            <canvas id="spectrum" class="spectrum" aria-hidden="true"></canvas>
-          </div>
-
-          <!-- Time -->
-          <div class="time-row">
-            <span class="time-current" id="currentTime">0:00</span>
-            <span class="time-total" id="duration">0:00</span>
-          </div>
-
-          <!-- Transport -->
-          <div class="transport">
-            <button id="stopBtn" class="btn btn-icon" title="Stop (s)" aria-label="Stop">
-              <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="currentColor" rx="1"/></svg>
-            </button>
-            <button id="playPauseBtn" class="btn btn-play" title="Play / Pause (Space)" aria-label="Play">
-              <svg id="iconPlay" width="22" height="22" viewBox="0 0 22 22"><polygon points="6,3 19,11 6,19" fill="currentColor"/></svg>
-              <svg id="iconPause" width="22" height="22" viewBox="0 0 22 22" style="display:none"><rect x="4" y="3" width="5" height="16" fill="currentColor" rx="1"/><rect x="13" y="3" width="5" height="16" fill="currentColor" rx="1"/></svg>
-            </button>
-            <button id="rewindBtn" class="btn btn-icon" title="Rewind 5s (←)" aria-label="Rewind 5 seconds">
-              <svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 2 A7 7 0 1 0 4 5.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><polygon points="1,3 7,3 4,7" fill="currentColor"/><text x="6" y="12" font-size="5" fill="currentColor" font-family="system-ui">5s</text></svg>
-            </button>
-            <button id="exportBtn" class="btn btn-icon btn-export" title="Export as WAV" aria-label="Export processed audio as WAV">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2 L8 10 M5 7 L8 10 L11 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M3 12 L13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              </svg>
-            </button>
-            <span id="exportStatus" class="export-status" aria-live="polite"></span>
-          </div>
-
-          <!-- Controls drawer - inline on mobile, dismissible/pinnable overlay on desktop -->
-          <div id="controlsDrawer" class="controls-drawer">
-
-            <!-- Drawer header: only visible on desktop (hidden via CSS on mobile) -->
+          <!-- Audio Controls drawer — right side, opens with "Controls" button -->
+          <div id="controlsDrawer" class="controls-drawer controls-drawer--hidden">
             <div class="controls-drawer-header">
               <span class="controls-drawer-title">Controls</span>
               <button id="controlsFloatBtn" class="controls-drawer-btn" title="Float panel" aria-label="Float panel">&#8862;</button>
               <button id="controlsCloseBtn" class="controls-drawer-btn" title="Close panel" aria-label="Close panel">&times;</button>
             </div>
 
-            <!-- Core controls grid -->
             <div class="controls">
               <div class="control-group">
                 <div class="control-header">
                   <label for="speedSlider">Speed</label>
                   <span class="value-badge" id="speedValue">1.00×</span>
                 </div>
-                <input type="range" id="speedSlider" class="slider" min="25" max="100" value="100" step="1" aria-label="Playback speed" />
+                <input type="range" id="speedSlider" class="slider" min="50" max="170" value="100" step="1" aria-label="Playback speed" />
                 <div class="slider-ticks">
-                  <span>0.25×</span>
-                  <span>0.50×</span>
-                  <span>0.75×</span>
-                  <span>1.00×</span>
+                  <span>0.50×</span><span>1.00×</span><span>1.70×</span>
                 </div>
               </div>
-
+              <div class="control-group">
+                <div class="control-header">
+                  <label for="pitchSlider">Pitch</label>
+                  <span class="value-badge" id="pitchValue">0 st</span>
+                </div>
+                <input type="range" id="pitchSlider" class="slider slider--pitch" min="-12" max="12" value="0" step="1" aria-label="Pitch shift in semitones" />
+                <div class="slider-ticks">
+                  <span>-12</span><span>0</span><span>+12</span>
+                </div>
+              </div>
               <div class="control-group">
                 <div class="control-header">
                   <label for="reverbSlider">Reverb Mix</label>
                   <span class="value-badge" id="reverbValue">20%</span>
                 </div>
-                <input type="range" id="reverbSlider" class="slider slider--teal" min="0" max="100" value="20" step="1" aria-label="Reverb wet/dry mix" />
+                <input type="range" id="reverbSlider" class="slider slider--teal" min="0" max="100" value="20" step="1" aria-label="Reverb mix" />
               </div>
-
               <div class="control-group">
                 <div class="control-header">
                   <label for="decaySlider">Decay</label>
                   <span class="value-badge" id="decayValue">2.5s</span>
                 </div>
-                <input type="range" id="decaySlider" class="slider slider--teal" min="5" max="80" value="25" step="1" aria-label="Reverb decay time" />
+                <input type="range" id="decaySlider" class="slider slider--teal" min="5" max="80" value="25" step="1" aria-label="Reverb decay" />
               </div>
-
               <div class="control-group">
                 <div class="control-header">
                   <label for="roomSlider">Room Size</label>
                   <span class="value-badge" id="roomValue">50%</span>
                 </div>
-                <input type="range" id="roomSlider" class="slider slider--teal" min="1" max="100" value="50" step="1" aria-label="Reverb room size" />
+                <input type="range" id="roomSlider" class="slider slider--teal" min="1" max="100" value="50" step="1" aria-label="Room size" />
               </div>
-
               <div class="control-group">
                 <div class="control-header">
                   <label for="volumeSlider">Volume</label>
                   <span class="value-badge" id="volumeValue">80%</span>
                 </div>
-                <input type="range" id="volumeSlider" class="slider slider--dim" min="0" max="100" value="80" step="1" aria-label="Master volume" />
+                <input type="range" id="volumeSlider" class="slider slider--dim" min="0" max="100" value="80" step="1" aria-label="Volume" />
               </div>
             </div>
 
-            <!-- Effects chain (collapsible) -->
-            <details class="controls-section" id="effectsSection">
+          </div>
+
+          <!-- Effects drawer — right side, opens with "Effects" button -->
+          <div id="effectsDrawer" class="controls-drawer controls-drawer--hidden">
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Effects Chain</span>
+              <button id="effectsCloseBtn" class="controls-drawer-btn" title="Close panel" aria-label="Close panel">&times;</button>
+            </div>
+            <div class="controls">
+              <div class="control-group">
+                <div class="control-header"><label for="eqLowSlider">EQ Low</label><span class="value-badge value-badge--green" id="eqLowValue">0 dB</span></div>
+                <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf" />
+                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="eqMidSlider">EQ Mid</label><span class="value-badge value-badge--green" id="eqMidValue">0 dB</span></div>
+                <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak" />
+                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="eqHighSlider">EQ High</label><span class="value-badge value-badge--green" id="eqHighValue">0 dB</span></div>
+                <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf" />
+                <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="chorusRateSlider">Chorus Rate</label><span class="value-badge value-badge--orange" id="chorusRateValue">0.8 Hz</span></div>
+                <input type="range" id="chorusRateSlider" class="slider slider--orange" min="0.1" max="5" value="0.8" step="0.1" aria-label="Chorus rate" />
+                <div class="slider-ticks"><span>0.1 Hz</span><span>2.5 Hz</span><span>5 Hz</span></div>
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="chorusDepthSlider">Chorus Depth</label><span class="value-badge value-badge--orange" id="chorusDepthValue">0%</span></div>
+                <input type="range" id="chorusDepthSlider" class="slider slider--orange" min="0" max="100" value="0" step="1" aria-label="Chorus depth" />
+              </div>
+              <div class="control-group">
+                <div class="control-header"><label for="satDriveSlider">Saturator</label><span class="value-badge value-badge--red" id="satDriveValue">0%</span></div>
+                <input type="range" id="satDriveSlider" class="slider slider--red" min="0" max="100" value="0" step="1" aria-label="Saturator" />
+                <div class="slider-ticks"><span>Clean</span><span>Warm</span><span>Saturated</span></div>
+              </div>
+              <div class="control-group control-group--8d">
+                <label class="toggle-row">
+                  <span class="toggle-label">
+                    <svg class="icon-headphones" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+                    </svg>
+                    8D Audio
+                  </span>
+                  <span class="toggle-wrap">
+                    <input type="checkbox" id="eightDToggle" class="toggle-input" aria-label="8D audio — headphones required" />
+                    <span class="toggle-track"></span>
+                  </span>
+                </label>
+                <p class="control-hint" id="eightDHint">Use headphones for the binaural effect</p>
+                <div class="control-header" id="eightDSpeedRow" style="display:none">
+                  <label for="eightDSpeedSlider">Rotation Speed</label>
+                  <span class="value-badge value-badge--purple" id="eightDSpeedValue">0.5 Hz</span>
+                </div>
+                <input type="range" id="eightDSpeedSlider" class="slider slider--purple" min="1" max="20" value="5" step="1" aria-label="8D rotation speed" style="display:none" />
+                <div class="slider-ticks" id="eightDSpeedTicks" style="display:none"><span>Slow</span><span>0.5 Hz</span><span>Fast</span></div>
+              </div>
+              <div class="control-group control-group--hz">
+                <div class="control-header">
+                  <label>Hz Resonance</label>
+                  <span class="value-badge value-badge--indigo" id="hzValue">Off</span>
+                </div>
+                <div class="btn-hz-group" role="group" aria-label="Hz frequency resonance">
+                  <button class="btn-hz btn-hz--active" data-hz="off"  title="No frequency boost"                                 aria-pressed="true">Off</button>
+                  <button class="btn-hz" data-hz="432" title="432 Hz — Natural tuning, relaxation &amp; harmony"        aria-pressed="false">432</button>
+                  <button class="btn-hz" data-hz="528" title="528 Hz — Love frequency, transformation"                  aria-pressed="false">528</button>
+                  <button class="btn-hz" data-hz="639" title="639 Hz — Relationship healing, emotional balance"         aria-pressed="false">639</button>
+                  <button class="btn-hz" data-hz="741" title="741 Hz — Expression, intuition &amp; mental clarity"     aria-pressed="false">741</button>
+                  <button class="btn-hz" data-hz="852" title="852 Hz — Spiritual awareness &amp; inner strength"       aria-pressed="false">852</button>
+                  <button class="btn-hz" data-hz="963" title="963 Hz — Divine connection &amp; enlightenment"          aria-pressed="false">963</button>
+                </div>
+                <p class="control-hint" id="hzHint">Hover a frequency to learn more</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visual Settings drawer — left side, opens with gear button -->
+          <div id="settingsDrawer" class="settings-drawer settings-drawer--hidden">
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Visual Settings</span>
+              <button id="settingsCloseBtn" class="controls-drawer-btn" title="Close" aria-label="Close">&times;</button>
+            </div>
+
+            <!-- Color Themes -->
+            <div class="settings-themes">
+              <div class="settings-label">Color Theme</div>
+              <div class="theme-chips" role="group" aria-label="Color theme">
+                <button class="theme-chip theme-chip--active" data-theme="prism" title="Hue reacts to music">
+                  <span class="theme-swatch theme-swatch--prism"></span>Prism
+                </button>
+                <button class="theme-chip" data-theme="void" title="Deep violet-indigo">
+                  <span class="theme-swatch theme-swatch--void"></span>Void
+                </button>
+                <button class="theme-chip" data-theme="neon" title="Cyan & electric blue">
+                  <span class="theme-swatch theme-swatch--neon"></span>Neon
+                </button>
+                <button class="theme-chip" data-theme="ember" title="Red, orange & gold">
+                  <span class="theme-swatch theme-swatch--ember"></span>Ember
+                </button>
+                <button class="theme-chip" data-theme="frost" title="Ice blue & white">
+                  <span class="theme-swatch theme-swatch--frost"></span>Frost
+                </button>
+                <button class="theme-chip" data-theme="mono" title="Grayscale">
+                  <span class="theme-swatch theme-swatch--mono"></span>Mono
+                </button>
+              </div>
+            </div>
+
+            <!-- Orb options -->
+            <details class="controls-section" open>
               <summary class="controls-section-header">
-                <span>Effects Chain</span>
-                <span class="controls-section-hint">EQ · Chorus · Saturation</span>
+                <span>Orb</span>
+                <span class="controls-section-hint">Shape · Motion · Effects</span>
               </summary>
               <div class="controls">
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="eqLowSlider">EQ Low</label>
-                    <span class="value-badge value-badge--green" id="eqLowValue">0 dB</span>
-                  </div>
-                  <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf gain" />
-                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                  <div class="control-header"><label for="orbReactivitySlider">Reactivity</label><span class="value-badge" id="orbReactivityValue">80%</span></div>
+                  <input type="range" id="orbReactivitySlider" class="slider" min="0" max="100" value="80" step="1" aria-label="Orb reactivity" />
+                  <div class="slider-ticks"><span>Calm</span><span>Normal</span><span>Wild</span></div>
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="eqMidSlider">EQ Mid</label>
-                    <span class="value-badge value-badge--green" id="eqMidValue">0 dB</span>
-                  </div>
-                  <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak gain" />
-                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                  <div class="control-header"><label for="orbGlowSlider">Glow</label><span class="value-badge" id="orbGlowValue">100%</span></div>
+                  <input type="range" id="orbGlowSlider" class="slider" min="0" max="150" value="100" step="1" aria-label="Orb glow intensity" />
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="eqHighSlider">EQ High</label>
-                    <span class="value-badge value-badge--green" id="eqHighValue">0 dB</span>
-                  </div>
-                  <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf gain" />
-                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                  <div class="control-header"><label for="orbSizeSlider">Size</label><span class="value-badge" id="orbSizeValue">100%</span></div>
+                  <input type="range" id="orbSizeSlider" class="slider" min="40" max="180" value="100" step="1" aria-label="Orb size" />
+                  <div class="slider-ticks"><span>Small</span><span>Normal</span><span>Large</span></div>
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="chorusRateSlider">Chorus Rate</label>
-                    <span class="value-badge value-badge--orange" id="chorusRateValue">0.8 Hz</span>
-                  </div>
-                  <input type="range" id="chorusRateSlider" class="slider slider--orange" min="0.1" max="5" value="0.8" step="0.1" aria-label="Chorus LFO rate" />
-                  <div class="slider-ticks"><span>0.1 Hz</span><span>2.5 Hz</span><span>5 Hz</span></div>
+                  <div class="control-header"><label for="rotationSpeedSlider">Rotation</label><span class="value-badge" id="rotationSpeedValue">1.0×</span></div>
+                  <input type="range" id="rotationSpeedSlider" class="slider" min="0" max="200" value="100" step="1" aria-label="Orb rotation speed" />
+                  <div class="slider-ticks"><span>Still</span><span>1×</span><span>Fast</span></div>
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="chorusDepthSlider">Chorus Depth</label>
-                    <span class="value-badge value-badge--orange" id="chorusDepthValue">0%</span>
-                  </div>
-                  <input type="range" id="chorusDepthSlider" class="slider slider--orange" min="0" max="100" value="0" step="1" aria-label="Chorus depth" />
+                  <div class="control-header"><label for="particleCountSlider">Particles</label><span class="value-badge" id="particleCountValue">500</span></div>
+                  <input type="range" id="particleCountSlider" class="slider" min="0" max="2000" value="500" step="50" aria-label="Particle count" />
+                  <div class="slider-ticks"><span>None</span><span>500</span><span>2000</span></div>
                 </div>
-
                 <div class="control-group">
-                  <div class="control-header">
-                    <label for="satDriveSlider">Tape Drive</label>
-                    <span class="value-badge value-badge--red" id="satDriveValue">0%</span>
-                  </div>
-                  <input type="range" id="satDriveSlider" class="slider slider--red" min="0" max="100" value="0" step="1" aria-label="Tape saturation drive" />
-                  <div class="slider-ticks"><span>Clean</span><span>Warm</span><span>Driven</span></div>
+                  <label class="toggle-row">
+                    <span class="toggle-label">Bass Pulse</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="bassPulseToggle" class="toggle-input" checked aria-label="Bass pulse" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                  <label class="toggle-row">
+                    <span class="toggle-label">Wireframe</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="wireframeToggle" class="toggle-input" checked aria-label="Wireframe mode" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                </div>
+                <div class="control-group">
+                  <div class="control-group-label">Orb Effects</div>
+                  <label class="toggle-row">
+                    <span class="toggle-label">Lightning</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="lightningToggle" class="toggle-input" checked aria-label="Lightning tendrils" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                  <label class="toggle-row">
+                    <span class="toggle-label">Crack Veins</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="crackToggle" class="toggle-input" checked aria-label="Surface crack veins" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                  <label class="toggle-row">
+                    <span class="toggle-label">Crystallize on Pause</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="crystalToggle" class="toggle-input" checked aria-label="Pause crystallization" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                  <label class="toggle-row">
+                    <span class="toggle-label">Glitch</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="glitchToggle" class="toggle-input" aria-label="Glitch corruption" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </details>
+
+            <!-- Stars -->
+            <details class="controls-section">
+              <summary class="controls-section-header">
+                <span>Stars</span>
+                <span class="controls-section-hint">Brightness · Twinkle</span>
+              </summary>
+              <div class="controls">
+                <div class="control-group">
+                  <div class="control-header"><label for="starsSlider">Brightness</label><span class="value-badge" id="starsValue">70%</span></div>
+                  <input type="range" id="starsSlider" class="slider" min="0" max="100" value="70" step="1" aria-label="Star brightness" />
+                  <div class="slider-ticks"><span>Off</span><span>Normal</span><span>Bright</span></div>
                 </div>
               </div>
             </details>
           </div>
 
-          <!-- Re-open button shown on desktop after the drawer is dismissed -->
-          <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls" style="display:none">Controls</button>
-        </div>
-      </main>
-
-      <!-- Collaborative sessions panel -->
-      <section id="collabPanel" class="collab-panel" aria-label="Collaborative session">
-        <div class="collab-inner">
-          <h2 class="collab-title">Collaborate</h2>
-          <p class="collab-desc">Sync parameters with another person in real time. You each load your own audio file.</p>
-          <div class="collab-actions">
-            <button id="collabStartBtn" class="btn-collab">Start Session</button>
-            <div class="collab-join">
-              <input type="text" id="collabRoomInput" class="collab-input" placeholder="Room ID" aria-label="Room ID to join" maxlength="32" pattern="[a-zA-Z0-9]+" />
-              <button id="collabJoinBtn" class="btn-collab">Join</button>
+          <!-- Bottom HUD: waveform + transport -->
+          <div class="player-bottom">
+            <div class="waveform-wrap">
+              <canvas id="waveform" class="waveform" role="slider" aria-label="Seek position" tabindex="0"></canvas>
+            </div>
+            <div class="transport-row">
+              <span class="time-current" id="currentTime">0:00</span>
+              <div class="transport">
+                <button id="stopBtn" class="btn btn-icon" title="Stop (s)" aria-label="Stop">
+                  <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="currentColor" rx="3"/></svg>
+                </button>
+                <button id="playPauseBtn" class="btn btn-play" title="Play / Pause (Space)" aria-label="Play">
+                  <svg id="iconPlay" width="22" height="22" viewBox="0 0 22 22"><polygon points="6,3 19,11 6,19" fill="currentColor"/></svg>
+                  <svg id="iconPause" width="22" height="22" viewBox="0 0 22 22"><rect x="4" y="3" width="5" height="16" fill="currentColor" rx="1"/><rect x="13" y="3" width="5" height="16" fill="currentColor" rx="1"/></svg>
+                </button>
+                <button id="rewindBtn" class="btn btn-icon" title="Rewind 5s (←)" aria-label="Rewind 5 seconds">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 5 A8 8 0 1 0 6.5 8.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <polygon points="3,4 9,4 6,9.5" fill="currentColor"/>
+                    <text x="12" y="18.5" font-size="8.5" fill="currentColor" font-family="system-ui,sans-serif" text-anchor="middle" font-weight="700">5s</text>
+                  </svg>
+                </button>
+                <button id="loopBtn" class="btn btn-icon btn-loop" title="Toggle loop region (L)" aria-label="Enable loop" aria-pressed="false">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 8 Q3 3 8 3 Q13 3 13 8 Q13 11 10 12.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/>
+                    <polyline points="7,10.5 10,12.5 7,14.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <line x1="5" y1="6" x2="5" y2="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    <line x1="11" y1="6" x2="11" y2="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button id="exportBtn" class="btn btn-icon btn-export" title="Export as WAV" aria-label="Export processed audio as WAV">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 2 L8 10 M5 7 L8 10 L11 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3 12 L13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <span id="exportStatus" class="export-status" aria-live="polite"></span>
+              </div>
+              <div class="transport-right">
+                <span class="time-total" id="duration">0:00</span>
+                <button id="fullscreenBtn" class="btn btn-icon btn-fullscreen" aria-label="Enter fullscreen" title="Fullscreen (F)">
+                  <svg id="iconFullscreenEnter" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <svg id="iconFullscreenExit" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="display:none">
+                    <path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button id="settingsShowBtn" class="btn-settings-show" aria-label="Visual settings" title="Visual settings">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                  </svg>
+                </button>
+                <button id="playlistShowBtn" class="btn-controls-show" aria-label="Show playlist">Playlist</button>
+                <button id="controlsShowBtn" class="btn-controls-show" aria-label="Show controls">Controls</button>
+                <button id="effectsShowBtn" class="btn-controls-show" aria-label="Show effects">Effects</button>
+                <button id="helpBtn" class="btn-controls-show btn-help" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
+              </div>
             </div>
           </div>
-          <div id="collabStatus" class="collab-status" aria-live="polite"></div>
-          <p class="collab-note">Requires the signaling server: <code>node server/signaling.js</code></p>
-        </div>
-      </section>
 
-      <footer class="footer">
-        <p>All audio stays on your device &nbsp;·&nbsp; zero uploads &nbsp;·&nbsp; zero tracking</p>
-      </footer>
-    </div>
+        </div><!-- /#player -->
+
+      </main>
+
+    </div><!-- /#app -->
+
+    <!-- Footer: GitHub link, visible on landing screen only -->
+    <footer class="site-footer">
+      <a href="https://github.com/gurvinny" target="_blank" rel="noopener noreferrer" class="footer-link" aria-label="GitHub profile — gurvinny">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        gurvinny
+      </a>
+    </footer>
+
+    <!-- Keyboard shortcut help overlay — opened with ? key or help button -->
+    <dialog id="help-modal" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div class="help-modal-inner">
+        <div class="help-modal-header">
+          <h2 class="help-modal-title">Keyboard Shortcuts</h2>
+          <button id="helpCloseBtn" class="help-modal-close" aria-label="Close shortcuts">&times;</button>
+        </div>
+        <dl class="shortcut-grid">
+          <div class="shortcut-row"><dt><kbd>Space</kbd></dt><dd>Play / Pause</dd></div>
+          <div class="shortcut-row"><dt><kbd>L</kbd></dt><dd>Toggle loop</dd></div>
+          <div class="shortcut-row"><dt><kbd>S</kbd></dt><dd>Stop &amp; rewind</dd></div>
+          <div class="shortcut-row"><dt><kbd>&#8592;</kbd></dt><dd>Rewind 5 s</dd></div>
+          <div class="shortcut-row"><dt><kbd>&#8594;</kbd></dt><dd>Forward 5 s</dd></div>
+          <div class="shortcut-row"><dt><kbd>?</kbd></dt><dd>Show this help</dd></div>
+        </dl>
+      </div>
+    </dialog>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -49,7 +49,7 @@ Open an [issue](https://github.com/gurvinny/slo-fi/issues/new) with:
 - Console errors if any
 
 **Suggest a Feature**
-Open an [issue](https://github.com/gurvinny/slo-fi/issues/new) tagged `enhancement`. Check the [v2.0 roadmap in the README](README.md#v20--dark-glass-redesign) first — it may already be planned.
+Open an [issue](https://github.com/gurvinny/slo-fi/issues/new) tagged `enhancement`. Check the [v2.0 Anomaly roadmap](ROADMAP.md) first — it may already be planned or in progress.
 
 **Submit Code**
 Bug fixes, performance improvements, new features that fit the project direction. See [Pull Request Checklist](#pull-request-checklist) before opening.
@@ -127,7 +127,7 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 feat: add loop region selection to waveform
 fix: prevent ConvolverNode clipping at high reverb mix
 docs: update CONTRIBUTING with Node version requirement
-chore: bump Vite to 5.2
+chore: bump Vite to 8.0
 perf: defer OfflineAudioContext creation until export
 ```
 
@@ -149,7 +149,7 @@ Before opening a PR, confirm all of the following:
 - [ ] No `any` types introduced (TypeScript strict mode is enforced)
 - [ ] No `console.log` statements left in production paths
 - [ ] Audio processing remains entirely client-side — no network calls for audio data
-- [ ] New UI elements follow the existing dark-mode aesthetic (dark backgrounds, neon accents)
+- [ ] New UI elements follow the glassmorphic dark-mode aesthetic (frosted panels, neon border glow, aurora palette)
 - [ ] No new runtime dependencies added without prior discussion in an issue
 - [ ] The PR title follows Conventional Commits format
 - [ ] The PR description explains *what* changed and *why*
@@ -171,11 +171,10 @@ The project uses **TypeScript in strict mode**. The compiler enforces:
 
 ### Patterns to Follow
 
-**Module structure** — code is organized into three modules:
+**Module structure** — code is organized into two modules:
 ```
-src/audio/    Web Audio API engine (AudioEngine, EffectsChain, Exporter, etc.)
-src/ui/       DOM controllers (App, Waveform, SpectrumAnalyzer, etc.)
-src/collab/   WebRTC collaboration layer
+src/audio/    Web Audio API engine (AudioEngine, EffectsChain, BpmDetector, KeyDetector, Exporter, etc.)
+src/ui/       DOM controllers (App, AnomalySphere, Waveform, SpectrumAnalyzer, MobileController, etc.)
 ```
 
 **Web Audio API** — prefer native nodes over manual DSP. The `AudioContext` instance is owned by `AudioEngine` and passed down — never create a second context.

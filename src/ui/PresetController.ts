@@ -9,6 +9,7 @@ export class PresetController {
   private buttons: NodeListOf<HTMLButtonElement>
 
   public onPresetApplied: ((params: AudioParams) => void) | null = null
+  public onThemeApplied: ((theme: string) => void) | null = null
 
   constructor(engine: AudioEngine) {
     this.engine = engine
@@ -35,6 +36,7 @@ export class PresetController {
         this.engine.applyPreset(preset.params)
         this.setActive(btn)
         this.onPresetApplied?.(preset.params)
+        if (preset.theme) this.onThemeApplied?.(preset.theme)
       })
     })
   }

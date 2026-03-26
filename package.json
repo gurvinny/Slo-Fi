@@ -1,16 +1,20 @@
 {
   "name": "slo-fi",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Professional-grade browser audio slow-down tool with convolution reverb",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node scripts/generate-icons.mjs && tsc && vite build && node scripts/precache-sw.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "@types/three": "^0.183.1",
+    "typescript": "^5.9.3",
     "vite": "^8.0.1"
+  },
+  "dependencies": {
+    "three": "^0.183.2"
   }
 }

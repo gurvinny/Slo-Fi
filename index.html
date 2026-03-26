@@ -48,6 +48,10 @@
     @keyframes _loader-spin {
       to { transform: rotate(360deg); }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .page-loader-icon { animation: none; }
+      .page-loader-inner { animation: none; }
+    }
   </style>
   </head>
   <body>

@@ -165,6 +165,12 @@ body::after {
     background: none;
   }
   .dropzone.landing-exit { transition: opacity 0.2s; transform: none; }
+  /* Universal motion kill — 0.01ms instead of none so transitionend still fires */
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */

@@ -37,6 +37,7 @@ export class StarOverlay {
   private rafId: number | null = null
   private playing = true
   private throttleId: ReturnType<typeof setInterval> | null = null
+  private _reducedMotion: boolean
 
   // Logical size (CSS pixels)
   private w = 0
@@ -60,6 +61,10 @@ export class StarOverlay {
 
     window.addEventListener('resize', () => this.resize())
     this.resize()
+
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    this._reducedMotion = mq.matches
+    mq.addEventListener('change', (e) => { this._reducedMotion = e.matches })
 
     requestAnimationFrame((t) => this.loop(t))
   }
@@ -150,10 +155,10 @@ export class StarOverlay {
 
     // ── Twinkling stars ─────────────────────────────────────────────────────
     for (const s of this.stars) {
-      const raw      = 0.5 + 0.5 * Math.sin(t * s.speed + s.phase)
-      const sharp    = 2.0 + this.treble * 3.0
-      const twinkle  = Math.pow(raw, sharp)
-      const alpha    = 0.20 + twinkle * (0.80 + this.treble * 0.20)
+      // Under reduced motion: skip the per-frame sine modulation and draw a
+      // static field at a fixed, comfortable alpha with no diffraction cross.
+      const twinkle  = this._reducedMotion ? 0 : Math.pow(0.5 + 0.5 * Math.sin(t * s.speed + s.phase), 2.0 + this.treble * 3.0)
+      const alpha    = this._reducedMotion ? 0.45 : (0.20 + twinkle * (0.80 + this.treble * 0.20))
       const r        = s.size * (0.8 + twinkle * 0.5)
 
       // Core + soft halo via radial gradient
@@ -179,8 +184,8 @@ export class StarOverlay {
       }
     }
 
-    // ── Shooting star timer (only while audio is playing) ───────────────────
-    if (this.playing) {
+    // ── Shooting star timer (only while audio is playing and motion is OK) ─────
+    if (this.playing && !this._reducedMotion) {
       this.shotTimer += dt
       if (this.shotTimer >= this.nextShotIn) {
         this.spawnShot()

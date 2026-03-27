@@ -87,6 +87,7 @@ export class App {
   // Playlist state
   private playlist: File[]        = []
   private currentTrackIndex       = -1
+  private _dragIndex              = -1
   private playlistDrawer          = document.getElementById('playlistDrawer')!
   private playlistCloseBtn        = document.getElementById('playlistCloseBtn')!
   private playlistShowBtn         = document.getElementById('playlistShowBtn')!
@@ -212,26 +213,76 @@ export class App {
     const count = this.playlist.length
     this.playlistCount.textContent = `${count} track${count !== 1 ? 's' : ''}`
     this.playlist.forEach((file, i) => {
-      const li   = document.createElement('li')
-      const name = document.createElement('span')
-      const btn  = document.createElement('button')
+      const li     = document.createElement('li')
+      const handle = document.createElement('span')
+      const name   = document.createElement('span')
+      const upBtn  = document.createElement('button')
+      const dnBtn  = document.createElement('button')
+      const rmBtn  = document.createElement('button')
 
       li.className = 'playlist-item'
       if (i === this.currentTrackIndex) li.setAttribute('aria-current', 'true')
+      li.draggable = true
+      li.addEventListener('dragstart', (e) => {
+        this._dragIndex = i
+        li.classList.add('dragging')
+        e.dataTransfer?.setData('text/plain', String(i))
+      })
+      li.addEventListener('dragend', () => {
+        li.classList.remove('dragging')
+        this._dragIndex = -1
+      })
+      li.addEventListener('dragover', (e) => { e.preventDefault(); li.classList.add('drag-over') })
+      li.addEventListener('dragleave', () => li.classList.remove('drag-over'))
+      li.addEventListener('drop', (e) => {
+        e.preventDefault()
+        li.classList.remove('drag-over')
+        this.reorderTrack(this._dragIndex, i)
+      })
+
+      handle.className = 'playlist-drag-handle'
+      handle.textContent = '⠿'
+      handle.setAttribute('aria-hidden', 'true')
 
       name.className = 'playlist-item-name'
       name.textContent = file.name.replace(/\.[^.]+$/, '')
       name.title = file.name
 
-      btn.className = 'playlist-item-remove'
-      btn.setAttribute('aria-label', `Remove ${file.name}`)
-      btn.textContent = '×'
-      btn.addEventListener('click', (e) => { e.stopPropagation(); this.removeTrack(i) })
+      upBtn.className = 'playlist-move-btn'
+      upBtn.textContent = '↑'
+      upBtn.setAttribute('aria-label', `Move ${file.name} up`)
+      upBtn.disabled = i === 0
+      upBtn.addEventListener('click', (e) => { e.stopPropagation(); this.reorderTrack(i, i - 1) })
+
+      dnBtn.className = 'playlist-move-btn'
+      dnBtn.textContent = '↓'
+      dnBtn.setAttribute('aria-label', `Move ${file.name} down`)
+      dnBtn.disabled = i === count - 1
+      dnBtn.addEventListener('click', (e) => { e.stopPropagation(); this.reorderTrack(i, i + 1) })
+
+      rmBtn.className = 'playlist-item-remove'
+      rmBtn.setAttribute('aria-label', `Remove ${file.name}`)
+      rmBtn.textContent = '×'
+      rmBtn.addEventListener('click', (e) => { e.stopPropagation(); this.removeTrack(i) })
 
       li.addEventListener('click', () => void this.switchTrack(i))
-      li.append(name, btn)
+      li.append(handle, name, upBtn, dnBtn, rmBtn)
       this.playlistList.appendChild(li)
     })
+  }
+
+  private reorderTrack(from: number, to: number): void {
+    if (from === to || from < 0 || to < 0 || to >= this.playlist.length) return
+    const [item] = this.playlist.splice(from, 1)
+    this.playlist.splice(to, 0, item)
+    if (this.currentTrackIndex === from) {
+      this.currentTrackIndex = to
+    } else if (from < this.currentTrackIndex && to >= this.currentTrackIndex) {
+      this.currentTrackIndex--
+    } else if (from > this.currentTrackIndex && to <= this.currentTrackIndex) {
+      this.currentTrackIndex++
+    }
+    this.renderPlaylist()
   }
 
   private wireHelpModal(): void {

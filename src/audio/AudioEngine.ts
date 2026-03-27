@@ -141,6 +141,13 @@ export class AudioEngine {
     }
 
     this.context = new AudioContext({ latencyHint: 'interactive' })
+    // Auto-resume if iOS suspends the context mid-foreground (e.g. phone call,
+    // Siri, AirPods reconnect) so the user doesn't perceive it as a crash.
+    this.context.addEventListener('statechange', () => {
+      if (this.context?.state === 'suspended' && this._isPlaying) {
+        this.context.resume().catch(() => {})
+      }
+    })
 
     // Crossfade gain: sits between sourceNode and the dry/wet split.
     // Normally at 1.0; briefly dipped on loop boundaries to remove convolver artifacts.
@@ -219,8 +226,9 @@ export class AudioEngine {
     // Release the old decoded buffer before allocating the new one so iOS
     // doesn't hold both simultaneously and trigger a memory-pressure reload.
     this.buffer = null
-    const arrayBuffer = await file.arrayBuffer()
+    let arrayBuffer: ArrayBuffer | null = await file.arrayBuffer()
     this.buffer = await this.context!.decodeAudioData(arrayBuffer)
+    arrayBuffer = null  // release raw bytes; iOS may not GC until explicitly nulled
     this._startOffset = 0
   }
 

@@ -633,8 +633,13 @@ export class AnomalySphere {
     // ── Renderer ────────────────────────────────────────────────────────────
     // Match the page background exactly so removing the CSS box makes the
     // renderer area seamless — the orb appears to float over the page.
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3))
+    // On mobile (DPR ≥ 3) cap at 2 to reduce WebGL framebuffer memory pressure.
+    // Capping 3→2 cuts FBO size by ~44% — critical for avoiding iOS OOM page reloads.
+    // Use 'default' powerPreference so the GPU driver doesn't aggressively pre-allocate
+    // memory (which 'high-performance' can trigger on mobile).
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    this.renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: isMobile ? 'default' : 'high-performance' })
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 2 : 3))
     this.renderer.setClearColor(new Color('#080810'), 1)
     // ACESFilmic gracefully compresses HDR bloom values instead of clipping to white
     this.renderer.toneMapping         = ACESFilmicToneMapping

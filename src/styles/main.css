@@ -2400,12 +2400,39 @@ body.is-paused .site-footer {
   outline-offset: 2px;
 }
 
+/* ── Playlist drag-and-drop + move buttons ──────────────────────────────── */
+.playlist-drag-handle {
+  cursor: grab;
+  opacity: 0.35;
+  padding: 0 4px 0 0;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.playlist-item.dragging { opacity: 0.4; }
+.playlist-item.drag-over { border-top: 2px solid var(--accent, #9b6dff); }
+.playlist-move-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.35;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.playlist-move-btn:hover:not(:disabled) { opacity: 0.85; }
+.playlist-move-btn:disabled { opacity: 0.15; cursor: default; }
+
 /* ── Help button: fixed top-right corner ────────────────────────────────── */
 .btn-help {
   position: fixed;
   top: calc(12px + env(safe-area-inset-top, 0px));
   right: calc(12px + env(safe-area-inset-right, 0px));
-  z-index: 55;
+  z-index: 105;
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;

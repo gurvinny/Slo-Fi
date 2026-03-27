@@ -51,6 +51,7 @@ export class AudioEngine {
   private _8DEnabled = false
   private _8DSpeed   = 0.5   // Hz, rotation rate
   private _8DRafId:  number | null = null
+  private _irRafId:  number | null = null  // debounce handle for IR rebuild
 
   // Fires each animation frame when 8D is enabled, with the current angle in radians.
   // App.ts uses this to keep the orb rotation in sync with the panner.
@@ -361,12 +362,23 @@ export class AudioEngine {
 
   setReverbDecay(decaySeconds: number): void {
     this._reverbDecay = Math.max(0.1, Math.min(8.0, decaySeconds))
-    this.rebuildIR()
+    this._scheduleRebuildIR()
   }
 
   setReverbRoomSize(size: number): void {
     this._reverbRoomSize = Math.max(0.01, Math.min(1.0, size))
-    this.rebuildIR()
+    this._scheduleRebuildIR()
+  }
+
+  // Defers rebuildIR() to the next animation frame so that rapid back-to-back
+  // calls (e.g. applyPreset sets both decay and roomSize in the same tick) only
+  // trigger one allocation and one ConvolverNode buffer replacement.
+  private _scheduleRebuildIR(): void {
+    if (this._irRafId !== null) return
+    this._irRafId = requestAnimationFrame(() => {
+      this._irRafId = null
+      this.rebuildIR()
+    })
   }
 
   setEQ(band: 'low' | 'mid' | 'high', db: number): void {

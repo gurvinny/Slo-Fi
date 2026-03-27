@@ -374,7 +374,7 @@ const GRAIN_CA_SHADER = {
       float b = texture2D(tDiffuse, vUv + dir * ca ).b;
 
       // Film grain: random noise per-pixel that changes every frame
-      float grain = (rand(vUv + fract(uTime * 0.0173)) * 2.0 - 1.0) * 0.028;
+      float grain = (rand(vUv + fract(uTime * 0.0173)) * 2.0 - 1.0) * 0.016;
 
       gl_FragColor = vec4(r + grain, g + grain, b + grain, 1.0);
     }
@@ -639,6 +639,9 @@ export class AnomalySphere {
     // Use 'default' powerPreference so the GPU driver doesn't aggressively pre-allocate
     // memory (which 'high-performance' can trigger on mobile).
     this._isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    // Fewer particles on mobile to reduce JS heap pressure alongside the large
+    // decoded AudioBuffer that can exceed 100 MB for long tracks.
+    if (this._isMobile) this.particleCount = 150
     this.renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: this._isMobile ? 'default' : 'high-performance' })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 2 : 3))
     this.renderer.setClearColor(new Color('#080810'), 1)
@@ -658,6 +661,16 @@ export class AnomalySphere {
     canvas.setAttribute('aria-hidden', 'true')
     canvas.setAttribute('tabindex', '-1')
     container.appendChild(canvas)
+
+    // WebGL context-loss recovery. Three.js 0.183 already returns early from
+    // render() when the context is lost, so the RAF loop keeps ticking. The
+    // restored handler restarts it as a safety net in case it was cancelled.
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault()  // required to allow the browser to restore the context
+    }, false)
+    canvas.addEventListener('webglcontextrestored', () => {
+      if (this.rafId === null) this.loop()
+    }, false)
 
     // ── Scene + camera ───────────────────────────────────────────────────────
     this.scene  = new Scene()
@@ -874,6 +887,11 @@ export class AnomalySphere {
 
   private loop(): void {
     this.rafId = requestAnimationFrame(() => this.loop())
+
+    // Skip GPU work while the tab is hidden on mobile. This prevents shader
+    // uniform mutations from accumulating and reduces memory pressure from
+    // background OS processes fighting for GPU resources on iOS.
+    if (this._isMobile && document.visibilityState === 'hidden') return
 
     const elapsed = this.clock.getElapsedTime()
 

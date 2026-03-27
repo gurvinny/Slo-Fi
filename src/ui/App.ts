@@ -181,13 +181,19 @@ export class App {
     await this.loadFile(this.playlist[index])
     window.setTimeout(() => this.sphere?.setReactivity(reactVal), 150)
     if (autoPlay) {
-      this.engine.play()
-      this.setPlayingState(true)
-      this.sphere?.start()
-      this.starOverlay.resume()
-      this._mobile?.ensureSilenceLoop()
-      this._mobile?.updatePlaybackState(true)
-      void this._mobile?.acquireWakeLock()
+      try {
+        await this.engine.play()
+        this.setPlayingState(true)
+        this.sphere?.start()
+        this.starOverlay.resume()
+        this._mobile?.ensureSilenceLoop()
+        this._mobile?.updatePlaybackState(true)
+        void this._mobile?.acquireWakeLock()
+      } catch {
+        // AudioContext resume failed (e.g. iOS suspended context without a
+        // user gesture). Stay in paused state so the user can tap to resume.
+        this.setPlayingState(false)
+      }
     }
   }
 
@@ -375,13 +381,15 @@ export class App {
       this.waveform.setProgress(0)
       this.sphere?.stop()
       this.starOverlay.pause()
-      this._mobile?.stopSilenceLoop()
-      // Auto-advance to next track and start playback immediately
+      // Auto-advance to next track and start playback immediately.
+      // Keep the silence loop running during the decode gap so the iOS audio
+      // session stays alive — only stop it when the playlist is fully done.
       const next = this.currentTrackIndex + 1
       if (next < this.playlist.length) {
         void this.switchTrack(next, true)
       } else {
-        // No more tracks — release the wake lock so the screen can sleep.
+        // No more tracks — stop the keepalive and release the wake lock.
+        this._mobile?.stopSilenceLoop()
         this._mobile?.releaseWakeLock()
       }
     }

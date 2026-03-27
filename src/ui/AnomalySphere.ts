@@ -484,7 +484,7 @@ export class AnomalySphere {
   private mesh:      Mesh
   private composer:  EffectComposer
   private bloom:     UnrealBloomPass
-  private grainPass: ShaderPass
+  private grainPass?: ShaderPass
   private clock:     Clock
 
   private analyser: AnalyserNode
@@ -554,7 +554,7 @@ export class AnomalySphere {
   // glitchRaw each frame (fast attack, moderate decay). The GLITCH_SHADER
   // reads uGlitch each frame so the amount tracks the energy smoothly.
   // Default OFF — can be distracting on subtle music, so the user opts in.
-  private glitchPass!: ShaderPass
+  private glitchPass?: ShaderPass
   private glitchAmount = 0          // current smoothed glitch intensity (0-1)
   private glitchEnabled = false     // default OFF; toggled by UI switch
 
@@ -615,6 +615,7 @@ export class AnomalySphere {
   }
 
   private container: HTMLElement  // stored so resize() doesn't need parentElement
+  private _isMobile: boolean
   private rafId:   number | null = null
   private playing  = false
   private _reducedMotion: boolean
@@ -637,9 +638,9 @@ export class AnomalySphere {
     // Capping 3→2 cuts FBO size by ~44% — critical for avoiding iOS OOM page reloads.
     // Use 'default' powerPreference so the GPU driver doesn't aggressively pre-allocate
     // memory (which 'high-performance' can trigger on mobile).
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: isMobile ? 'default' : 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 2 : 3))
+    this._isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    this.renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: this._isMobile ? 'default' : 'high-performance' })
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 2 : 3))
     this.renderer.setClearColor(new Color('#080810'), 1)
     // ACESFilmic gracefully compresses HDR bloom values instead of clipping to white
     this.renderer.toneMapping         = ACESFilmicToneMapping
@@ -664,8 +665,9 @@ export class AnomalySphere {
     this.camera.position.z = 4.2
 
     // ── Sphere geometry + material ───────────────────────────────────────────
-    // Detail level 6 → ~10k vertices for smooth high-frequency displacement
-    const geo = new IcosahedronGeometry(1, 6)
+    // Detail level 6 → ~10k vertices for smooth high-frequency displacement.
+    // On mobile use level 4 (~2.5k vertices, 4× reduction) to cut GPU memory.
+    const geo = new IcosahedronGeometry(1, this._isMobile ? 4 : 6)
 
     this.uniforms = {
       uTime:    { value: 0 },
@@ -712,11 +714,15 @@ export class AnomalySphere {
     )
     this.composer.addPass(this.bloom)
 
-    this.grainPass = new ShaderPass(GRAIN_CA_SHADER)
-    this.composer.addPass(this.grainPass)
+    // On mobile skip grain + glitch passes — each ShaderPass allocates a full-res
+    // render target; removing them saves ~20 MB of GPU memory on retina phones.
+    if (!this._isMobile) {
+      this.grainPass = new ShaderPass(GRAIN_CA_SHADER)
+      this.composer.addPass(this.grainPass)
 
-    this.glitchPass = new ShaderPass(GLITCH_SHADER)
-    this.composer.addPass(this.glitchPass)
+      this.glitchPass = new ShaderPass(GLITCH_SHADER)
+      this.composer.addPass(this.glitchPass)
+    }
 
     this.composer.addPass(new OutputPass())
 
@@ -1129,8 +1135,10 @@ export class AnomalySphere {
 
     // Film grain uses bVis (broad bass) rather than kickVis so the grain texture
     // stays continuously present during sustained bass passages, not just on hits.
-    this.grainPass.uniforms['uTime'].value = elapsed
-    this.grainPass.uniforms['uBass'].value = bVis
+    if (this.grainPass) {
+      this.grainPass.uniforms['uTime'].value = elapsed
+      this.grainPass.uniforms['uBass'].value = bVis
+    }
 
     // ── Effect: crystallization ──────────────────────────────────────────────
     // crystalAmount drives two shader uniforms: uCrystal.
@@ -1183,8 +1191,10 @@ export class AnomalySphere {
     } else {
       this.glitchAmount *= 0.80   // drain quickly so the screen clears on toggle-off
     }
-    this.glitchPass.uniforms['uGlitch'].value = this.glitchAmount
-    this.glitchPass.uniforms['uTime'].value   = elapsed
+    if (this.glitchPass) {
+      this.glitchPass.uniforms['uGlitch'].value = this.glitchAmount
+      this.glitchPass.uniforms['uTime'].value   = elapsed
+    }
 
     // Lightning tendrils
     if (this.lightningEnabled) {
@@ -1224,7 +1234,11 @@ export class AnomalySphere {
 
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h, false)
-    this.composer.setSize(w, h)
+    // Render the composer at 75% resolution on mobile to reduce FBO memory by ~44%.
+    // The canvas CSS still fills 100% so it upscales imperceptibly on retina screens.
+    const cw = this._isMobile ? Math.round(w * 0.75) : w
+    const ch = this._isMobile ? Math.round(h * 0.75) : h
+    this.composer.setSize(cw, ch)
   }
 
   // Maps a frequency in Hz to the nearest FFT bin index

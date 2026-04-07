@@ -115,6 +115,8 @@ export class App {
   private starsSlider          = document.getElementById('starsSlider') as HTMLInputElement
   private starsValue           = document.getElementById('starsValue')!
 
+  private readonly SETTINGS_KEY = 'slofi-settings'
+
   constructor() {
     this.waveform = new Waveform(document.getElementById('waveform') as HTMLCanvasElement)
 
@@ -131,6 +133,7 @@ export class App {
     this.wireSettingsPanel()
     this.wireHelpModal()
     this.wirePlaylistPanel()
+    this.loadSettings()
     this.initAriaValueText()
 
     // Wire up mobile APIs: Media Session, Fullscreen, Vibration, and
@@ -271,7 +274,7 @@ export class App {
       rmBtn.textContent = '×'
       rmBtn.addEventListener('click', (e) => { e.stopPropagation(); this.removeTrack(i) })
 
-      li.addEventListener('click', () => void this.switchTrack(i))
+      li.addEventListener('click', () => void this.switchTrack(i, true))
       li.append(handle, name, upBtn, dnBtn, rmBtn)
       this.playlistList.appendChild(li)
     })
@@ -358,6 +361,7 @@ export class App {
       this.effects.syncToParams(params)
       this.sphere?.setSpeed(params.playbackRate)
       this.sphere?.setReverb(params.reverbMix)
+      this.saveSettings()
     }
     this.presets.onThemeApplied = (theme: string) => {
       this.applyTheme(theme)
@@ -480,6 +484,7 @@ export class App {
       this.sphere?.setSpeed(rate)
       this.presets.clearActive()
       this.updateBpmDisplay()
+      this.saveSettings()
     })
 
     // Pitch
@@ -490,6 +495,7 @@ export class App {
       this.pitchSlider.setAttribute('aria-valuetext', st === 0 ? '0 semitones' : `${st > 0 ? '+' : ''}${st} semitones`)
       this.presets.clearActive()
       this.updateBpmDisplay()
+      this.saveSettings()
     })
 
     // Reverb mix
@@ -500,6 +506,7 @@ export class App {
       this.reverbSlider.setAttribute('aria-valuetext', `${this.reverbSlider.value}%`)
       this.sphere?.setReverb(mix)
       this.presets.clearActive()
+      this.saveSettings()
     })
 
     // Decay
@@ -509,6 +516,7 @@ export class App {
       this.decayValue.textContent = `${decay.toFixed(1)}s`
       this.decaySlider.setAttribute('aria-valuetext', `${decay.toFixed(1)} seconds`)
       this.presets.clearActive()
+      this.saveSettings()
     })
 
     // Room size
@@ -518,6 +526,7 @@ export class App {
       this.roomValue.textContent = `${this.roomSlider.value}%`
       this.roomSlider.setAttribute('aria-valuetext', `${this.roomSlider.value}%`)
       this.presets.clearActive()
+      this.saveSettings()
     })
 
     // Volume
@@ -526,6 +535,7 @@ export class App {
       this.engine.setVolume(vol)
       this.volumeValue.textContent = `${this.volumeSlider.value}%`
       this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
+      this.saveSettings()
     })
 
     // Visual settings — particle count
@@ -533,6 +543,7 @@ export class App {
       const n = parseInt(this.particleCountSlider.value)
       this.sphere?.setParticleCount(n)
       this.particleCountValue.textContent = String(n)
+      this.saveSettings()
     })
 
     // Visual settings — orb reactivity
@@ -540,6 +551,7 @@ export class App {
       const v = parseInt(this.orbReactivitySlider.value) / 100
       this.sphere?.setReactivity(v)
       this.orbReactivityValue.textContent = `${this.orbReactivitySlider.value}%`
+      this.saveSettings()
     })
 
     // Visual settings — orb glow
@@ -547,6 +559,7 @@ export class App {
       const v = parseInt(this.orbGlowSlider.value) / 100
       this.sphere?.setGlow(v)
       this.orbGlowValue.textContent = `${this.orbGlowSlider.value}%`
+      this.saveSettings()
     })
 
     // Visual settings — orb size
@@ -554,6 +567,7 @@ export class App {
       const v = parseInt(this.orbSizeSlider.value) / 100
       this.sphere?.setOrbSize(v)
       this.orbSizeValue.textContent = `${this.orbSizeSlider.value}%`
+      this.saveSettings()
     })
 
     // Visual settings — rotation speed
@@ -561,30 +575,37 @@ export class App {
       const v = parseInt(this.rotationSpeedSlider.value) / 100
       this.sphere?.setRotationSpeed(v)
       this.rotationSpeedValue.textContent = `${v.toFixed(1)}×`
+      this.saveSettings()
     })
 
     // Visual settings — bass pulse toggle
     this.bassPulseToggle.addEventListener('change', () => {
       this.sphere?.setBassPulse(this.bassPulseToggle.checked)
+      this.saveSettings()
     })
 
     // Visual settings — wireframe toggle
     this.wireframeToggle.addEventListener('change', () => {
       this.sphere?.setWireframe(this.wireframeToggle.checked)
+      this.saveSettings()
     })
 
     // Visual settings — orb effect toggles
     this.lightningToggle.addEventListener('change', () => {
       this.sphere?.setLightning(this.lightningToggle.checked)
+      this.saveSettings()
     })
     this.crackToggle.addEventListener('change', () => {
       this.sphere?.setCrack(this.crackToggle.checked)
+      this.saveSettings()
     })
     this.crystalToggle.addEventListener('change', () => {
       this.sphere?.setCrystal(this.crystalToggle.checked)
+      this.saveSettings()
     })
     this.glitchToggle.addEventListener('change', () => {
       this.sphere?.setGlitch(this.glitchToggle.checked)
+      this.saveSettings()
     })
 
     // Visual settings — star brightness
@@ -592,6 +613,7 @@ export class App {
       const v = parseInt(this.starsSlider.value) / 100
       this.sphere?.setStarBrightness(v)
       this.starsValue.textContent = `${this.starsSlider.value}%`
+      this.saveSettings()
     })
   }
 
@@ -662,9 +684,19 @@ export class App {
     this.dropzone.classList.add('loading')
     title.textContent = 'Decoding audio...'
 
+    // Isolate the decode step so that any UI/visual error that follows is
+    // NOT misreported as "Could not decode this file."
     try {
       await this.engine.loadFile(file)
+    } catch (err) {
+      console.error('Failed to decode audio:', err)
+      showDropzoneError('Could not decode this file. Try a different format.')
+      this.dropzone.classList.remove('loading')
+      return
+    }
 
+    // Audio decoded successfully — set up the UI.
+    try {
       // Show the player first so the canvases have real CSS dimensions before
       // we resize and draw into them.
       this.showPlayer()
@@ -698,10 +730,8 @@ export class App {
       this.trackMeta.textContent = `${formatTime(this.engine.duration)} · ${formatBytes(file.size)} · ${file.type || 'audio'}`
       this.durationEl.textContent = formatTime(this.engine.duration)
       this.currentTimeEl.textContent = '0:00'
-
-    } catch (err) {
-      console.error('Failed to decode audio:', err)
-      showDropzoneError('Could not decode this file. Try a different format.')
+    } catch (uiErr) {
+      console.error('UI setup error after audio load (non-fatal):', uiErr)
     } finally {
       this.dropzone.classList.remove('loading')
     }
@@ -722,6 +752,20 @@ export class App {
           root.setProperty('--ui-treble',     String(uiTreble.toFixed(3)))
           this.starOverlay.setTreble(treble)
         }
+        // Sync slider/toggle defaults to sphere immediately after construction so the
+        // sphere reflects the HTML default values without requiring user interaction.
+        this.sphere.setReactivity(parseInt(this.orbReactivitySlider.value) / 100)
+        this.sphere.setOrbSize(parseInt(this.orbSizeSlider.value) / 100)
+        this.sphere.setGlow(parseInt(this.orbGlowSlider.value) / 100)
+        this.sphere.setRotationSpeed(parseInt(this.rotationSpeedSlider.value) / 100)
+        this.sphere.setBassPulse(this.bassPulseToggle.checked)
+        this.sphere.setWireframe(this.wireframeToggle.checked)
+        this.sphere.setLightning(this.lightningToggle.checked)
+        this.sphere.setCrack(this.crackToggle.checked)
+        this.sphere.setCrystal(this.crystalToggle.checked)
+        this.sphere.setGlitch(this.glitchToggle.checked)
+        this.sphere.setParticleCount(parseInt(this.particleCountSlider.value))
+        this.sphere.setStarBrightness(parseInt(this.starsSlider.value) / 100)
       } catch (sphereErr) {
         console.error('3D sphere unavailable (WebGL may not be supported):', sphereErr)
       }
@@ -770,6 +814,118 @@ export class App {
     this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
   }
 
+  private saveSettings(): void {
+    const settings = {
+      theme:        document.documentElement.dataset.theme ?? 'prism',
+      speed:        this.speedSlider.value,
+      pitch:        this.pitchSlider.value,
+      reverb:       this.reverbSlider.value,
+      decay:        this.decaySlider.value,
+      room:         this.roomSlider.value,
+      volume:       this.volumeSlider.value,
+      particleCount: this.particleCountSlider.value,
+      orbReactivity: this.orbReactivitySlider.value,
+      orbGlow:      this.orbGlowSlider.value,
+      orbSize:      this.orbSizeSlider.value,
+      rotationSpeed: this.rotationSpeedSlider.value,
+      bassPulse:    this.bassPulseToggle.checked,
+      wireframe:    this.wireframeToggle.checked,
+      lightning:    this.lightningToggle.checked,
+      crack:        this.crackToggle.checked,
+      crystal:      this.crystalToggle.checked,
+      glitch:       this.glitchToggle.checked,
+      stars:        this.starsSlider.value,
+    }
+    try { localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(settings)) } catch { /* quota */ }
+  }
+
+  private loadSettings(): void {
+    let s: Record<string, unknown>
+    try {
+      const raw = localStorage.getItem(this.SETTINGS_KEY)
+      if (!raw) return
+      s = JSON.parse(raw) as Record<string, unknown>
+    } catch { return }
+
+    const str  = (v: unknown, fb: string)  => typeof v === 'string'  ? v  : fb
+    const bool = (v: unknown, fb: boolean) => typeof v === 'boolean' ? v  : fb
+
+    if (s['theme'] !== undefined) this.applyTheme(str(s['theme'], 'prism'))
+
+    // Audio sliders — restore DOM value + display text + engine state.
+    // isFinite() guards prevent NaN from reaching the engine (which would
+    // cause buildIR() to throw InvalidStateError on ctx.createBuffer(2, NaN)).
+    if (s['speed'] !== undefined) {
+      this.speedSlider.value = str(s['speed'], this.speedSlider.value)
+      const rate = parseInt(this.speedSlider.value) / 100
+      this.speedValue.textContent = `${rate.toFixed(2)}x`
+      if (isFinite(rate)) this.engine.setPlaybackRate(rate)
+    }
+    if (s['pitch'] !== undefined) {
+      this.pitchSlider.value = str(s['pitch'], this.pitchSlider.value)
+      const st = parseInt(this.pitchSlider.value)
+      this.pitchValue.textContent = st === 0 ? '0 st' : `${st > 0 ? '+' : ''}${st} st`
+      if (isFinite(st)) this.engine.setPitch(st)
+    }
+    if (s['reverb'] !== undefined) {
+      this.reverbSlider.value = str(s['reverb'], this.reverbSlider.value)
+      this.reverbValue.textContent = `${this.reverbSlider.value}%`
+      const mix = parseInt(this.reverbSlider.value) / 100
+      if (isFinite(mix)) this.engine.setReverbMix(mix)
+    }
+    if (s['decay'] !== undefined) {
+      this.decaySlider.value = str(s['decay'], this.decaySlider.value)
+      const decay = parseInt(this.decaySlider.value) / 10
+      this.decayValue.textContent = `${decay.toFixed(1)}s`
+      if (isFinite(decay)) this.engine.setReverbDecay(decay)
+    }
+    if (s['room'] !== undefined) {
+      this.roomSlider.value = str(s['room'], this.roomSlider.value)
+      this.roomValue.textContent = `${this.roomSlider.value}%`
+      const room = parseInt(this.roomSlider.value) / 100
+      if (isFinite(room)) this.engine.setReverbRoomSize(room)
+    }
+    if (s['volume'] !== undefined) {
+      this.volumeSlider.value = str(s['volume'], this.volumeSlider.value)
+      this.volumeValue.textContent = `${this.volumeSlider.value}%`
+      const vol = parseInt(this.volumeSlider.value) / 100
+      if (isFinite(vol)) this.engine.setVolume(vol)
+    }
+
+    // Visual settings — restore DOM only (sphere reads these when created in loadFile)
+    if (s['particleCount'] !== undefined) {
+      this.particleCountSlider.value = str(s['particleCount'], this.particleCountSlider.value)
+      this.particleCountValue.textContent = this.particleCountSlider.value
+    }
+    if (s['orbReactivity'] !== undefined) {
+      this.orbReactivitySlider.value = str(s['orbReactivity'], this.orbReactivitySlider.value)
+      this.orbReactivityValue.textContent = `${this.orbReactivitySlider.value}%`
+    }
+    if (s['orbGlow'] !== undefined) {
+      this.orbGlowSlider.value = str(s['orbGlow'], this.orbGlowSlider.value)
+      this.orbGlowValue.textContent = `${this.orbGlowSlider.value}%`
+    }
+    if (s['orbSize'] !== undefined) {
+      this.orbSizeSlider.value = str(s['orbSize'], this.orbSizeSlider.value)
+      this.orbSizeValue.textContent = `${this.orbSizeSlider.value}%`
+    }
+    if (s['rotationSpeed'] !== undefined) {
+      this.rotationSpeedSlider.value = str(s['rotationSpeed'], this.rotationSpeedSlider.value)
+      const v = parseInt(this.rotationSpeedSlider.value) / 100
+      this.rotationSpeedValue.textContent = `${v.toFixed(1)}×`
+    }
+    if (s['bassPulse'] !== undefined)  this.bassPulseToggle.checked  = bool(s['bassPulse'],  this.bassPulseToggle.checked)
+    if (s['wireframe'] !== undefined)  this.wireframeToggle.checked  = bool(s['wireframe'],  this.wireframeToggle.checked)
+    if (s['lightning'] !== undefined)  this.lightningToggle.checked  = bool(s['lightning'],  this.lightningToggle.checked)
+    if (s['crack'] !== undefined)      this.crackToggle.checked      = bool(s['crack'],      this.crackToggle.checked)
+    if (s['crystal'] !== undefined)    this.crystalToggle.checked    = bool(s['crystal'],    this.crystalToggle.checked)
+    if (s['glitch'] !== undefined)     this.glitchToggle.checked     = bool(s['glitch'],     this.glitchToggle.checked)
+    if (s['stars'] !== undefined) {
+      this.starsSlider.value = str(s['stars'], this.starsSlider.value)
+      this.starsValue.textContent = `${this.starsSlider.value}%`
+    }
+  }
+
   private applyTheme(theme: string): void {
     this.settingsDrawer.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('theme-chip--active'))
     const chip = this.settingsDrawer.querySelector<HTMLButtonElement>(`.theme-chip[data-theme="${theme}"]`)
@@ -780,6 +936,9 @@ export class App {
       document.documentElement.dataset.theme = theme
     }
     this.sphere?.setColorTheme(theme)
+    this.saveSettings()
+    // Redraw immediately so the new theme's CSS colour vars are picked up.
+    this.waveform.redraw()
   }
 
   private updateBpmDisplay(): void {
@@ -798,7 +957,7 @@ export class App {
     if (statusEl) statusEl.textContent = text
   }
 
-  private togglePlayPause(): void {
+  private async togglePlayPause(): Promise<void> {
     if (this.engine.isPlaying) {
       this.engine.pause()
       this.setPlayingState(false)
@@ -809,14 +968,20 @@ export class App {
       // Keep the silence loop running during pause so the iOS audio session
       // and lock screen controls stay visible while the track is paused.
     } else {
-      this.engine.play()
-      this.setPlayingState(true)
-      this.sphere?.start()
-      this.starOverlay.resume()
-      this._mobile.hapticPlay()
-      this._mobile.updatePlaybackState(true)
-      this._mobile.ensureSilenceLoop()
-      void this._mobile.acquireWakeLock()
+      try {
+        await this.engine.play()
+        this.setPlayingState(true)
+        this.sphere?.start()
+        this.starOverlay.resume()
+        this._mobile.hapticPlay()
+        this._mobile.updatePlaybackState(true)
+        this._mobile.ensureSilenceLoop()
+        void this._mobile.acquireWakeLock()
+      } catch {
+        // AudioContext resume failed (e.g. iOS suspended context without a
+        // user gesture). Stay in paused state so the user can tap to resume.
+        this.setPlayingState(false)
+      }
     }
   }
 

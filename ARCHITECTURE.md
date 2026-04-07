@@ -101,7 +101,9 @@ The effects chain (`src/audio/EffectsChain.ts`) sits between the playback rate n
 |:---|:---|:---|
 | 3-Band EQ | `BiquadFilterNode` × 3 | Low shelf, peaking mid, high shelf |
 | Chorus | `DelayNode` + `OscillatorNode` + `GainNode` | LFO modulates delay time for shimmer |
-| Tape Saturation | `WaveShaperNode` | Soft-clipping curve applied via `curve` buffer |
+| Tape Saturation | `WaveShaperNode` | Normalized `tanh` soft-clip curve; 4096-sample resolution (v2.1) |
+
+The saturation curve uses a normalized `tanh` transfer function (`y = tanh(k·x) / tanh(k)`) with 4096 samples, ensuring gain-unity across all drive settings and eliminating intermodulation aliasing at high drive values. Pitch shifts and Hz frequency changes use `setTargetAtTime` for click-free transitions.
 
 The chain is fully bypassable — when all effects are at neutral, the nodes are still connected but have no audible effect, avoiding the click that would occur from disconnecting and reconnecting nodes mid-playback.
 
@@ -125,7 +127,7 @@ panner.maxDistance = 1; // no volume attenuation
 Two `AnalyserNode` instances feed the waveform and spectrum visualisers:
 
 - **Waveform** (`src/ui/Waveform.ts`) — reads time-domain data via `getByteTimeDomainData()` and draws it to a `<canvas>` element on every animation frame. Supports drag-to-seek and draggable loop region handles.
-- **Spectrum Analyzer** (`src/ui/SpectrumAnalyzer.ts`) — reads frequency-domain data via `getByteFrequencyData()` with an FFT size of 2048, rendered as a bar chart on `<canvas>`. Peak energy spawns particle sparks. Updates aurora CSS variables in real time (`--aurora-bass`, `--aurora-mid`, `--aurora-treble`).
+- **Spectrum analysis** — reads frequency-domain data via `getByteFrequencyData()` with an FFT size of 2048. Peak energy updates aurora CSS variables in real time (`--aurora-bass`, `--aurora-mid`, `--aurora-treble`). This logic lives in `App.ts` (merged from `SpectrumAnalyzer.ts` in v2.1).
 
 Both run on `requestAnimationFrame` and only redraw while audio is playing.
 
@@ -190,7 +192,6 @@ src/
     ├── AnomalySphere.ts     Three.js 3D orb with simplex noise displacement + post-processing
     ├── StarOverlay.ts       Particle star field behind the orb
     ├── Waveform.ts          Time-domain canvas visualiser + loop region handles
-    ├── SpectrumAnalyzer.ts  Frequency-domain canvas visualiser + aurora variable driver
     ├── EffectsController.ts Effects panel DOM bindings
     ├── PresetController.ts  Preset selection UI + theme switching
     ├── ExportController.ts  Export button and progress

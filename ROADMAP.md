@@ -8,14 +8,14 @@
 
 ### ✦ Where Slo-Fi has been and where it's going ✦
 
-[![Current](https://img.shields.io/badge/Current-v2.0.0-A855F7.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases)
-[![Milestone](https://img.shields.io/badge/v2.0-Anomaly-06B6D4.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/milestone/2)
+[![Current](https://img.shields.io/badge/Current-v2.1.0-A855F7.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases)
+[![Milestone](https://img.shields.io/badge/v2.1-Obsidian_Studio-06B6D4.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/milestone/3)
 [![Open Issues](https://img.shields.io/github/issues/gurvinny/Slo-Fi?style=flat-square&color=A855F7&label=Open%20Issues)](https://github.com/gurvinny/Slo-Fi/issues)
 
 <p>
   <a href="#v10--complete">v1.0 — Complete</a> •
   <a href="#v20--anomaly">v2.0 — Anomaly</a> •
-  <a href="#v20--complete">v2.0 — Complete</a>
+  <a href="#v21--obsidian-studio">v2.1 — Obsidian Studio</a>
 </p>
 
 </div>
@@ -144,6 +144,55 @@ Track remaining items on the [v2.0 milestone](https://github.com/gurvinny/Slo-Fi
 ## v2.0 — Complete
 
 All 13 planned v2.0 issues shipped. The milestone is closed.
+
+<br/>
+
+---
+
+<br/>
+
+## v2.1 — Obsidian Studio
+
+A focused refinement release: a complete visual overhaul ("Obsidian Studio"), waveform compositor fix, audio engine stability hardening, effects quality improvements, and Docker self-hosting support.
+
+<br/>
+
+### Design & UI
+
+| Status | Feature | Description |
+|:---:|:---|:---|
+| ✅ | **Obsidian Studio redesign** | Near-black palette (`#020208`), 120px waveform, cinematic landing screen — orbit rings removed, mega-type title, luminous glass drop card with gradient border glow. Compact 46px header with purple-to-teal gradient wordmark. |
+| ✅ | **Refined transport** | Rounded-rectangle icon buttons, refined Controls/Effects/Playlist pills, tabular-numeral time display, increased waveform height from 96px to 120px. |
+| ✅ | **Deeper purple accent** | Accent shifted from `#9b6dff` to `#7c4dff` — cooler, deeper, more intentional use across glows, borders, and hover states. |
+| ✅ | **Drawer refinements** | Near-black panels (`rgba(3,3,12,0.97)`) with 44px backdrop blur, 14px border radius, thinner accent scrollbars. |
+
+<br/>
+
+### Bug Fixes
+
+| Status | Feature | Description |
+|:---:|:---|:---|
+| ✅ | **Waveform canvas compositor fix** | `filter:brightness(1)` on `.waveform-wrap` creates an independent GPU compositing backing store. The parent `backdrop-filter` on `.player-bottom` can no longer clear the canvas bitmap when aurora CSS vars update every animation frame. Previously the canvas disappeared on all non-Prism themes during playback. |
+| ✅ | **Audio decode error isolation** | `loadFile()` try-catch split: audio decode errors and UI/sphere init errors are reported separately. Sphere failures are non-fatal and never surface as "Could not decode this file." |
+| ✅ | **NaN guard in reverb engine** | `isFinite()` guards on all 6 audio params in `loadSettings()` prevent corrupted localStorage values from reaching `buildIR()` (which would throw `InvalidStateError` on `ctx.createBuffer(2, NaN, sr)`). |
+| ✅ | **buildIR try-catch** | `ensureContext()` now wraps the initial `buildIR()` call in a try-catch, matching the existing guard in `rebuildIR()`. |
+
+<br/>
+
+### Audio Quality
+
+| Status | Feature | Description |
+|:---:|:---|:---|
+| ✅ | **Saturation waveshaper resolution** | WaveShaper curve increased from 256 to 4096 samples, eliminating intermodulation aliasing at high drive settings. |
+| ✅ | **Click-free pitch and Hz transitions** | `setPitch()` and `setHzFrequency()` use `setTargetAtTime` instead of direct `.value` assignment, removing audible clicks when parameters change during playback. |
+
+<br/>
+
+### Infrastructure
+
+| Status | Feature | Description |
+|:---:|:---|:---|
+| ✅ | **Docker containerization** | `Dockerfile` (multi-stage Node build → nginx), `docker-compose.yml`, `nginx.conf` with immutable-asset and no-cache `sw.js` headers, `.dockerignore`. Run the full production build with `docker compose up -d`. |
 
 <br/>
 

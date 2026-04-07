@@ -196,6 +196,7 @@ body::after {
   inset: 0;
   z-index: 1;  /* above page bg, below aurora (z-2) and UI (z-50+) */
   pointer-events: none;
+  will-change: transform;  /* own compositing layer — prevents compositor disruption when aurora filter activates on preset selection */
 }
 
 /* Three.js canvas fills the container */
@@ -619,6 +620,12 @@ body.is-playing #iconPause    { opacity: 1; }
   border: none;
   border-bottom: 1px solid var(--glass-border);
   border-radius: 0;
+  /* CSS filter creates an independent compositing backing store for this
+     element and all its children (including the canvas). The parent
+     backdrop-filter on .player-bottom stops sampling at this boundary, so
+     aurora-driven compositor repaints never clear the canvas bitmap.
+     brightness(1) is a visual no-op — zero effect on rendered appearance. */
+  filter: brightness(1);
 }
 
 /* Transport row: time | buttons | right-side controls */
@@ -2522,5 +2529,731 @@ body.is-paused .site-footer {
   background: rgba(155, 109, 255, 0.10);
   color: var(--accent, #9b6dff);
   white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OBSIDIAN STUDIO — Visual Redesign
+   All rules in this section override earlier declarations in the cascade.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Design token overrides ──────────────────────────────────────────────── */
+:root {
+  --bg:            #020208;
+  --surface:       #07070f;
+  --surface-2:     #0c0c18;
+  --surface-3:     #111120;
+  --border:        #181828;
+  --border-2:      #202033;
+  --text:          #d6d6ee;
+  --text-dim:      #74748e;
+  --text-muted:    #36364a;
+  --accent:        #7c4dff;
+  --accent-dim:    rgba(124, 77, 255, 0.18);
+  --accent-glow:   rgba(124, 77, 255, 0.38);
+  --accent-bright: #a37bff;
+  --teal:          #00c9a0;
+  --teal-dim:      rgba(0, 201, 160, 0.15);
+  --accent-subtle: rgba(124, 77, 255, 0.22);
+  --accent-faint:  rgba(124, 77, 255, 0.10);
+  --glass-bg:      rgba(7, 7, 18, 0.68);
+  --glass-blur:    28px;
+  --radius:        12px;
+  --radius-sm:     7px;
+  --btn-glass-bg:  rgba(8, 8, 20, 0.50);
+  --btn-glass-border: rgba(255, 255, 255, 0.07);
+  --btn-glass-edge:   rgba(255, 255, 255, 0.11);
+}
+
+/* ── Header — compact monogram bar ──────────────────────────────────────── */
+.header {
+  background: rgba(2, 2, 8, 0.95);
+  border-bottom: 1px solid rgba(124, 77, 255, 0.07);
+}
+
+.header-inner {
+  padding: 10px 24px;
+}
+
+.logo-icon {
+  color: var(--accent);
+  filter: drop-shadow(0 0 10px var(--accent-glow));
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  background: linear-gradient(130deg, #c8a8ff 0%, var(--accent-bright) 40%, var(--teal) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent; /* fallback */
+}
+
+.tagline {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Header is ~46px tall — fix dependent fixed panels */
+.dropzone  { top: 46px; }
+.player-top { top: 46px; }
+
+/* ── Landing page — cinematic hero ───────────────────────────────────────── */
+
+/* Kill the orbit rings — they date the design */
+.landing-rings {
+  display: none;
+}
+
+/* Scan line: slimmer, more subtle */
+.landing-scan-line {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(124, 77, 255, 0.55) 30%,
+    rgba(0, 201, 160, 0.65) 70%,
+    transparent 100%);
+  opacity: 0.5;
+}
+
+/* Hero stack: tighter */
+.landing-hero {
+  gap: 28px;
+  max-width: 560px;
+}
+
+/* MEGA title — confident, massive */
+.landing-logo-text {
+  font-size: clamp(88px, 14vw, 152px);
+  font-weight: 900;
+  letter-spacing: -6px;
+  line-height: 0.88;
+  margin-bottom: 16px;
+  background: linear-gradient(
+    150deg,
+    #ffffff        0%,
+    var(--accent-bright) 30%,
+    var(--teal)    65%,
+    #ffffff       100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 7s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (max-width: 600px) {
+  .landing-logo-text {
+    font-size: 58px;
+    letter-spacing: -2px;
+    margin-bottom: 10px;
+  }
+}
+
+.landing-tagline {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+/* Feature badge pills — cleaner, minimal */
+.landing-badge {
+  padding: 5px 16px;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  background: rgba(124, 77, 255, 0.06);
+  border: 1px solid rgba(124, 77, 255, 0.16);
+  border-radius: 100px;
+  color: var(--text-dim);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  gap: 8px;
+}
+
+/* Drop zone card — luminous glass slab, no dashes */
+.dropzone-content {
+  padding: 52px 52px;
+  border: 1px solid rgba(124, 77, 255, 0.18);
+  border-radius: 20px;
+  background: rgba(8, 8, 22, 0.75);
+  backdrop-filter: blur(36px);
+  -webkit-backdrop-filter: blur(36px);
+  box-shadow:
+    0 0 0 1px rgba(124, 77, 255, 0.05),
+    0 32px 100px rgba(0, 0, 0, 0.60),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.25s, box-shadow 0.25s;
+  min-width: 300px;
+}
+
+.dropzone:hover .dropzone-content,
+.dropzone:focus-visible .dropzone-content {
+  border-color: rgba(124, 77, 255, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(124, 77, 255, 0.12),
+    0 0 50px rgba(124, 77, 255, 0.12),
+    0 32px 100px rgba(0, 0, 0, 0.60),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.dropzone.drag-over .dropzone-content {
+  border-color: var(--accent);
+  background: rgba(124, 77, 255, 0.10);
+  box-shadow:
+    0 0 0 2px rgba(124, 77, 255, 0.28),
+    0 0 70px rgba(124, 77, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.dropzone-icon {
+  color: var(--accent);
+  opacity: 0.70;
+}
+
+.dropzone:hover .dropzone-icon,
+.dropzone.drag-over .dropzone-icon {
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.dropzone-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.dropzone-hint {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+
+/* ── Player top bar — elevated track info ────────────────────────────────── */
+.player-top {
+  background: rgba(2, 2, 8, 0.96);
+  backdrop-filter: blur(44px);
+  -webkit-backdrop-filter: blur(44px);
+  border-bottom: 1px solid rgba(124, 77, 255, calc(0.05 + var(--ui-bass, 0) * 0.48));
+  box-shadow: 0 2px 28px rgba(124, 77, 255, calc(var(--ui-bass, 0) * 0.14));
+  padding: 10px 24px;
+  gap: 20px;
+}
+
+.track-info {
+  max-width: 260px;
+}
+
+.track-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.track-bpm {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.track-meta {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+/* Preset cards — flatter, more tab-like */
+.preset-card {
+  min-width: 82px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-top-color: rgba(255, 255, 255, 0.06);
+  gap: 3px;
+}
+
+.preset-card::before {
+  height: 2px;
+  top: 0;
+  border-radius: 0;
+}
+
+.preset-card:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
+.preset-card--active {
+  background: rgba(124, 77, 255, 0.12);
+  border-color: rgba(124, 77, 255, 0.32);
+  border-top-color: var(--accent);
+  box-shadow: 0 0 20px rgba(124, 77, 255, 0.12);
+}
+
+.preset-card-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.preset-card-hint {
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Player bottom — waveform + transport ────────────────────────────────── */
+.player-bottom {
+  background: rgba(2, 2, 8, 0.97);
+  backdrop-filter: blur(44px);
+  -webkit-backdrop-filter: blur(44px);
+  border-top: 1px solid rgba(124, 77, 255, calc(0.05 + var(--ui-bass, 0) * 0.48));
+  box-shadow:
+    0 -6px 48px rgba(0, 0, 0, 0.55),
+    0 -1px 0 rgba(124, 77, 255, calc(var(--ui-bass, 0) * 0.20));
+}
+
+/* Taller, more prominent waveform */
+.waveform {
+  height: 120px;
+}
+
+@media (max-width: 480px) {
+  .waveform { height: 68px; }
+}
+
+@media (min-width: 601px) and (max-width: 768px) {
+  .waveform { height: 88px; }
+}
+
+/* Transport row — more breathing room */
+.transport-row {
+  padding: 10px 24px;
+  gap: 16px;
+}
+
+/* Time display — tabular numerals, cleaner */
+.time-current,
+.time-total {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  min-width: 38px;
+}
+
+/* Transport buttons — slightly more spaced */
+.transport {
+  gap: 14px;
+}
+
+/* Play button — bigger glow */
+.btn-play {
+  width: 60px;
+  height: 60px;
+}
+
+@media (max-width: 600px) {
+  .btn-play { width: 52px; height: 52px; }
+}
+
+/* Icon buttons — rounded rectangle style */
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: none;
+}
+
+.btn-icon:hover {
+  background: rgba(124, 77, 255, 0.08);
+  border-color: rgba(124, 77, 255, 0.28);
+  color: var(--accent-bright);
+  transform: none;
+  box-shadow: 0 0 14px rgba(124, 77, 255, 0.12);
+}
+
+.btn-icon:active {
+  transform: scale(0.93);
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Transport-right buttons — pill style */
+.transport-right {
+  gap: 5px;
+}
+
+.btn-controls-show {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-dim);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.btn-controls-show:hover {
+  background: rgba(124, 77, 255, 0.09);
+  border-color: rgba(124, 77, 255, 0.32);
+  color: var(--accent-bright);
+  box-shadow: 0 0 12px rgba(124, 77, 255, 0.10);
+}
+
+.btn-settings-show {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.btn-settings-show:hover,
+.btn-settings-show--active {
+  background: rgba(0, 201, 160, 0.09);
+  border-color: rgba(0, 201, 160, 0.36);
+  color: var(--teal);
+  box-shadow: 0 0 12px rgba(0, 201, 160, 0.10);
+}
+
+/* ── Control drawers — refined dark panels ───────────────────────────────── */
+.controls-drawer {
+  background: rgba(3, 3, 12, 0.97);
+  backdrop-filter: blur(44px);
+  -webkit-backdrop-filter: blur(44px);
+  border: 1px solid rgba(124, 77, 255, 0.18);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(124, 77, 255, 0.05),
+    0 28px 90px rgba(0, 0, 0, 0.80);
+  /* Updated bottom offset: waveform 120px + transport ~64px + gap */
+  bottom: 190px;
+}
+
+.settings-drawer {
+  background: rgba(3, 3, 12, 0.97);
+  backdrop-filter: blur(44px);
+  -webkit-backdrop-filter: blur(44px);
+  border: 1px solid rgba(0, 201, 160, 0.18);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(0, 201, 160, 0.05),
+    0 28px 90px rgba(0, 0, 0, 0.80);
+  bottom: 190px;
+}
+
+@media (max-width: 600px) {
+  .controls-drawer,
+  .settings-drawer {
+    bottom: calc(190px + env(safe-area-inset-bottom));
+    border-radius: 14px 14px 0 0;
+  }
+}
+
+.controls-drawer-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  color: var(--text-muted);
+}
+
+.controls-drawer-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.controls-drawer-btn:hover {
+  border-color: rgba(124, 77, 255, 0.35);
+  color: var(--accent-bright);
+  background: rgba(124, 77, 255, 0.08);
+}
+
+/* Control groups inside drawers — more padding */
+.control-group {
+  padding: 13px 18px;
+}
+
+.control-header label {
+  font-size: 10px;
+  letter-spacing: 0.11em;
+}
+
+/* Sliders — cleaner track */
+.slider {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.slider::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+}
+
+.slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+}
+
+/* Value badges */
+.value-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ── Stop/Rewind hover — updated colors ──────────────────────────────────── */
+#stopBtn:hover {
+  background: rgba(0, 201, 160, 0.08);
+  color: var(--teal);
+  border-color: rgba(0, 201, 160, 0.28);
+  box-shadow: 0 0 12px rgba(0, 201, 160, 0.10);
+}
+
+#rewindBtn:hover {
+  background: rgba(124, 77, 255, 0.08);
+  color: var(--accent-bright);
+  border-color: rgba(124, 77, 255, 0.28);
+  box-shadow: 0 0 12px rgba(124, 77, 255, 0.10);
+}
+
+#rewindBtn:active {
+  transform: scale(0.93) rotate(-12deg);
+}
+
+/* Loop button active state */
+.btn-loop--active {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  background: rgba(124, 77, 255, 0.10);
+  box-shadow:
+    inset 0 1px 6px rgba(124, 77, 255, 0.18),
+    0 0 16px rgba(124, 77, 255, 0.18);
+  filter: none;
+}
+
+.btn-loop--active:hover {
+  background: rgba(124, 77, 255, 0.15);
+  filter: none;
+}
+
+/* Export button */
+.btn-export {
+  color: var(--teal);
+  border-color: rgba(0, 201, 160, 0.18);
+  box-shadow: none;
+}
+
+.btn-export:hover {
+  background: rgba(0, 201, 160, 0.07);
+  color: var(--teal);
+  border-color: rgba(0, 201, 160, 0.40);
+  box-shadow: 0 0 16px rgba(0, 201, 160, 0.14);
+  filter: none;
+  transform: none;
+}
+
+/* ── Settings drawer internals ───────────────────────────────────────────── */
+.controls-section-header {
+  background: transparent;
+  padding: 10px 18px;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+}
+
+.controls-section-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+}
+
+.settings-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.settings-themes {
+  padding: 14px 18px 12px;
+}
+
+/* Theme chips */
+.theme-chip {
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.theme-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.theme-chip--active {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: rgba(0, 201, 160, 0.08);
+}
+
+/* Toggle switch */
+.toggle-input:checked + .toggle-track {
+  background: rgba(0, 201, 160, 0.20);
+  border-color: var(--teal);
+}
+
+.toggle-input:checked + .toggle-track::after {
+  background: var(--teal);
+}
+
+.toggle-label {
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+}
+
+/* Hz buttons */
+.btn-hz {
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 10px;
+}
+
+/* ── Paused-state dim — less harsh ───────────────────────────────────────── */
+body.is-paused .player-top,
+body.is-paused .player-bottom {
+  opacity: 0.70;
+}
+
+/* ── Playlist ─────────────────────────────────────────────────────────────── */
+.playlist-item {
+  padding: 9px 18px;
+  border-bottom-color: rgba(124, 77, 255, 0.06);
+}
+
+.playlist-item:hover {
+  background: rgba(124, 77, 255, 0.05);
+}
+
+.playlist-item[aria-current="true"] {
+  background: rgba(124, 77, 255, 0.09);
+  border-left-color: var(--accent);
+}
+
+.playlist-item-name {
+  font-size: 0.80rem;
+}
+
+.playlist-footer {
+  padding: 10px 18px 14px;
+  border-top-color: rgba(124, 77, 255, 0.07);
+}
+
+.btn-playlist-add {
+  background: rgba(124, 77, 255, 0.08);
+  border-color: rgba(124, 77, 255, 0.20);
+  border-radius: 8px;
+  color: var(--accent-bright);
+}
+
+.btn-playlist-add:hover {
+  background: rgba(124, 77, 255, 0.15);
+}
+
+/* ── Scrollbars — thinner ────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 77, 255, 0.22);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 77, 255, 0.42);
+}
+
+/* ── Site footer link ────────────────────────────────────────────────────── */
+.footer-link {
+  border-radius: 100px;
+  font-size: 10.5px;
+  background: rgba(7, 7, 18, 0.75);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.footer-link:hover {
+  border-color: rgba(124, 77, 255, 0.28);
+  color: var(--accent-bright);
+  box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.08);
+}
+
+/* ── Help button ─────────────────────────────────────────────────────────── */
+.btn-help {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: none;
+}
+
+/* ── Help modal ──────────────────────────────────────────────────────────── */
+#help-modal {
+  background: rgba(3, 3, 12, 0.98);
+  border-color: rgba(124, 77, 255, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.08), 0 24px 80px rgba(0, 0, 0, 0.85);
+}
+
+.help-modal-header {
+  border-bottom-color: rgba(124, 77, 255, 0.12);
+}
+
+.help-modal-title {
+  color: var(--accent-bright);
+  font-size: 0.85rem;
+}
+
+.shortcut-row dt kbd {
+  border-color: rgba(124, 77, 255, 0.30);
+  background: rgba(124, 77, 255, 0.08);
+  color: var(--accent-bright);
+  border-radius: 6px;
+}
+
+/* ── Aurora: slightly richer for the darker bg ───────────────────────────── */
+body::before {
+  opacity: 0.85;
+}
+
+body::after {
+  opacity: 0.80;
+}
+
+/* ── Page loader: accent sync ────────────────────────────────────────────── */
+#page-loader {
+  background: #020208;
+}
+
+.page-loader-icon {
+  color: #7c4dff;
+  filter: drop-shadow(0 0 12px rgba(124, 77, 255, 0.55));
 }
 

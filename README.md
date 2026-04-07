@@ -16,8 +16,8 @@
 
 <br/>
 
-[![Milestone](https://img.shields.io/badge/v2.0-Anomaly-06B6D4.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/milestone/2)
-[![Version](https://img.shields.io/badge/Version-2.0.0-A855F7.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/releases)
+[![Milestone](https://img.shields.io/badge/v2.1-Obsidian_Studio-06B6D4.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/milestone/3)
+[![Version](https://img.shields.io/badge/Version-2.1.0-A855F7.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/releases)
 [![License](https://img.shields.io/badge/License-MIT-A855F7.svg?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.x-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -76,6 +76,18 @@ Six color themes change the entire palette at once — **Prism** (hue shifts wit
 ---
 
 <br/>
+
+## ✦ Obsidian Studio
+
+v2.1 is a visual and stability refinement built on Anomaly's foundation.
+
+**Obsidian Studio** strips the interface back to its essentials — a near-black canvas, a cinematic landing screen, and a larger, more tactile waveform. The orbit rings are gone. The drop card glows. The header is leaner. Every surface is darker and more intentional.
+
+Under the hood, v2.1 resolves a persistent compositor bug that caused the waveform canvas to disappear on non-Prism themes during playback, isolates audio decode errors from UI failures, hardens the reverb engine against malformed settings, and ships the app in a Docker container for reproducible self-hosting.
+
+> *Dark. Focused. Yours.*
+
+---
 
 ## ✦ Anomaly
 
@@ -228,6 +240,19 @@ Open `http://localhost:5173`, drop a track, and the orb comes to life.
 ```bash
 npm run build    # production build
 npm run preview  # preview the build locally
+```
+
+### Run with Docker
+
+```bash
+docker compose up -d
+```
+
+Builds the production bundle and serves it via nginx. No Node.js installation required on the host.
+
+```bash
+docker compose down          # stop
+docker compose build --no-cache && docker compose up -d  # rebuild from scratch
 ```
 
 ### How to use it

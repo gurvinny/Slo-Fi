@@ -67,10 +67,16 @@
         <circle cx="14" cy="14" r="2" fill="currentColor"/>
       </svg>
     </div>
-    <div id="app">
 
-      <!-- Full-page orb canvas — fixed behind all UI, fades to transparent at edges -->
-      <div id="anomaly" class="anomaly-bg" aria-hidden="true"></div>
+    <!-- Full-page orb canvas — direct child of body so it shares the same stacking
+         context as body::before/::after (the aurora). Keeping it inside #app put it
+         inside #app's stacking context; when the aurora filter activates on preset
+         selection Chrome would flatten the WebGL compositing layer into #app's group,
+         causing the orb to disappear. At body level the WebGL layer is a peer of the
+         aurora layers and the compositor handles them independently. -->
+    <div id="anomaly" class="anomaly-bg" aria-hidden="true"></div>
+
+    <div id="app">
 
       <!-- Header: minimal fixed top bar -->
       <header class="header">

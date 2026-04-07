@@ -180,7 +180,9 @@ export class EffectsChain {
     if (hz === null) {
       this.hzFilter.gain.setTargetAtTime(0, t, 0.01)
     } else {
-      this.hzFilter.frequency.value = hz
+      // Smooth the frequency transition too — an instantaneous jump on a
+      // peaking filter causes an audible click when switching Hz presets.
+      this.hzFilter.frequency.setTargetAtTime(hz, t, 0.02)
       this.hzFilter.gain.setTargetAtTime(4, t, 0.01)
     }
   }
@@ -195,10 +197,12 @@ export class EffectsChain {
   //
   // Normalization: y = tanh(k*x) / tanh(k) guarantees that x=±1 always
   // maps to y=±1, so there is zero gain change — only waveform shaping.
-  // The old formula violated this, amplifying quiet signals and crushing
-  // loud ones regardless of the drive setting.
+  //
+  // 4096 samples (vs the previous 256) eliminates aliasing artifacts at high
+  // drive settings — WaveShaperNode interpolates between samples, so a coarse
+  // curve introduces intermodulation distortion on high-frequency content.
   private buildSatCurve(drive: number): Float32Array<ArrayBuffer> {
-    const n = 256
+    const n = 4096
     const curve: Float32Array<ArrayBuffer> = new Float32Array(n)
     // k from ~0 (linear) to 6 (noticeable but never harsh saturation)
     const k    = drive * 6 + 0.001

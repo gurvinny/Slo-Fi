@@ -1,86 +1,158 @@
-/* ── Design tokens ─────────────────────────────────────────────────────── */
-:root {
-  --bg: #080810;
-  --surface: #0f0f1a;
-  --surface-2: #141424;
-  --surface-3: #1a1a2e;
-  --border: #1e1e32;
-  --border-2: #28283d;
+/* ── Tailwind v4 — Vite-native, zero PostCSS config ────────────────────── */
+@import "tailwindcss";
 
-  --text: #e2e2f0;
-  --text-dim: #8888a8;
-  --text-muted: #44445a;
+/* ── Design tokens → Tailwind theme ────────────────────────────────────── */
+/* All @theme variables become both CSS custom props AND Tailwind utilities:
+   e.g. --color-accent → `bg-accent`, `text-accent`, `border-accent` etc.
+   Dynamic JS-updated vars (--aurora-bass, --ui-bass) stay in @layer base. */
+@theme {
+  --color-bg:           #080810;
+  --color-surface:      #0f0f1a;
+  --color-surface-2:    #141424;
+  --color-surface-3:    #1a1a2e;
+  --color-border:       #1e1e32;
+  --color-border-2:     #28283d;
 
-  --accent: #9b6dff;
-  --accent-dim: rgba(155, 109, 255, 0.18);
-  --accent-glow: rgba(155, 109, 255, 0.35);
-  --accent-bright: #b48aff;
+  --color-text:         #e2e2f0;
+  --color-text-dim:     #8888a8;
+  --color-text-muted:   #44445a;
 
-  --teal: #00d4aa;
-  --teal-dim: rgba(0, 212, 170, 0.15);
+  --color-accent:       #9b6dff;
+  --color-accent-bright:#b48aff;
+  --color-teal:         #00d4aa;
+  --color-error:        #ff5f7e;
 
-  --error-color: #ff5f7e;
+  --color-green:        #4ade80;
+  --color-orange:       #fb923c;
+  --color-red:          #f87171;
+  --color-purple:       #a78bfa;
+  --color-indigo:       #818cf8;
 
-  --radius: 10px;
-  --radius-sm: 6px;
-
-  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-
-  /* Glass design tokens */
-  --glass-bg: rgba(12, 12, 22, 0.55);
-  --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-blur: 24px;
-  /* glass-glow uses var(--accent-dim) so it auto-updates with themes */
-  --glass-glow: 0 0 0 1px var(--accent-dim), 0 8px 32px rgba(0, 0, 0, 0.4);
-
-  /* Derived accent tokens for borders/shadows — override these per theme */
-  --accent-subtle: rgba(155, 109, 255, 0.22);
-  --accent-faint:  rgba(155, 109, 255, 0.10);
-
-  /* Aurora hue-shift per theme — applied as filter on the aurora layers */
-  --aurora-filter: none;
-
-  /* Button glass tokens */
-  --btn-glass-bg:         rgba(10, 10, 15, 0.40);
-  --btn-glass-border:     rgba(255, 255, 255, 0.09);
-  --btn-glass-edge:       rgba(255, 255, 255, 0.13);
-  --btn-glass-blur:       16px;
-  --btn-tilt-perspective: 300px;
+  --font-mono:          'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --radius:             10px;
+  --radius-sm:          6px;
 }
 
-/* ── Reset ─────────────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Base styles ────────────────────────────────────────────────────────── */
+/* Tailwind preflight handles the box-sizing reset. We add app-specific base. */
+@layer base {
+  :root {
+    /* Semantic aliases kept as CSS vars — referenced throughout the stylesheet */
+    --bg: #080810;
+    --surface: #0f0f1a;
+    --surface-2: #141424;
+    --surface-3: #1a1a2e;
+    --border: #1e1e32;
+    --border-2: #28283d;
+    --text: #e2e2f0;
+    --text-dim: #8888a8;
+    --text-muted: #44445a;
+    --accent: #9b6dff;
+    --accent-dim: rgba(155, 109, 255, 0.18);
+    --accent-glow: rgba(155, 109, 255, 0.35);
+    --accent-bright: #b48aff;
+    --teal: #00d4aa;
+    --teal-dim: rgba(0, 212, 170, 0.15);
+    --error-color: #ff5f7e;
+    --glass-bg: rgba(12, 12, 22, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.07);
+    --glass-blur: 24px;
+    --glass-glow: 0 0 0 1px var(--accent-dim), 0 8px 32px rgba(0, 0, 0, 0.4);
+    --accent-subtle: rgba(155, 109, 255, 0.22);
+    --accent-faint:  rgba(155, 109, 255, 0.10);
+    --aurora-filter: none;
+    --btn-glass-bg:         rgba(10, 10, 15, 0.40);
+    --btn-glass-border:     rgba(255, 255, 255, 0.09);
+    --btn-glass-edge:       rgba(255, 255, 255, 0.13);
+    --btn-glass-blur:       16px;
+    --btn-tilt-perspective: 300px;
+    /* JS-driven reactive values — updated each RAF frame by AnomalySphere */
+    --aurora-bass:   0;
+    --aurora-mid:    0;
+    --aurora-treble: 0;
+    --ui-bass:    0;
+    --ui-treble:  0;
+  }
 
-html {
-  height: 100%;
-  scroll-behavior: smooth;
-  overscroll-behavior: none;
+  html {
+    height: 100%;
+    scroll-behavior: smooth;
+    overscroll-behavior: none;
+  }
+
+  body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
 }
 
-body {
-  min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
-  overscroll-behavior: none;
+/* ── Component utilities ────────────────────────────────────────────────── */
+/* Reusable Tailwind component classes. Use these with @apply in Tailwind HTML
+   or as standalone classes. Complex CSS-var patterns that can't be pure utilities
+   stay here; simple ones become @apply chains. */
+@layer components {
+  /* Glassmorphism panel — base glass surface used by drawers, modals, cards */
+  .glass {
+    @apply backdrop-blur-xl border border-white/[0.07];
+    background: var(--glass-bg);
+    box-shadow: var(--glass-glow);
+  }
+
+  /* Dark glass for player bars (player-top, player-bottom, header) */
+  .glass-dark {
+    backdrop-filter: blur(44px);
+    -webkit-backdrop-filter: blur(44px);
+    background: rgba(2, 2, 8, 0.97);
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* Accent glass panel — used for controls/settings drawers */
+  .glass-accent {
+    @apply backdrop-blur-[44px] border;
+    background: rgba(3, 3, 12, 0.97);
+    border-color: rgba(124, 77, 255, 0.18);
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.05), 0 28px 90px rgba(0, 0, 0, 0.80);
+  }
+
+  /* Teal glass panel — used for settings drawer */
+  .glass-teal {
+    @apply backdrop-blur-[44px] border;
+    background: rgba(3, 3, 12, 0.97);
+    border-color: rgba(0, 201, 160, 0.18);
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px rgba(0, 201, 160, 0.05), 0 28px 90px rgba(0, 0, 0, 0.80);
+  }
+
+  /* Pill / icon button base */
+  .btn-base {
+    @apply inline-flex items-center justify-center
+           rounded-[10px] border border-white/[0.07]
+           bg-white/[0.025] text-[var(--text-dim)]
+           transition-colors duration-150
+           cursor-pointer select-none
+           hover:bg-accent/10 hover:border-accent/30 hover:text-[var(--accent-bright)];
+  }
+
+  /* Screen-reader only — kept here for @apply compatibility */
+  .sr-only {
+    @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
 }
 
 /* Aurora gradient background - animated color blobs behind the glass UI.
    CSS variables --aurora-bass, --aurora-mid, --aurora-treble are updated
-   by SpectrumAnalyzer each frame so the aurora reacts to the live audio. */
-:root {
-  --aurora-bass:   0;
-  --aurora-mid:    0;
-  --aurora-treble: 0;
-  /* Fast-attack beat-pulse values — drive snappy UI reactivity */
-  --ui-bass:    0;
-  --ui-treble:  0;
-}
-
+   by AnomalySphere each frame so the aurora reacts to the live audio.
+   Initial values are set in @layer base :root block above. */
 body::before {
   content: '';
   position: fixed;
@@ -185,7 +257,7 @@ body::after {
 #app {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  min-height: 100svh;
 }
 
 /* ── Full-page orb canvas ────────────────────────────────────────────────── */
@@ -196,7 +268,13 @@ body::after {
   inset: 0;
   z-index: 1;  /* above page bg, below aurora (z-2) and UI (z-50+) */
   pointer-events: none;
-  will-change: transform;  /* own compositing layer — prevents compositor disruption when aurora filter activates on preset selection */
+  /* isolation:isolate creates a stacking context WITHOUT promoting a GPU texture
+     layer. Using will-change:transform here caused Chrome's Skia compositor to
+     re-sample every backdrop-filter element above on each WebGL frame swap,
+     producing a one-frame stale-capture flash ("screen glitch") on Chrome macOS.
+     transform:translateZ(0) retains the GPU layer hint without that side-effect. */
+  isolation: isolate;
+  transform: translateZ(0);
 }
 
 /* Three.js canvas fills the container */
@@ -257,7 +335,7 @@ body::after {
 /* ── Main ───────────────────────────────────────────────────────────────── */
 .main {
   position: relative;
-  min-height: 100vh;
+  min-height: 100svh;
 }
 
 /* ── Drop zone — full-page overlay before a file is loaded ──────────────── */
@@ -1117,7 +1195,7 @@ body.is-paused .btn-play {
     width: auto;
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 175px;
-    max-height: calc(100vh - 280px);
+    max-height: calc(100svh - 280px);
   }
 
   /* Two-row transport layout so Controls and Effects buttons are never hidden.
@@ -1795,7 +1873,7 @@ body.is-paused .site-footer {
   border: 1px solid var(--accent-subtle);
   border-radius: var(--radius);
   box-shadow: 0 0 0 1px var(--accent-faint), 0 20px 60px rgba(0, 0, 0, 0.65);
-  max-height: calc(100vh - 310px);
+  max-height: calc(100dvh - 310px);
   overflow-y: auto;
 }
 
@@ -1812,7 +1890,7 @@ body.is-paused .site-footer {
   border: 1px solid rgba(0, 212, 170, 0.20);
   border-radius: var(--radius);
   box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.08), 0 20px 60px rgba(0, 0, 0, 0.65);
-  max-height: calc(100vh - 310px);
+  max-height: calc(100dvh - 310px);
   overflow-y: auto;
 }
 
@@ -2314,8 +2392,8 @@ body.is-paused .site-footer {
 /* ── Fullscreen layout fill ─────────────────────────────────────────────── */
 :fullscreen #app,
 :-webkit-full-screen #app {
-  width: 100vw;
-  height: 100vh;
+  width: 100dvw;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -2344,7 +2422,7 @@ body.is-paused .site-footer {
   padding: 4px 0;
   margin: 0;
   overflow-y: auto;
-  max-height: calc(100vh - 180px);
+  max-height: calc(100dvh - 180px);
 }
 .playlist-item {
   display: flex;
@@ -2456,7 +2534,7 @@ body.is-paused .site-footer {
   color: var(--text, rgba(240, 240, 255, 0.92));
   padding: 0;
   max-width: 460px;
-  width: calc(100vw - 40px);
+  width: calc(100dvw - 40px);
   box-shadow: 0 0 0 1px rgba(155, 109, 255, 0.12), 0 20px 60px rgba(0, 0, 0, 0.75);
 }
 #help-modal::backdrop {

@@ -33,6 +33,9 @@ export class App {
   private effects: EffectsController
   private exporter: ExportController
   private _mobile!: MobileController
+
+  private _isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  private _auroraFrameN = 0
   // Core DOM refs
   private dropzone = document.getElementById('dropzone')!
   private fileInput = document.getElementById('fileInput') as HTMLInputElement
@@ -744,12 +747,17 @@ export class App {
           this.engine.analyserNode,
         )
         this.sphere.onEnergyUpdate = (bass, mid, treble, uiBass, uiTreble) => {
-          const root = document.documentElement.style
-          root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
-          root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
-          root.setProperty('--aurora-treble', String(treble.toFixed(3)))
-          root.setProperty('--ui-bass',       String(uiBass.toFixed(3)))
-          root.setProperty('--ui-treble',     String(uiTreble.toFixed(3)))
+          // On mobile, aurora vars trigger full style-recalc + compositor repaint on every
+          // backdrop-filter layer (6+). Throttle to every 3rd frame to cut repaint pressure
+          // from 60/s → 20/s — the primary fix for iOS OOM crashes during long playback.
+          if (!this._isMobile || ++this._auroraFrameN % 3 === 0) {
+            const root = document.documentElement.style
+            root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
+            root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
+            root.setProperty('--aurora-treble', String(treble.toFixed(3)))
+            root.setProperty('--ui-bass',       String(uiBass.toFixed(3)))
+            root.setProperty('--ui-treble',     String(uiTreble.toFixed(3)))
+          }
           this.starOverlay.setTreble(treble)
         }
         // Sync slider/toggle defaults to sphere immediately after construction so the

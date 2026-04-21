@@ -21,8 +21,7 @@ import {
   Color,
   Vector2,
   Vector3,
-  IcosahedronGeometry,
-  ShaderMaterial,
+  RawShaderMaterial,  // OGL-style: no Three.js built-in injection; we declare all uniforms/attributes
   BufferGeometry,
   BufferAttribute,
   Texture,
@@ -92,7 +91,19 @@ float snoise(vec3 v){
 // Four displacement layers + idle breath. uSpeed warps time so slow playback
 // makes the surface deform more languidly with bigger bulges.
 const VERTEX_SHADER = /* glsl */`
+precision highp float;
+precision highp int;
+
 ${GLSL_NOISE}
+
+// Three.js built-ins — must be declared manually with RawShaderMaterial
+attribute vec3 position;
+attribute vec3 normal;
+
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+uniform mat4 modelMatrix;
+uniform mat3 normalMatrix;
 
 uniform float uTime;
 uniform float uBass;
@@ -139,19 +150,26 @@ void main() {
 // Color uniforms rotate each frame so the palette cycles with the beat.
 // uReverb adds iridescent wash — high reverb makes the orb look wet and blurry.
 const FRAGMENT_SHADER = /* glsl */`
+precision highp float;
+precision highp int;
+
 ${GLSL_NOISE}
+
+// cameraPosition must be declared manually with RawShaderMaterial
+uniform vec3 cameraPosition;
 
 uniform float uBass;
 uniform float uMid;
 uniform float uTreble;
 uniform float uTime;
-uniform float uReverb;  // 0-1 — higher = more iridescent / glowy wash
-uniform float uCrack;   // 0-1 — fracture vein intensity, peaks on hard bass
-uniform float uCrystal; // 0-1 — crystallization, lerps toward 1 when paused
-uniform vec3  uColorA;  // hue 0   — cycles each frame
-uniform vec3  uColorB;  // hue +0.28 offset
-uniform vec3  uColorC;  // hue +0.55 offset
-uniform vec3  uColorD;  // hue +0.14 offset (bass warmth)
+uniform float uReverb;    // 0-1 — higher = more iridescent / glowy wash
+uniform float uCrack;     // 0-1 — fracture vein intensity, peaks on hard bass
+uniform float uCrystal;   // 0-1 — crystallization, lerps toward 1 when paused
+uniform float uWireframe; // 1.0 = wireframe mode — flat bright lines, no surface shading
+uniform vec3  uColorA;    // hue 0   — cycles each frame
+uniform vec3  uColorB;    // hue +0.28 offset
+uniform vec3  uColorC;    // hue +0.55 offset
+uniform vec3  uColorD;    // hue +0.14 offset (bass warmth)
 
 varying vec3  vNormal;
 varying vec3  vWorldPos;
@@ -184,7 +202,11 @@ void main() {
   // Equatorial mid-band mixes in proportionally to mid energy
   color = mix(color, colorEq, midBand * (0.35 + uMid * 0.65));
 
-  float dispBright = 0.12 + clamp(vDisp * 1.9, 0.0, 1.0) * 0.55;
+  // In wireframe mode blend toward a flat high brightness so all edges glow
+  // uniformly — the surface shading model (low base at 0.12) makes undisplaced
+  // lines near-invisible and creates a patchy, uneven look on the mesh.
+  float dispBrightSolid = 0.12 + clamp(vDisp * 1.9, 0.0, 1.0) * 0.55;
+  float dispBright = mix(dispBrightSolid, 0.68 + clamp(vDisp * 0.5, 0.0, 1.0) * 0.22, uWireframe);
 
   // Subtle iridescent shimmer — kept light so it doesn't hide the palette colors
   float iridHue  = fract(nDotV * 0.40 + vDisp * 0.30 + uTime * 0.035 + uBass * 0.25);
@@ -220,8 +242,11 @@ void main() {
     color += fresnel * iceColor * uCrystal * 0.55;
   }
 
-  // Reverb also slightly increases alpha — more verb = more ethereal opacity
-  float alpha = 0.40 + fresnel * 0.48 + uBass * 0.07 + uReverb * 0.06;
+  // Wireframe: lines should be nearly opaque so edges are crisp and neon-bright.
+  // Solid: keep the translucent depth with fresnel/audio reactivity.
+  float alphaSolid = 0.40 + fresnel * 0.48 + uBass * 0.07 + uReverb * 0.06;
+  float alphaWire  = 0.82 + fresnel * 0.14 + uBass * 0.04;
+  float alpha = mix(alphaSolid, alphaWire, uWireframe);
   gl_FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
 }
 `
@@ -230,6 +255,13 @@ void main() {
 // Each star has a random twinkle speed and phase so they glisten independently.
 // Treble energy makes peaks sharper — hi-hats cause the whole sky to sparkle.
 const STAR_VERT = /* glsl */`
+precision highp float;
+precision highp int;
+
+attribute vec3 position;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+
 uniform float uTime;
 uniform float uTreble;
 attribute float aPhase;
@@ -253,6 +285,9 @@ void main() {
 `
 
 const STAR_FRAG = /* glsl */`
+precision highp float;
+precision highp int;
+
 uniform float uBrightness;
 varying float vAlpha;
 varying float vSpark;
@@ -281,6 +316,13 @@ void main() {
 // Each particle slowly orbits at a random phase; bass pushes them outward and
 // treble makes them brighter and larger.
 const PARTICLE_VERT = /* glsl */`
+precision highp float;
+precision highp int;
+
+attribute vec3 position;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+
 uniform float uBass;
 uniform float uTreble;
 uniform float uTime;
@@ -321,6 +363,9 @@ void main() {
 // Sharp dot: bright solid core with a tight falloff so particles read as
 // crisp sparks rather than blurry blobs.
 const PARTICLE_FRAG = /* glsl */`
+precision highp float;
+precision highp int;
+
 uniform vec3 uParticleColor;
 varying float vAlpha;
 
@@ -477,6 +522,83 @@ const THEME_PALETTES: Record<string, Array<[number, number, number]>> = {
   mono:  [[0.00, 0.04, 0.55], [0.00, 0.04, 0.65], [0.00, 0.04, 0.70], [0.00, 0.04, 0.45]],
 }
 
+// ── Manual icosahedron (replaces Three.js IcosahedronGeometry) ───────────────
+// Builds a geodesic sphere by starting from the 12-vertex icosahedron and
+// applying midpoint subdivision `detail` times. Vertices are projected onto
+// the unit sphere after each split so the surface stays perfectly round.
+// Returns a raw BufferGeometry with `position` and `normal` attributes.
+// On the unit sphere, position === normal, so both attributes share the same data.
+function buildIcosahedron(detail: number): BufferGeometry {
+  const PHI = (1 + Math.sqrt(5)) / 2
+  const rawVerts = [
+    -1,  PHI, 0,   1,  PHI, 0,  -1, -PHI, 0,   1, -PHI, 0,
+     0, -1,  PHI,  0,  1,  PHI,  0, -1, -PHI,   0,  1, -PHI,
+     PHI, 0, -1,   PHI, 0,  1,  -PHI, 0, -1,  -PHI, 0,  1,
+  ]
+  // Project all vertices onto the unit sphere
+  const verts: number[] = []
+  for (let i = 0; i < rawVerts.length; i += 3) {
+    const x = rawVerts[i], y = rawVerts[i + 1], z = rawVerts[i + 2]
+    const len = Math.sqrt(x * x + y * y + z * z)
+    verts.push(x / len, y / len, z / len)
+  }
+
+  let faces = [
+    0,11,5,  0,5,1,  0,1,7,  0,7,10,  0,10,11,
+    1,5,9,  5,11,4,  11,10,2,  10,7,6,  7,1,8,
+    3,9,4,  3,4,2,  3,2,6,  3,6,8,  3,8,9,
+    4,9,5,  2,4,11,  6,2,10,  8,6,7,  9,8,1,
+  ]
+
+  // Compute midpoint between two vertex indices, project onto sphere, cache result
+  const midCache = new Map<number, number>()
+  const getMid = (a: number, b: number): number => {
+    // Pack two 16-bit indices into one 32-bit key (works up to 65535 verts)
+    const key = (Math.min(a, b) << 16) | Math.max(a, b)
+    let idx = midCache.get(key)
+    if (idx !== undefined) return idx
+    const ax = verts[a * 3], ay = verts[a * 3 + 1], az = verts[a * 3 + 2]
+    const bx = verts[b * 3], by = verts[b * 3 + 1], bz = verts[b * 3 + 2]
+    const mx = ax + bx, my = ay + by, mz = az + bz
+    const len = Math.sqrt(mx * mx + my * my + mz * mz)
+    idx = verts.length / 3
+    verts.push(mx / len, my / len, mz / len)
+    midCache.set(key, idx)
+    return idx
+  }
+
+  for (let d = 0; d < detail; d++) {
+    const next: number[] = []
+    for (let i = 0; i < faces.length; i += 3) {
+      const a = faces[i], b = faces[i + 1], c = faces[i + 2]
+      const ab = getMid(a, b), bc = getMid(b, c), ca = getMid(c, a)
+      next.push(a, ab, ca,  b, bc, ab,  c, ca, bc,  ab, bc, ca)
+    }
+    faces = next
+    midCache.clear()
+  }
+
+  // Flatten into typed arrays — on the unit sphere, position === normal
+  const triCount = faces.length / 3
+  const positions = new Float32Array(triCount * 9)
+  const normals   = new Float32Array(triCount * 9)
+  for (let i = 0; i < faces.length; i += 3) {
+    const base = (i / 3) * 9
+    for (let j = 0; j < 3; j++) {
+      const vi = faces[i + j] * 3
+      const off = base + j * 3
+      positions[off]     = normals[off]     = verts[vi]
+      positions[off + 1] = normals[off + 1] = verts[vi + 1]
+      positions[off + 2] = normals[off + 2] = verts[vi + 2]
+    }
+  }
+
+  const geo = new BufferGeometry()
+  geo.setAttribute('position', new BufferAttribute(positions, 3))
+  geo.setAttribute('normal',   new BufferAttribute(normals,   3))
+  return geo
+}
+
 export class AnomalySphere {
   private renderer:  WebGLRenderer
   private scene:     Scene
@@ -597,9 +719,10 @@ export class AnomalySphere {
     uReverb:  IUniform<number>
     uSpeed:   IUniform<number>
     uSubBass: IUniform<number>
-    uCrack:   IUniform<number>
-    uCrystal: IUniform<number>
-    uColorA:  IUniform<Color>
+    uCrack:      IUniform<number>
+    uCrystal:    IUniform<number>
+    uWireframe:  IUniform<number>
+    uColorA:     IUniform<Color>
     uColorB:  IUniform<Color>
     uColorC:  IUniform<Color>
     uColorD:  IUniform<Color>
@@ -620,6 +743,7 @@ export class AnomalySphere {
   private playing  = false
   private _reducedMotion: boolean
   private _motionMQ: MediaQueryList
+  private _onVisibilityChange: () => void
 
   // Called each frame with smoothed bass/mid/treble for the aurora, plus
   // fast-attack uiBass/uiTreble for snappy site-wide UI reactivity.
@@ -636,13 +760,16 @@ export class AnomalySphere {
     // renderer area seamless — the orb appears to float over the page.
     // On mobile (DPR ≥ 3) cap at 2 to reduce WebGL framebuffer memory pressure.
     // Capping 3→2 cuts FBO size by ~44% — critical for avoiding iOS OOM page reloads.
-    // Use 'default' powerPreference so the GPU driver doesn't aggressively pre-allocate
-    // memory (which 'high-performance' can trigger on mobile).
     this._isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
     // Fewer particles on mobile to reduce JS heap pressure alongside the large
     // decoded AudioBuffer that can exceed 100 MB for long tracks.
     if (this._isMobile) this.particleCount = 150
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: this._isMobile ? 'default' : 'high-performance' })
+    this.renderer = new WebGLRenderer({
+      antialias: !this._isMobile,  // MSAA doubles GPU framebuffer size — skip on mobile
+      alpha: false,
+      stencil: false,              // not used by this app; frees the depth+stencil buffer
+      powerPreference: this._isMobile ? 'low-power' : 'high-performance',
+    })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 2 : 3))
     this.renderer.setClearColor(new Color('#080810'), 1)
     // ACESFilmic gracefully compresses HDR bloom values instead of clipping to white
@@ -678,9 +805,10 @@ export class AnomalySphere {
     this.camera.position.z = 4.2
 
     // ── Sphere geometry + material ───────────────────────────────────────────
-    // Detail level 6 → ~10k vertices for smooth high-frequency displacement.
-    // On mobile use level 4 (~2.5k vertices, 4× reduction) to cut GPU memory.
-    const geo = new IcosahedronGeometry(1, this._isMobile ? 4 : 6)
+    // buildIcosahedron() replaces Three.js IcosahedronGeometry — same geodesic
+    // subdivision, but implemented here so that class is not included in the bundle.
+    // Detail 6 → ~10k vertices; detail 4 → ~2.5k (~75% reduction) on mobile.
+    const geo = buildIcosahedron(this._isMobile ? 4 : 6)
 
     this.uniforms = {
       uTime:    { value: 0 },
@@ -690,15 +818,19 @@ export class AnomalySphere {
       uReverb:  { value: this.reverb },
       uSpeed:   { value: this.speed },
       uSubBass: { value: 0 },
-      uCrack:   { value: 0 },
-      uCrystal: { value: 0 },
-      uColorA:  { value: new Color('#9b6dff') },
+      uCrack:      { value: 0 },
+      uCrystal:    { value: 0 },
+      uWireframe:  { value: 1.0 },
+      uColorA:     { value: new Color('#9b6dff') },
       uColorB:  { value: new Color('#00d4aa') },
       uColorC:  { value: new Color('#ff6eb4') },
       uColorD:  { value: new Color('#ffaa44') },
     }
 
-    const mat = new ShaderMaterial({
+    // RawShaderMaterial (OGL-style): no Three.js built-in injection — all
+    // uniforms/attributes must be declared in the GLSL. Gives us full control
+    // over the shader environment and skips Three.js's uniform-injection overhead.
+    const mat = new RawShaderMaterial({
       uniforms:       this.uniforms,
       vertexShader:   VERTEX_SHADER,
       fragmentShader: FRAGMENT_SHADER,
@@ -719,8 +851,11 @@ export class AnomalySphere {
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
 
+    // Halve bloom resolution on mobile — UnrealBloomPass creates 3-4 internal render
+    // targets; halving cuts their GPU memory footprint by ~75%.
+    const bloomRes = this._isMobile ? 150 : 300
     this.bloom = new UnrealBloomPass(
-      new Vector2(300, 300),
+      new Vector2(bloomRes, bloomRes),
       0.45,  // base strength — dimmer; reverb raises this at runtime
       0.38,
       0.22,
@@ -752,6 +887,16 @@ export class AnomalySphere {
     // orientationchange fires before the browser has applied the new viewport
     // dimensions, so defer resize by 150 ms to let the layout settle first.
     window.addEventListener('orientationchange', () => { setTimeout(() => this.resize(), 150) })
+
+    // Restart the RAF loop when the tab becomes visible again after being
+    // hidden (the loop cancels itself on visibilityState === 'hidden').
+    this._onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && this.rafId === null) {
+        this.loop()
+      }
+    }
+    document.addEventListener('visibilitychange', this._onVisibilityChange)
+
     this.loop()
     requestAnimationFrame(() => this.resize())
   }
@@ -767,7 +912,7 @@ export class AnomalySphere {
       uParticleColor: { value: new Color('#b08aff') },
     }
 
-    const mat = new ShaderMaterial({
+    const mat = new RawShaderMaterial({
       uniforms:       this.particleUniforms,
       vertexShader:   PARTICLE_VERT,
       fragmentShader: PARTICLE_FRAG,
@@ -805,12 +950,19 @@ export class AnomalySphere {
         : 2.5 + Math.random() * 7.5     // wide field:  2.5–10.0
     }
 
-    const geo = this.particles.geometry
-    geo.setAttribute('position', new BufferAttribute(positions, 3))
-    geo.setAttribute('aSize',    new BufferAttribute(sizes, 1))
-    geo.setAttribute('aPhase',   new BufferAttribute(phases, 1))
-    geo.setAttribute('aRadius',  new BufferAttribute(radii, 1))
-    geo.computeBoundingSphere()
+    // Create a fresh geometry so old GPU buffers are explicitly freed.
+    // Replacing BufferAttributes on a live geometry leaves the old GPU buffers
+    // allocated until GC — on iOS that may never happen, causing VRAM leaks
+    // each time the user adjusts the particle count slider.
+    const oldGeo = this.particles.geometry
+    const newGeo = new BufferGeometry()
+    newGeo.setAttribute('position', new BufferAttribute(positions, 3))
+    newGeo.setAttribute('aSize',    new BufferAttribute(sizes, 1))
+    newGeo.setAttribute('aPhase',   new BufferAttribute(phases, 1))
+    newGeo.setAttribute('aRadius',  new BufferAttribute(radii, 1))
+    newGeo.computeBoundingSphere()
+    this.particles.geometry = newGeo
+    oldGeo.dispose()
   }
 
   // Builds a 1 400-point starfield spread across a large sphere.
@@ -849,7 +1001,7 @@ export class AnomalySphere {
       uBrightness: { value: 0.9 },
     }
 
-    const mat = new ShaderMaterial({
+    const mat = new RawShaderMaterial({
       uniforms:       this.starUniforms,
       vertexShader:   STAR_VERT,
       fragmentShader: STAR_FRAG,
@@ -888,10 +1040,15 @@ export class AnomalySphere {
   private loop(): void {
     this.rafId = requestAnimationFrame(() => this.loop())
 
-    // Skip GPU work while the tab is hidden on mobile. This prevents shader
-    // uniform mutations from accumulating and reduces memory pressure from
-    // background OS processes fighting for GPU resources on iOS.
-    if (this._isMobile && document.visibilityState === 'hidden') return
+    // Fully pause the RAF loop when the tab is hidden — cancel the pending
+    // frame so the loop stops firing entirely (not just skips rendering).
+    // The visibilitychange listener in the constructor restarts it on return.
+    // This prevents unbounded GPU/JS work while backgrounded on iOS and desktop.
+    if (document.visibilityState === 'hidden') {
+      cancelAnimationFrame(this.rafId)
+      this.rafId = null
+      return
+    }
 
     const elapsed = this.clock.getElapsedTime()
 
@@ -1296,7 +1453,8 @@ export class AnomalySphere {
   setCrystal(v: boolean): void      { this.crystalEnabled = v }
 
   setWireframe(v: boolean): void {
-    ;(this.mesh.material as ShaderMaterial).wireframe = v
+    ;(this.mesh.material as RawShaderMaterial).wireframe = v
+    this.uniforms.uWireframe.value = v ? 1.0 : 0.0
   }
 
   // Change the color theme. 'prism' = fully audio-reactive hue cycling.
@@ -1367,12 +1525,37 @@ export class AnomalySphere {
 
   destroy(): void {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId)
+    this.rafId = null
+    document.removeEventListener('visibilitychange', this._onVisibilityChange)
+
+    // Lightning arcs
     for (const arc of this.lightningArcs) {
       this.scene.remove(arc.mesh)
       arc.mesh.geometry.dispose()
       ;(arc.mesh.material as LineBasicMaterial).dispose()
     }
     this.lightningArcs = []
+
+    // Main orb mesh
+    this.mesh.geometry.dispose()
+    ;(this.mesh.material as RawShaderMaterial).dispose()
+
+    // Particle cloud
+    this.particles.geometry.dispose()
+    ;(this.particles.material as RawShaderMaterial).dispose()
+
+    // Star field
+    this.stars.geometry.dispose()
+    ;(this.stars.material as RawShaderMaterial).dispose()
+
+    // Post-processing render targets
+    this.composer.dispose()
+
+    // Release the WebGL context immediately — tells iOS GPU driver to free VRAM
+    // now rather than waiting for GC (which may never run under memory pressure).
+    this.renderer.forceContextLoss()
     this.renderer.dispose()
+
+    this.scene.clear()
   }
 }

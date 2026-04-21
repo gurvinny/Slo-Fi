@@ -16,6 +16,8 @@
 
 <br/>
 
+[![Live App](https://img.shields.io/badge/▶%20Try%20it%20Live-slofi.live-A855F7.svg?style=for-the-badge)](https://slofi.live)
+
 [![Milestone](https://img.shields.io/badge/v2.1-Obsidian_Studio-06B6D4.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/milestone/3)
 [![Version](https://img.shields.io/badge/Version-2.1.0-A855F7.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/releases)
 [![License](https://img.shields.io/badge/License-MIT-A855F7.svg?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE)
@@ -224,7 +226,9 @@ For the full security architecture and responsible disclosure policy, see [SECUR
 
 ### Use it in the browser
 
-Supports **Chrome 35+, Firefox 25+, Safari 14.1+, Edge 79+**. No install required.
+**→ [slofi.live](https://slofi.live)** — open it, drop a track, done. No install, no account, no upload.
+
+Supports **Chrome 35+, Firefox 25+, Safari 14.1+, Edge 79+**.
 
 ### Run it locally
 

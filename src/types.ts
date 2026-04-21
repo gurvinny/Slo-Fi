@@ -26,10 +26,26 @@ export interface AudioParams {
   pitchSemitones: number    // -12 to +12 semitones (0 = no shift)
 }
 
+export interface VisualParams {
+  reactivity?:     number   // beat response  [0.00 – 1.00]
+  glow?:           number   // bloom amount   [0.00 – 1.50]
+  orbSize?:        number   // sphere scale   [0.40 – 1.80]
+  rotationSpeed?:  number   // spin rate      [0.00 – 2.00]
+  stars?:          number   // star field     [0.00 – 1.00]
+  particleCount?:  number   // particle cloud [0 – 2000]
+  wireframe?:      boolean
+  bassPulse?:      boolean
+  lightning?:      boolean
+  crack?:          boolean
+  crystal?:        boolean
+  glitch?:         boolean
+}
+
 export interface PresetDefinition {
   id: string
   name: string
   theme?: string
   params: AudioParams
+  visual?: VisualParams
 }
 

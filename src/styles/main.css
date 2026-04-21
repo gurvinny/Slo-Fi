@@ -1063,6 +1063,11 @@ body.is-paused .btn-play {
   background: var(--border-2);
   outline: none;
   cursor: pointer;
+  /* touch-action: none — tells iOS/Android that this element owns the touch
+     entirely. Without this, horizontal drags on a range input inside a
+     scrollable container get intercepted by the OS scroll handler and the
+     slider value never changes. */
+  touch-action: none;
 }
 
 .slider::-webkit-slider-thumb {
@@ -1189,13 +1194,15 @@ body.is-paused .btn-play {
 
   /* Drawers: full-width at bottom of phones */
   .controls-drawer,
+  .sound-drawer,
   .settings-drawer {
     right: 0;
     left: 0;
     width: auto;
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 175px;
-    max-height: calc(100svh - 280px);
+    height: calc(100dvh - 260px);
+    max-height: calc(100dvh - 260px);
   }
 
   /* Two-row transport layout so Controls and Effects buttons are never hidden.
@@ -1784,6 +1791,9 @@ body.is-paused .site-footer {
   padding: 8px 12px;
   border-bottom: 1px solid var(--glass-border);
   margin-bottom: 4px;
+  flex-shrink: 0; /* never compressed by flex: pinned header */
+  position: relative;
+  z-index: 2;
 }
 
 .controls-drawer-title {
@@ -1853,51 +1863,206 @@ body.is-paused .site-footer {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-/* Hidden state — added by JS when drawer is open, removed when closed */
-.controls-drawer--hidden {
-  display: none !important;
+/* ── Panel animation system ────────────────────────────────────────────────
+   All drawers use pointer-events + opacity + transform instead of display:none
+   so CSS transitions can run. .panel--visible is toggled by JS.             */
+.controls-drawer,
+.sound-drawer,
+.settings-drawer {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease-in, transform 150ms ease-in;
 }
 
-/* Controls drawer — fixed panel above the bottom bar, on the right.
-   max-height accounts for header (54px) + player-top (~54px) + bottom bar (~172px)
-   so expanding the Effects Chain section never pushes the drawer above the top panel. */
+/* Right-side panels slide in from the right */
+.controls-drawer,
+.sound-drawer {
+  transform: translateX(16px);
+}
+
+/* Left-side panel slides in from the left */
+.settings-drawer {
+  transform: translateX(-16px);
+}
+
+.controls-drawer.panel--visible,
+.sound-drawer.panel--visible,
+.settings-drawer.panel--visible {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+/* On mobile, drawers are full-width bottom sheets — slide up instead of sideways */
+@media (max-width: 600px) {
+  .controls-drawer,
+  .sound-drawer,
+  .settings-drawer {
+    transform: translateY(16px);
+  }
+  .controls-drawer.panel--visible,
+  .sound-drawer.panel--visible,
+  .settings-drawer.panel--visible {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .controls-drawer, .sound-drawer, .settings-drawer {
+    transition: none !important;
+  }
+}
+
+/* Controls/Playlist drawer — fixed panel above the bottom bar, on the right */
 .controls-drawer {
   position: fixed;
   right: 20px;
   bottom: 172px;
-  width: 300px;
+  width: 310px;
   z-index: 60;
-  background: rgba(8, 8, 18, 0.90);
+  background: rgba(8, 8, 18, 0.92);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 1px solid var(--accent-subtle);
   border-radius: var(--radius);
   box-shadow: 0 0 0 1px var(--accent-faint), 0 20px 60px rgba(0, 0, 0, 0.65);
+  /* Definite height (not just max-height) is required for flex distribution:
+     flex children with flex-grow can only consume space from a definite height.
+     max-height alone is not "definite" in the CSS spec — the scroll body stays 0. */
+  height: calc(100dvh - 310px);
   max-height: calc(100dvh - 310px);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-/* ── Visual Settings drawer — left side, same glass style ───────────────── */
+/* ── Sound drawer (unified Audio + Effects) ─────────────────────────────── */
+.sound-drawer {
+  position: fixed;
+  right: 20px;
+  bottom: 172px;
+  width: 310px;
+  z-index: 60;
+  background: rgba(8, 8, 18, 0.92);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--accent-subtle);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px var(--accent-faint), 0 20px 60px rgba(0, 0, 0, 0.65);
+  height: calc(100dvh - 310px);
+  max-height: calc(100dvh - 310px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sound-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 14px;
+  border-bottom: 1px solid var(--border);
+  /* position:sticky inside overflow:hidden is broken on iOS and causes
+     hit-test mismatches — the header taps pass through to the scroll body.
+     Use position:relative + z-index so it stacks correctly but doesn't try to stick. */
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  background: rgba(8, 8, 18, 0.96);
+  /* backdrop-filter removed — the drawer already blurs; double-blurring the header
+     creates a compositing layer that can steal touches on iOS */
+}
+
+/* ── Shared tab nav (Sound panel + Help modal) ──────────────────────────── */
+.sound-tabs,
+.help-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 7px;
+  padding: 3px;
+  flex: 1;
+}
+
+.sound-tab,
+.help-tab {
+  flex: 1;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.sound-tab:hover,
+.help-tab:hover {
+  color: var(--text);
+}
+
+.sound-tab--active,
+.help-tab--active {
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+
+.sound-tab-panel--hidden,
+.help-tab-panel--hidden {
+  display: none;
+}
+
+/* ── Section labels inside tabs ─────────────────────────────────────────── */
+.control-section-label {
+  padding: 10px 16px 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ── Visual Settings drawer — left side ─────────────────────────────────── */
 .settings-drawer {
   position: fixed;
   left: 20px;
   bottom: 172px;
   width: 290px;
   z-index: 60;
-  background: rgba(8, 8, 18, 0.90);
+  background: rgba(8, 8, 18, 0.92);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 1px solid rgba(0, 212, 170, 0.20);
   border-radius: var(--radius);
   box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.08), 0 20px 60px rgba(0, 0, 0, 0.65);
+  height: calc(100dvh - 310px);
   max-height: calc(100dvh - 310px);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.settings-drawer--hidden {
-  display: none !important;
+/* ── Inner scroll wrapper — the only element that actually scrolls ─────── */
+/* iOS Safari requires a dedicated scroll child inside position:fixed parents.
+   Using overflow:hidden on the drawer + overflow-y:scroll here fixes the
+   classic "can't scroll inside position:fixed" bug on iOS. */
+.drawer-scroll-body {
+  flex: 1 1 auto;
+  min-height: 0; /* lets flex child shrink below content intrinsic size */
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
+/* Drawers already blur their entire surface — inner .controls panels don't
+   need their own backdrop-filter. Extra compositing layers on iOS cause
+   touch dispatch issues inside overflow:scroll containers. */
+.sound-drawer .controls,
 .settings-drawer .controls {
   background: transparent;
   backdrop-filter: none;
@@ -2346,20 +2511,14 @@ body.is-paused .site-footer {
 }
 
 /* ── Safe-area-aware drawer positioning on notched phones ───────────────── */
-/* The drawers sit 148px above the transport bar. On notched phones that bar
+/* The drawers sit above the transport bar. On notched phones that bar
    itself gets extra bottom padding, so the drawers need to shift up too. */
 @media (max-width: 600px) {
   .controls-drawer,
+  .sound-drawer,
   .settings-drawer {
     bottom: calc(175px + env(safe-area-inset-bottom));
   }
-}
-
-/* ── iOS momentum scroll for drawers ────────────────────────────────────── */
-/* Gives the panel scroll areas a native rubber-band feel on iOS Safari. */
-.controls-drawer,
-.settings-drawer {
-  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Fullscreen button ──────────────────────────────────────────────────── */
@@ -2404,6 +2563,7 @@ body.is-paused .site-footer {
   .waveform { height: 80px; }
 
   .controls-drawer,
+  .sound-drawer,
   .settings-drawer {
     max-width: 380px;
   }
@@ -2421,8 +2581,7 @@ body.is-paused .site-footer {
   list-style: none;
   padding: 4px 0;
   margin: 0;
-  overflow-y: auto;
-  max-height: calc(100dvh - 180px);
+  /* overflow handled by .drawer-scroll-body parent — no nested scroll */
 }
 .playlist-item {
   display: flex;
@@ -2464,12 +2623,54 @@ body.is-paused .site-footer {
   outline: 2px solid var(--accent, #9b6dff);
   outline-offset: 2px;
 }
+/* ── Playlist search ─────────────────────────────────────────────────────── */
+.playlist-search-wrap {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; /* pinned above scroll body */
+}
+.playlist-search {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.playlist-search::placeholder { color: var(--text-muted); }
+.playlist-search:focus { border-color: rgba(155, 109, 255, 0.40); }
+
+/* ── Playlist item info (name + meta) ───────────────────────────────────── */
+.playlist-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.playlist-item-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Playlist footer ─────────────────────────────────────────────────────── */
 .playlist-footer {
-  padding: 10px 16px 14px;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 14px;
   border-top: 1px solid rgba(155, 109, 255, 0.08);
+  flex-shrink: 0; /* pinned footer below scroll body */
 }
 .btn-playlist-add {
-  width: 100%;
+  flex: 1;
   padding: 7px 12px;
   background: rgba(155, 109, 255, 0.10);
   border: 1px solid rgba(155, 109, 255, 0.25);
@@ -2482,6 +2683,25 @@ body.is-paused .site-footer {
 .btn-playlist-add:hover { background: rgba(155, 109, 255, 0.18); }
 .btn-playlist-add:focus-visible {
   outline: 2px solid var(--accent, #9b6dff);
+  outline-offset: 2px;
+}
+.btn-playlist-clear {
+  padding: 7px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn-playlist-clear:hover {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: var(--red, #f87171);
+}
+.btn-playlist-clear:focus-visible {
+  outline: 2px solid var(--red, #f87171);
   outline-offset: 2px;
 }
 
@@ -2524,7 +2744,7 @@ body.is-paused .site-footer {
   min-width: 36px;
 }
 
-/* ── Keyboard shortcut help modal ───────────────────────────────────────── */
+/* ── Help modal ─────────────────────────────────────────────────────────── */
 #help-modal {
   border: 1px solid var(--accent-subtle, rgba(155, 109, 255, 0.3));
   border-radius: var(--radius, 12px);
@@ -2533,54 +2753,64 @@ body.is-paused .site-footer {
   -webkit-backdrop-filter: blur(32px);
   color: var(--text, rgba(240, 240, 255, 0.92));
   padding: 0;
-  max-width: 460px;
+  max-width: 600px;
   width: calc(100dvw - 40px);
+  max-height: calc(100dvh - 80px);
+  overflow: hidden;
   box-shadow: 0 0 0 1px rgba(155, 109, 255, 0.12), 0 20px 60px rgba(0, 0, 0, 0.75);
+  margin: auto;
 }
 #help-modal::backdrop {
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
 }
 .help-modal-inner {
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 80px);
 }
 .help-modal-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px 12px;
+  gap: 8px;
+  padding: 12px 14px 12px 16px;
   border-bottom: 1px solid rgba(155, 109, 255, 0.15);
+  flex-shrink: 0;
 }
-.help-modal-title {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--accent, #9b6dff);
+
+/* ── Shortcuts tab content ──────────────────────────────────────────────── */
+.help-tab-panel {
+  overflow-y: auto;
+  max-height: calc(100dvh - 160px);
+  padding: 16px 20px 20px;
 }
-.help-modal-close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  font-size: 1.2rem;
-  line-height: 1;
-  opacity: 0.65;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: opacity 0.15s;
+.shortcut-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
 }
-.help-modal-close:hover { opacity: 1; }
-.help-modal-close:focus-visible {
-  outline: 2px solid var(--accent, #9b6dff);
-  outline-offset: 2px;
+@media (max-width: 480px) {
+  .shortcut-sections { grid-template-columns: 1fr; }
+}
+.shortcut-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  grid-column: 1 / -1;
+}
+.shortcut-section {
+  display: contents;
 }
 .shortcut-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 12px;
-  padding: 14px 20px 20px;
-  margin: 0;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0 0 2px;
 }
 .shortcut-row {
   display: contents;
@@ -2588,25 +2818,129 @@ body.is-paused .site-footer {
 .shortcut-row dt {
   display: flex;
   align-items: center;
-  padding: 5px 0;
+  padding: 4px 0;
 }
 .shortcut-row dd {
   display: flex;
   align-items: center;
-  padding: 5px 0;
+  padding: 4px 0;
   margin: 0;
-  font-size: 0.82rem;
-  opacity: 0.8;
+  font-size: 0.8rem;
+  color: var(--text-dim);
 }
 .shortcut-row dt kbd {
   font-family: ui-monospace, SFMono-Regular, monospace;
   border: 1px solid rgba(155, 109, 255, 0.35);
   border-radius: 5px;
   padding: 3px 8px;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   background: rgba(155, 109, 255, 0.10);
   color: var(--accent, #9b6dff);
   white-space: nowrap;
+}
+
+/* ── Feature Guide tab ──────────────────────────────────────────────────── */
+.guide-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+@media (max-width: 520px) { .guide-grid { grid-template-columns: 1fr; } }
+.guide-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.guide-list {
+  margin: 0 0 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.guide-row {
+  display: contents;
+}
+.guide-row dt {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  padding: 5px 0 1px;
+}
+.guide-row dd {
+  font-size: 0.77rem;
+  color: var(--text-dim);
+  margin: 0 0 4px;
+  line-height: 1.4;
+}
+
+/* ── About tab ──────────────────────────────────────────────────────────── */
+.about-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 12px 0 4px;
+}
+.about-logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--accent-bright);
+}
+.about-version {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  margin-top: -6px;
+}
+.about-desc {
+  font-size: 0.83rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+  max-width: 340px;
+  margin: 4px 0;
+}
+.about-github {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--accent-bright);
+  opacity: 0.7;
+  text-decoration: none;
+  margin-top: 8px;
+  transition: opacity 0.15s;
+}
+.about-github:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+.about-stack-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.about-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+.about-stack span {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  padding: 3px 10px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-subtle);
+  border-radius: 100px;
+  color: var(--accent-bright);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2983,11 +3317,12 @@ body.is-paused .site-footer {
   -webkit-backdrop-filter: none;
 }
 
-.btn-controls-show:hover {
-  background: rgba(124, 77, 255, 0.09);
-  border-color: rgba(124, 77, 255, 0.32);
+.btn-controls-show:hover,
+.btn-controls-show--active {
+  background: rgba(124, 77, 255, 0.12);
+  border-color: rgba(124, 77, 255, 0.40);
   color: var(--accent-bright);
-  box-shadow: 0 0 12px rgba(124, 77, 255, 0.10);
+  box-shadow: 0 0 12px rgba(124, 77, 255, 0.12);
 }
 
 .btn-settings-show {
@@ -3009,7 +3344,8 @@ body.is-paused .site-footer {
 }
 
 /* ── Control drawers — refined dark panels ───────────────────────────────── */
-.controls-drawer {
+.controls-drawer,
+.sound-drawer {
   background: rgba(3, 3, 12, 0.97);
   backdrop-filter: blur(44px);
   -webkit-backdrop-filter: blur(44px);
@@ -3036,9 +3372,15 @@ body.is-paused .site-footer {
 
 @media (max-width: 600px) {
   .controls-drawer,
+  .sound-drawer,
   .settings-drawer {
     bottom: calc(190px + env(safe-area-inset-bottom));
     border-radius: 14px 14px 0 0;
+    right: 0;
+    left: 0;
+    width: auto;
+    height: calc(100dvh - 275px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 275px - env(safe-area-inset-bottom));
   }
 }
 
@@ -3333,5 +3675,38 @@ body::after {
 .page-loader-icon {
   color: #7c4dff;
   filter: drop-shadow(0 0 12px rgba(124, 77, 255, 0.55));
+}
+
+/* ── Mobile drawer backdrop ─────────────────────────────────────────────── */
+/* Appears behind open drawers on phones so users can tap-to-close.
+   Hidden on desktop (min-width: 601px) via !important so it never shows. */
+.drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.50);
+  z-index: 45;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.drawer-backdrop.backdrop--visible {
+  display: block;
+}
+@media (min-width: 601px) {
+  .drawer-backdrop { display: none !important; }
+}
+
+/* ── Aurora idle animation (mobile) ────────────────────────────────────── */
+/* On mobile, JS stops updating --aurora-* CSS vars to avoid style-recalc
+   on every backdrop-filter layer. The aurora stays alive via this keyframe. */
+@keyframes aurora-idle {
+  from { opacity: 0.30; }
+  to   { opacity: 0.60; }
+}
+@media (max-width: 600px) {
+  body::before,
+  body::after {
+    animation: aurora-idle 8s ease-in-out infinite alternate;
+  }
 }
 

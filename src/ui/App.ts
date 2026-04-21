@@ -1,3 +1,4 @@
+import { DEFAULTS } from '../config/defaults'
 import { AudioEngine } from '../audio/AudioEngine'
 import { detectBpm } from '../audio/BpmDetector'
 import { detectKey, NOTE_NAMES } from '../audio/KeyDetector'
@@ -35,7 +36,6 @@ export class App {
   private _mobile!: MobileController
 
   private _isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-  private _auroraFrameN = 0
   // Core DOM refs
   private dropzone = document.getElementById('dropzone')!
   private fileInput = document.getElementById('fileInput') as HTMLInputElement
@@ -66,16 +66,13 @@ export class App {
   private volumeSlider = document.getElementById('volumeSlider') as HTMLInputElement
   private volumeValue = document.getElementById('volumeValue')!
 
-  // Controls drawer refs
-  private controlsDrawer = document.getElementById('controlsDrawer')!
-  private controlsFloatBtn = document.getElementById('controlsFloatBtn')!
-  private controlsCloseBtn = document.getElementById('controlsCloseBtn')!
-  private controlsShowBtn = document.getElementById('controlsShowBtn')!
+  // Sound drawer refs (merged Audio + Effects)
+  private soundDrawer   = document.getElementById('soundDrawer')!
+  private soundShowBtn  = document.getElementById('soundShowBtn')!
+  private soundCloseBtn = document.getElementById('soundCloseBtn')!
 
-  // Effects drawer refs
-  private effectsDrawer   = document.getElementById('effectsDrawer')!
-  private effectsCloseBtn = document.getElementById('effectsCloseBtn')!
-  private effectsShowBtn  = document.getElementById('effectsShowBtn')!
+  // Mobile backdrop — shown behind open drawers on phones; tap to close
+  private _drawerBackdrop = document.getElementById('drawerBackdrop')!
 
   // Settings drawer refs
   private settingsDrawer   = document.getElementById('settingsDrawer')!
@@ -91,6 +88,7 @@ export class App {
   private playlist: File[]        = []
   private currentTrackIndex       = -1
   private _dragIndex              = -1
+  private _trackMeta              = new Map<number, { duration: number; key: string; bpm: number }>()
   private playlistDrawer          = document.getElementById('playlistDrawer')!
   private playlistCloseBtn        = document.getElementById('playlistCloseBtn')!
   private playlistShowBtn         = document.getElementById('playlistShowBtn')!
@@ -131,11 +129,13 @@ export class App {
     this.wireUI()
     this.wireKeyboard()
     this.wireCrossController()
-    this.wireControlsPanel()
-    this.wireEffectsPanel()
+    this.wireSoundPanel()
     this.wireSettingsPanel()
     this.wireHelpModal()
     this.wirePlaylistPanel()
+    this._drawerBackdrop.addEventListener('click', () => this.closeAllPanels())
+    this.wireSliderTouch()
+    this.applyDefaults()
     this.loadSettings()
     this.initAriaValueText()
 
@@ -158,12 +158,39 @@ export class App {
   }
 
   private wirePlaylistPanel(): void {
-    this.playlistCloseBtn.addEventListener('click', () =>
-      this.playlistDrawer.classList.add('controls-drawer--hidden'))
-    this.playlistShowBtn.addEventListener('click', () =>
-      this.playlistDrawer.classList.remove('controls-drawer--hidden'))
-    // "Add files" button reuses the hidden fileInput so no extra dialog is needed
+    this.playlistCloseBtn.addEventListener('click', () => {
+      this.playlistDrawer.classList.remove('panel--visible')
+      this._drawerBackdrop.classList.remove('backdrop--visible')
+    })
+    this.playlistShowBtn.addEventListener('click', () => {
+      const isOpen = this.playlistDrawer.classList.contains('panel--visible')
+      this.closeAllPanels()
+      if (!isOpen) {
+        this.playlistDrawer.classList.add('panel--visible')
+        this.showBackdrop()
+      }
+    })
     this.playlistAddBtn.addEventListener('click', () => this.fileInput.click())
+
+    const clearBtn = document.getElementById('playlistClearBtn')
+    clearBtn?.addEventListener('click', () => {
+      if (!this.playlist.length) return
+      this.playlist = []
+      this._trackMeta.clear()
+      this.currentTrackIndex = -1
+      this.engine.stop()
+      this.setPlayingState(false)
+      this.renderPlaylist()
+    })
+
+    const search = document.getElementById('playlistSearch') as HTMLInputElement | null
+    search?.addEventListener('input', () => {
+      const q = search.value.toLowerCase()
+      this.playlistList.querySelectorAll<HTMLElement>('.playlist-item').forEach((li) => {
+        const name = li.querySelector('.playlist-item-name')?.textContent?.toLowerCase() ?? ''
+        li.style.display = !q || name.includes(q) ? '' : 'none'
+      })
+    })
   }
 
   private addFilesToPlaylist(files: File[]): void {
@@ -205,6 +232,15 @@ export class App {
 
   private removeTrack(index: number): void {
     this.playlist.splice(index, 1)
+    // Rebuild _trackMeta with shifted indices
+    const newMeta = new Map<number, { duration: number; key: string; bpm: number }>()
+    this._trackMeta.forEach((v, k) => {
+      if (k < index)       newMeta.set(k, v)
+      else if (k > index)  newMeta.set(k - 1, v)
+      // k === index is dropped
+    })
+    this._trackMeta = newMeta
+
     if (!this.playlist.length) {
       this.currentTrackIndex = -1
       this.engine.stop()
@@ -227,9 +263,9 @@ export class App {
     this.playlist.forEach((file, i) => {
       const li     = document.createElement('li')
       const handle = document.createElement('span')
+      const info   = document.createElement('div')
       const name   = document.createElement('span')
-      const upBtn  = document.createElement('button')
-      const dnBtn  = document.createElement('button')
+      const meta   = document.createElement('span')
       const rmBtn  = document.createElement('button')
 
       li.className = 'playlist-item'
@@ -253,24 +289,23 @@ export class App {
       })
 
       handle.className = 'playlist-drag-handle'
-      handle.textContent = '⠿'
+      handle.textContent = '☰'
       handle.setAttribute('aria-hidden', 'true')
 
+      const idx = String(i + 1).padStart(2, '0')
       name.className = 'playlist-item-name'
-      name.textContent = file.name.replace(/\.[^.]+$/, '')
+      name.textContent = `${idx}. ${file.name.replace(/\.[^.]+$/, '')}`
       name.title = file.name
 
-      upBtn.className = 'playlist-move-btn'
-      upBtn.textContent = '↑'
-      upBtn.setAttribute('aria-label', `Move ${file.name} up`)
-      upBtn.disabled = i === 0
-      upBtn.addEventListener('click', (e) => { e.stopPropagation(); this.reorderTrack(i, i - 1) })
+      const m = this._trackMeta.get(i)
+      const dur = m ? formatTime(m.duration) : '—'
+      const key = m?.key ?? '—'
+      const bpm = m ? `${Math.round(m.bpm)} BPM` : '—'
+      meta.className = 'playlist-item-meta'
+      meta.textContent = `${dur} · ${key} · ${bpm}`
 
-      dnBtn.className = 'playlist-move-btn'
-      dnBtn.textContent = '↓'
-      dnBtn.setAttribute('aria-label', `Move ${file.name} down`)
-      dnBtn.disabled = i === count - 1
-      dnBtn.addEventListener('click', (e) => { e.stopPropagation(); this.reorderTrack(i, i + 1) })
+      info.className = 'playlist-item-info'
+      info.append(name, meta)
 
       rmBtn.className = 'playlist-item-remove'
       rmBtn.setAttribute('aria-label', `Remove ${file.name}`)
@@ -278,7 +313,7 @@ export class App {
       rmBtn.addEventListener('click', (e) => { e.stopPropagation(); this.removeTrack(i) })
 
       li.addEventListener('click', () => void this.switchTrack(i, true))
-      li.append(handle, name, upBtn, dnBtn, rmBtn)
+      li.append(handle, info, rmBtn)
       this.playlistList.appendChild(li)
     })
   }
@@ -294,62 +329,135 @@ export class App {
     } else if (from > this.currentTrackIndex && to <= this.currentTrackIndex) {
       this.currentTrackIndex++
     }
+    // Rebuild _trackMeta: apply the same splice to a meta array then re-index
+    const metaArr = Array.from({ length: this.playlist.length + 1 }, (_, k) =>
+      this._trackMeta.get(k) ?? null)
+    const [movedMeta] = metaArr.splice(from, 1)
+    metaArr.splice(to, 0, movedMeta)
+    this._trackMeta = new Map()
+    metaArr.forEach((v, k) => { if (v) this._trackMeta.set(k, v) })
     this.renderPlaylist()
   }
 
   private wireHelpModal(): void {
     this.helpBtn.addEventListener('click', () => this.helpModal.showModal())
     this.helpCloseBtn.addEventListener('click', () => this.helpModal.close())
-    // Click outside the dialog content to close (the <dialog> element fills the
-    // viewport; a click on it but not on its child content means the backdrop)
     this.helpModal.addEventListener('click', (e) => {
       if (e.target === this.helpModal) this.helpModal.close()
     })
-  }
-
-  private wireControlsPanel(): void {
-    this.controlsFloatBtn.addEventListener('click', () => {
-      const isNowFloating = this.controlsDrawer.classList.toggle('controls-drawer--floating')
-      this.controlsFloatBtn.setAttribute('title',      isNowFloating ? 'Pin panel'   : 'Float panel')
-      this.controlsFloatBtn.setAttribute('aria-label', isNowFloating ? 'Pin panel'   : 'Float panel')
-    })
-    this.controlsCloseBtn.addEventListener('click', () => {
-      this.controlsDrawer.classList.add('controls-drawer--hidden')
-      this.controlsDrawer.classList.remove('controls-drawer--floating')
-      this.controlsShowBtn.style.display = ''
-    })
-    this.controlsShowBtn.addEventListener('click', () => {
-      this.controlsDrawer.classList.remove('controls-drawer--hidden')
-      this.controlsShowBtn.style.display = 'none'
-      // Close effects drawer if open
-      this.effectsDrawer.classList.add('controls-drawer--hidden')
-      this.effectsShowBtn.style.display = ''
+    // Tab switching
+    const tabs = this.helpModal.querySelectorAll<HTMLButtonElement>('.help-tab')
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach((t) => {
+          t.classList.remove('help-tab--active')
+          t.setAttribute('aria-selected', 'false')
+        })
+        tab.classList.add('help-tab--active')
+        tab.setAttribute('aria-selected', 'true')
+        this.helpModal.querySelectorAll<HTMLElement>('.help-tab-panel').forEach((p) => {
+          p.classList.toggle('help-tab-panel--hidden', p.id !== `helpTab-${tab.dataset.tab}`)
+        })
+      })
     })
   }
 
-  private wireEffectsPanel(): void {
-    this.effectsCloseBtn.addEventListener('click', () => {
-      this.effectsDrawer.classList.add('controls-drawer--hidden')
-      this.effectsShowBtn.style.display = ''
+  private closeAllPanels(): void {
+    this.playlistDrawer.classList.remove('panel--visible')
+    this.soundDrawer.classList.remove('panel--visible')
+    this.settingsDrawer.classList.remove('panel--visible')
+    this.soundShowBtn.classList.remove('btn-controls-show--active')
+    this.settingsShowBtn.classList.remove('btn-settings-show--active')
+    this._drawerBackdrop.classList.remove('backdrop--visible')
+  }
+
+  private showBackdrop(): void {
+    if (this._isMobile) this._drawerBackdrop.classList.add('backdrop--visible')
+  }
+
+  // iOS Safari does not fire input events from touch on range inputs that have
+  // -webkit-appearance:none, even with touch-action:none set in CSS.
+  // This method adds touch→value bridge listeners to every .slider so dragging
+  // on mobile produces the same input events as mouse drag on desktop.
+  private wireSliderTouch(): void {
+    // Touch Events are more reliable than Pointer Events for <input type="range">
+    // on iOS Safari. iOS has a native range gesture handler that conflicts with
+    // setPointerCapture(). Using touchmove with { passive: false } + preventDefault
+    // takes full ownership of the touch — the browser won't try to scroll or do
+    // its own range handling.
+    document.querySelectorAll<HTMLInputElement>('.slider').forEach((slider) => {
+      const readTouch = (e: TouchEvent) => {
+        const touch = e.touches[0]
+        if (!touch) return
+        const rect  = slider.getBoundingClientRect()
+        const min   = parseFloat(slider.min  || '0')
+        const max   = parseFloat(slider.max  || '100')
+        const step  = parseFloat(slider.step || '1')
+        const ratio = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width))
+        const raw   = min + ratio * (max - min)
+        const val   = Math.max(min, Math.min(max, Math.round(raw / step) * step))
+        slider.value = String(val)
+        slider.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      // touchstart: passive ok — just record initial position, no scroll risk
+      slider.addEventListener('touchstart', readTouch, { passive: true })
+      // touchmove: NON-passive so preventDefault() can stop iOS from scrolling
+      // the drawer while the user drags a slider horizontally
+      slider.addEventListener('touchmove', (e: TouchEvent) => {
+        e.preventDefault()
+        readTouch(e)
+      }, { passive: false })
     })
-    this.effectsShowBtn.addEventListener('click', () => {
-      this.effectsDrawer.classList.remove('controls-drawer--hidden')
-      this.effectsShowBtn.style.display = 'none'
-      // Close controls drawer if open
-      this.controlsDrawer.classList.add('controls-drawer--hidden')
-      this.controlsDrawer.classList.remove('controls-drawer--floating')
-      this.controlsShowBtn.style.display = ''
+  }
+
+  private wireSoundPanel(): void {
+    this.soundShowBtn.addEventListener('click', () => {
+      const isOpen = this.soundDrawer.classList.contains('panel--visible')
+      this.closeAllPanels()
+      if (!isOpen) {
+        this.soundDrawer.classList.add('panel--visible')
+        this.soundShowBtn.classList.add('btn-controls-show--active')
+        this.showBackdrop()
+      }
+    })
+    this.soundCloseBtn.addEventListener('click', () => {
+      this.soundDrawer.classList.remove('panel--visible')
+      this.soundShowBtn.classList.remove('btn-controls-show--active')
+      this._drawerBackdrop.classList.remove('backdrop--visible')
+    })
+    this.soundDrawer.querySelectorAll<HTMLButtonElement>('.sound-tab').forEach((tab) => {
+      tab.addEventListener('click', () =>
+        this.switchSoundTab(tab.dataset.tab as 'audio' | 'effects'))
+    })
+  }
+
+  private switchSoundTab(tab: 'audio' | 'effects'): void {
+    this.soundDrawer.querySelectorAll<HTMLElement>('.sound-tab').forEach((t) => {
+      const isActive = t.dataset.tab === tab
+      t.classList.toggle('sound-tab--active', isActive)
+      t.setAttribute('aria-selected', String(isActive))
+    })
+    this.soundDrawer.querySelectorAll<HTMLElement>('.sound-tab-panel').forEach((p) => {
+      p.classList.toggle('sound-tab-panel--hidden', p.id !== `soundTab-${tab}`)
     })
   }
 
   private wireSettingsPanel(): void {
     this.settingsCloseBtn.addEventListener('click', () => {
-      this.settingsDrawer.classList.add('settings-drawer--hidden')
+      this.settingsDrawer.classList.remove('panel--visible')
       this.settingsShowBtn.classList.remove('btn-settings-show--active')
+      this._drawerBackdrop.classList.remove('backdrop--visible')
     })
     this.settingsShowBtn.addEventListener('click', () => {
-      const isHidden = this.settingsDrawer.classList.toggle('settings-drawer--hidden')
-      this.settingsShowBtn.classList.toggle('btn-settings-show--active', !isHidden)
+      const isOpen = this.settingsDrawer.classList.contains('panel--visible')
+      if (isOpen) {
+        this.settingsDrawer.classList.remove('panel--visible')
+        this.settingsShowBtn.classList.remove('btn-settings-show--active')
+      } else {
+        this.settingsDrawer.classList.add('panel--visible')
+        this.settingsShowBtn.classList.add('btn-settings-show--active')
+        this.showBackdrop()
+      }
     })
     this.settingsDrawer.querySelectorAll<HTMLButtonElement>('.theme-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
@@ -368,6 +476,21 @@ export class App {
     }
     this.presets.onThemeApplied = (theme: string) => {
       this.applyTheme(theme)
+    }
+    this.presets.onVisualApplied = (visual) => {
+      if (visual.reactivity    !== undefined) { this.orbReactivitySlider.value = String(Math.round(visual.reactivity * 100));       this.orbReactivityValue.textContent = `${Math.round(visual.reactivity * 100)}%`;    this.sphere?.setReactivity(visual.reactivity) }
+      if (visual.glow          !== undefined) { this.orbGlowSlider.value       = String(Math.round(visual.glow * 100));             this.orbGlowValue.textContent       = `${Math.round(visual.glow * 100)}%`;          this.sphere?.setGlow(visual.glow) }
+      if (visual.orbSize       !== undefined) { this.orbSizeSlider.value        = String(Math.round(visual.orbSize * 100));          this.orbSizeValue.textContent        = `${Math.round(visual.orbSize * 100)}%`;        this.sphere?.setOrbSize(visual.orbSize) }
+      if (visual.rotationSpeed !== undefined) { this.rotationSpeedSlider.value  = String(Math.round(visual.rotationSpeed * 100));    this.rotationSpeedValue.textContent  = `${visual.rotationSpeed.toFixed(1)}×`;         this.sphere?.setRotationSpeed(visual.rotationSpeed) }
+      if (visual.stars         !== undefined) { this.starsSlider.value          = String(Math.round(visual.stars * 100));            this.starsValue.textContent          = `${Math.round(visual.stars * 100)}%`;          this.sphere?.setStarBrightness(visual.stars) }
+      if (visual.particleCount !== undefined) { this.particleCountSlider.value  = String(visual.particleCount);                      this.particleCountValue.textContent  = String(visual.particleCount);                   this.sphere?.setParticleCount(visual.particleCount) }
+      if (visual.wireframe     !== undefined) { this.wireframeToggle.checked    = visual.wireframe;    this.sphere?.setWireframe(visual.wireframe) }
+      if (visual.bassPulse     !== undefined) { this.bassPulseToggle.checked    = visual.bassPulse;    this.sphere?.setBassPulse(visual.bassPulse) }
+      if (visual.lightning     !== undefined) { this.lightningToggle.checked    = visual.lightning;    this.sphere?.setLightning(visual.lightning) }
+      if (visual.crack         !== undefined) { this.crackToggle.checked        = visual.crack;        this.sphere?.setCrack(visual.crack) }
+      if (visual.crystal       !== undefined) { this.crystalToggle.checked      = visual.crystal;      this.sphere?.setCrystal(visual.crystal) }
+      if (visual.glitch        !== undefined) { this.glitchToggle.checked       = visual.glitch;       this.sphere?.setGlitch(visual.glitch) }
+      this.saveSettings()
     }
     this.effects.onChanged = () => {
       this.presets.clearActive()
@@ -662,6 +785,35 @@ export class App {
         case 'F':
           ;(document.getElementById('fullscreenBtn') as HTMLButtonElement | null)?.click()
           break
+        case 'n':
+        case 'N':
+          if (this.currentTrackIndex < this.playlist.length - 1)
+            void this.switchTrack(this.currentTrackIndex + 1, true)
+          break
+        case 'p':
+        case 'P':
+          if (this.currentTrackIndex > 0)
+            void this.switchTrack(this.currentTrackIndex - 1, true)
+          break
+        case '1': case '2': case '3': case '4': case '5': {
+          const idx = parseInt(e.key) - 1
+          const presetBtn = document.querySelectorAll<HTMLButtonElement>('.preset-card')[idx]
+          presetBtn?.click()
+          break
+        }
+      }
+    })
+    // Volume shortcuts — work without a file loaded
+    document.addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement).tagName === 'INPUT') return
+      if (e.key === '[') {
+        const v = Math.max(0, parseInt(this.volumeSlider.value) - 10)
+        this.volumeSlider.value = String(v)
+        this.volumeSlider.dispatchEvent(new Event('input'))
+      } else if (e.key === ']') {
+        const v = Math.min(100, parseInt(this.volumeSlider.value) + 10)
+        this.volumeSlider.value = String(v)
+        this.volumeSlider.dispatchEvent(new Event('input'))
       }
     })
   }
@@ -730,6 +882,19 @@ export class App {
       this._detectedKey = detectKey(this.engine.getBuffer()!)
       this.updateBpmDisplay()
 
+      // Store metadata for the current playlist track and refresh the playlist
+      // so the duration/key/BPM row updates from "—" to real values.
+      if (this.currentTrackIndex >= 0) {
+        this._trackMeta.set(this.currentTrackIndex, {
+          duration: this.engine.duration,
+          key:      this._detectedKey
+            ? `${NOTE_NAMES[this._detectedKey.root]} ${this._detectedKey.mode}`
+            : '—',
+          bpm:      this._baseBpm,
+        })
+        this.renderPlaylist()
+      }
+
       this.trackMeta.textContent = `${formatTime(this.engine.duration)} · ${formatBytes(file.size)} · ${file.type || 'audio'}`
       this.durationEl.textContent = formatTime(this.engine.duration)
       this.currentTimeEl.textContent = '0:00'
@@ -747,10 +912,12 @@ export class App {
           this.engine.analyserNode,
         )
         this.sphere.onEnergyUpdate = (bass, mid, treble, uiBass, uiTreble) => {
-          // On mobile, aurora vars trigger full style-recalc + compositor repaint on every
-          // backdrop-filter layer (6+). Throttle to every 3rd frame to cut repaint pressure
-          // from 60/s → 20/s — the primary fix for iOS OOM crashes during long playback.
-          if (!this._isMobile || ++this._auroraFrameN % 3 === 0) {
+          // On mobile, skip CSS var updates entirely — setProperty() on aurora vars
+          // triggers a full style-recalc + GPU compositor repaint on every
+          // backdrop-filter layer (6+) each frame, which is the primary cause of
+          // iOS OOM crashes during long playback. The aurora animates via @keyframes
+          // on mobile instead (see main.css .aurora-idle).
+          if (!this._isMobile) {
             const root = document.documentElement.style
             root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
             root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
@@ -820,6 +987,63 @@ export class App {
 
     this.roomSlider.setAttribute('aria-valuetext', `${this.roomSlider.value}%`)
     this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
+  }
+
+  // Apply defaults.ts values to all sliders and engine state.
+  // Runs before loadSettings() so user-saved localStorage always wins.
+  private applyDefaults(): void {
+    const d = DEFAULTS
+
+    this.applyTheme(d.colorTheme)
+
+    this.speedSlider.value       = String(Math.round(d.speed * 100))
+    this.speedValue.textContent  = `${d.speed.toFixed(2)}x`
+    this.engine.setPlaybackRate(d.speed)
+
+    this.pitchSlider.value       = String(d.pitch)
+    this.pitchValue.textContent  = d.pitch === 0 ? '0 st' : `${d.pitch > 0 ? '+' : ''}${d.pitch} st`
+    this.engine.setPitch(d.pitch)
+
+    this.reverbSlider.value      = String(Math.round(d.reverbMix * 100))
+    this.reverbValue.textContent = `${Math.round(d.reverbMix * 100)}%`
+    this.engine.setReverbMix(d.reverbMix)
+
+    this.decaySlider.value       = String(Math.round(d.reverbDecay * 10))
+    this.decayValue.textContent  = `${d.reverbDecay.toFixed(1)}s`
+    this.engine.setReverbDecay(d.reverbDecay)
+
+    this.roomSlider.value        = String(Math.round(d.reverbRoomSize * 100))
+    this.roomValue.textContent   = `${Math.round(d.reverbRoomSize * 100)}%`
+    this.engine.setReverbRoomSize(d.reverbRoomSize)
+
+    this.volumeSlider.value      = String(Math.round(d.volume * 100))
+    this.volumeValue.textContent = `${Math.round(d.volume * 100)}%`
+    this.engine.setVolume(d.volume)
+
+    this.orbReactivitySlider.value      = String(Math.round(d.reactivity * 100))
+    this.orbReactivityValue.textContent = `${Math.round(d.reactivity * 100)}%`
+
+    this.orbGlowSlider.value      = String(Math.round(d.glow * 100))
+    this.orbGlowValue.textContent = `${Math.round(d.glow * 100)}%`
+
+    this.orbSizeSlider.value      = String(Math.round(d.orbSize * 100))
+    this.orbSizeValue.textContent = `${Math.round(d.orbSize * 100)}%`
+
+    this.rotationSpeedSlider.value      = String(Math.round(d.rotationSpeed * 100))
+    this.rotationSpeedValue.textContent = `${d.rotationSpeed.toFixed(1)}×`
+
+    this.particleCountSlider.value      = String(d.particleCount)
+    this.particleCountValue.textContent = String(d.particleCount)
+
+    this.starsSlider.value      = String(Math.round(d.stars * 100))
+    this.starsValue.textContent = `${Math.round(d.stars * 100)}%`
+
+    this.wireframeToggle.checked  = d.wireframe
+    this.bassPulseToggle.checked  = d.bassPulse
+    this.lightningToggle.checked  = d.lightning
+    this.crackToggle.checked      = d.crack
+    this.crystalToggle.checked    = d.crystal
+    this.glitchToggle.checked     = d.glitch
   }
 
   private saveSettings(): void {

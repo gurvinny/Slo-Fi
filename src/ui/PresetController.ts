@@ -1,15 +1,16 @@
 import type { AudioEngine } from '../audio/AudioEngine'
 import { PRESETS } from '../presets'
-import type { AudioParams } from '../types'
+import type { AudioParams, VisualParams } from '../types'
 
-// Manages the preset strip buttons and fires onPresetApplied
-// so App.ts can sync all sliders.
+// Manages the preset strip buttons and fires onPresetApplied / onVisualApplied
+// so App.ts can sync all sliders and sphere state.
 export class PresetController {
   private engine: AudioEngine
   private buttons: NodeListOf<HTMLButtonElement>
 
-  public onPresetApplied: ((params: AudioParams) => void) | null = null
-  public onThemeApplied: ((theme: string) => void) | null = null
+  public onPresetApplied:  ((params: AudioParams)  => void) | null = null
+  public onThemeApplied:   ((theme: string)         => void) | null = null
+  public onVisualApplied:  ((visual: VisualParams)  => void) | null = null
 
   constructor(engine: AudioEngine) {
     this.engine = engine
@@ -36,7 +37,8 @@ export class PresetController {
         this.engine.applyPreset(preset.params)
         this.setActive(btn)
         this.onPresetApplied?.(preset.params)
-        if (preset.theme) this.onThemeApplied?.(preset.theme)
+        if (preset.theme)  this.onThemeApplied?.(preset.theme)
+        if (preset.visual) this.onVisualApplied?.(preset.visual)
       })
     })
   }

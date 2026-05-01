@@ -1,86 +1,158 @@
-/* ── Design tokens ─────────────────────────────────────────────────────── */
-:root {
-  --bg: #080810;
-  --surface: #0f0f1a;
-  --surface-2: #141424;
-  --surface-3: #1a1a2e;
-  --border: #1e1e32;
-  --border-2: #28283d;
+/* ── Tailwind v4 — Vite-native, zero PostCSS config ────────────────────── */
+@import "tailwindcss";
 
-  --text: #e2e2f0;
-  --text-dim: #8888a8;
-  --text-muted: #44445a;
+/* ── Design tokens → Tailwind theme ────────────────────────────────────── */
+/* All @theme variables become both CSS custom props AND Tailwind utilities:
+   e.g. --color-accent → `bg-accent`, `text-accent`, `border-accent` etc.
+   Dynamic JS-updated vars (--aurora-bass, --ui-bass) stay in @layer base. */
+@theme {
+  --color-bg:           #080810;
+  --color-surface:      #0f0f1a;
+  --color-surface-2:    #141424;
+  --color-surface-3:    #1a1a2e;
+  --color-border:       #1e1e32;
+  --color-border-2:     #28283d;
 
-  --accent: #9b6dff;
-  --accent-dim: rgba(155, 109, 255, 0.18);
-  --accent-glow: rgba(155, 109, 255, 0.35);
-  --accent-bright: #b48aff;
+  --color-text:         #e2e2f0;
+  --color-text-dim:     #8888a8;
+  --color-text-muted:   #44445a;
 
-  --teal: #00d4aa;
-  --teal-dim: rgba(0, 212, 170, 0.15);
+  --color-accent:       #9b6dff;
+  --color-accent-bright:#b48aff;
+  --color-teal:         #00d4aa;
+  --color-error:        #ff5f7e;
 
-  --error-color: #ff5f7e;
+  --color-green:        #4ade80;
+  --color-orange:       #fb923c;
+  --color-red:          #f87171;
+  --color-purple:       #a78bfa;
+  --color-indigo:       #818cf8;
 
-  --radius: 10px;
-  --radius-sm: 6px;
-
-  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-
-  /* Glass design tokens */
-  --glass-bg: rgba(12, 12, 22, 0.55);
-  --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-blur: 24px;
-  /* glass-glow uses var(--accent-dim) so it auto-updates with themes */
-  --glass-glow: 0 0 0 1px var(--accent-dim), 0 8px 32px rgba(0, 0, 0, 0.4);
-
-  /* Derived accent tokens for borders/shadows — override these per theme */
-  --accent-subtle: rgba(155, 109, 255, 0.22);
-  --accent-faint:  rgba(155, 109, 255, 0.10);
-
-  /* Aurora hue-shift per theme — applied as filter on the aurora layers */
-  --aurora-filter: none;
-
-  /* Button glass tokens */
-  --btn-glass-bg:         rgba(10, 10, 15, 0.40);
-  --btn-glass-border:     rgba(255, 255, 255, 0.09);
-  --btn-glass-edge:       rgba(255, 255, 255, 0.13);
-  --btn-glass-blur:       16px;
-  --btn-tilt-perspective: 300px;
+  --font-mono:          'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --radius:             10px;
+  --radius-sm:          6px;
 }
 
-/* ── Reset ─────────────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Base styles ────────────────────────────────────────────────────────── */
+/* Tailwind preflight handles the box-sizing reset. We add app-specific base. */
+@layer base {
+  :root {
+    /* Semantic aliases kept as CSS vars — referenced throughout the stylesheet */
+    --bg: #080810;
+    --surface: #0f0f1a;
+    --surface-2: #141424;
+    --surface-3: #1a1a2e;
+    --border: #1e1e32;
+    --border-2: #28283d;
+    --text: #e2e2f0;
+    --text-dim: #8888a8;
+    --text-muted: #44445a;
+    --accent: #9b6dff;
+    --accent-dim: rgba(155, 109, 255, 0.18);
+    --accent-glow: rgba(155, 109, 255, 0.35);
+    --accent-bright: #b48aff;
+    --teal: #00d4aa;
+    --teal-dim: rgba(0, 212, 170, 0.15);
+    --error-color: #ff5f7e;
+    --glass-bg: rgba(12, 12, 22, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.07);
+    --glass-blur: 24px;
+    --glass-glow: 0 0 0 1px var(--accent-dim), 0 8px 32px rgba(0, 0, 0, 0.4);
+    --accent-subtle: rgba(155, 109, 255, 0.22);
+    --accent-faint:  rgba(155, 109, 255, 0.10);
+    --aurora-filter: none;
+    --btn-glass-bg:         rgba(10, 10, 15, 0.40);
+    --btn-glass-border:     rgba(255, 255, 255, 0.09);
+    --btn-glass-edge:       rgba(255, 255, 255, 0.13);
+    --btn-glass-blur:       16px;
+    --btn-tilt-perspective: 300px;
+    /* JS-driven reactive values — updated each RAF frame by AnomalySphere */
+    --aurora-bass:   0;
+    --aurora-mid:    0;
+    --aurora-treble: 0;
+    --ui-bass:    0;
+    --ui-treble:  0;
+  }
 
-html {
-  height: 100%;
-  scroll-behavior: smooth;
-  overscroll-behavior: none;
+  html {
+    height: 100%;
+    scroll-behavior: smooth;
+    overscroll-behavior: none;
+  }
+
+  body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
 }
 
-body {
-  min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
-  overscroll-behavior: none;
+/* ── Component utilities ────────────────────────────────────────────────── */
+/* Reusable Tailwind component classes. Use these with @apply in Tailwind HTML
+   or as standalone classes. Complex CSS-var patterns that can't be pure utilities
+   stay here; simple ones become @apply chains. */
+@layer components {
+  /* Glassmorphism panel — base glass surface used by drawers, modals, cards */
+  .glass {
+    @apply backdrop-blur-xl border border-white/[0.07];
+    background: var(--glass-bg);
+    box-shadow: var(--glass-glow);
+  }
+
+  /* Dark glass for player bars (player-top, player-bottom, header) */
+  .glass-dark {
+    backdrop-filter: blur(44px);
+    -webkit-backdrop-filter: blur(44px);
+    background: rgba(2, 2, 8, 0.97);
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* Accent glass panel — used for controls/settings drawers */
+  .glass-accent {
+    @apply backdrop-blur-[44px] border;
+    background: rgba(3, 3, 12, 0.97);
+    border-color: rgba(124, 77, 255, 0.18);
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.05), 0 28px 90px rgba(0, 0, 0, 0.80);
+  }
+
+  /* Teal glass panel — used for settings drawer */
+  .glass-teal {
+    @apply backdrop-blur-[44px] border;
+    background: rgba(3, 3, 12, 0.97);
+    border-color: rgba(0, 201, 160, 0.18);
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px rgba(0, 201, 160, 0.05), 0 28px 90px rgba(0, 0, 0, 0.80);
+  }
+
+  /* Pill / icon button base */
+  .btn-base {
+    @apply inline-flex items-center justify-center
+           rounded-[10px] border border-white/[0.07]
+           bg-white/[0.025] text-[var(--text-dim)]
+           transition-colors duration-150
+           cursor-pointer select-none
+           hover:bg-accent/10 hover:border-accent/30 hover:text-[var(--accent-bright)];
+  }
+
+  /* Screen-reader only — kept here for @apply compatibility */
+  .sr-only {
+    @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
 }
 
 /* Aurora gradient background - animated color blobs behind the glass UI.
    CSS variables --aurora-bass, --aurora-mid, --aurora-treble are updated
-   by SpectrumAnalyzer each frame so the aurora reacts to the live audio. */
-:root {
-  --aurora-bass:   0;
-  --aurora-mid:    0;
-  --aurora-treble: 0;
-  /* Fast-attack beat-pulse values — drive snappy UI reactivity */
-  --ui-bass:    0;
-  --ui-treble:  0;
-}
-
+   by AnomalySphere each frame so the aurora reacts to the live audio.
+   Initial values are set in @layer base :root block above. */
 body::before {
   content: '';
   position: fixed;
@@ -185,7 +257,7 @@ body::after {
 #app {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  min-height: 100svh;
 }
 
 /* ── Full-page orb canvas ────────────────────────────────────────────────── */
@@ -196,6 +268,13 @@ body::after {
   inset: 0;
   z-index: 1;  /* above page bg, below aurora (z-2) and UI (z-50+) */
   pointer-events: none;
+  /* isolation:isolate creates a stacking context WITHOUT promoting a GPU texture
+     layer. Using will-change:transform here caused Chrome's Skia compositor to
+     re-sample every backdrop-filter element above on each WebGL frame swap,
+     producing a one-frame stale-capture flash ("screen glitch") on Chrome macOS.
+     transform:translateZ(0) retains the GPU layer hint without that side-effect. */
+  isolation: isolate;
+  transform: translateZ(0);
 }
 
 /* Three.js canvas fills the container */
@@ -256,7 +335,7 @@ body::after {
 /* ── Main ───────────────────────────────────────────────────────────────── */
 .main {
   position: relative;
-  min-height: 100vh;
+  min-height: 100svh;
 }
 
 /* ── Drop zone — full-page overlay before a file is loaded ──────────────── */
@@ -619,6 +698,12 @@ body.is-playing #iconPause    { opacity: 1; }
   border: none;
   border-bottom: 1px solid var(--glass-border);
   border-radius: 0;
+  /* CSS filter creates an independent compositing backing store for this
+     element and all its children (including the canvas). The parent
+     backdrop-filter on .player-bottom stops sampling at this boundary, so
+     aurora-driven compositor repaints never clear the canvas bitmap.
+     brightness(1) is a visual no-op — zero effect on rendered appearance. */
+  filter: brightness(1);
 }
 
 /* Transport row: time | buttons | right-side controls */
@@ -978,6 +1063,11 @@ body.is-paused .btn-play {
   background: var(--border-2);
   outline: none;
   cursor: pointer;
+  /* touch-action: none — tells iOS/Android that this element owns the touch
+     entirely. Without this, horizontal drags on a range input inside a
+     scrollable container get intercepted by the OS scroll handler and the
+     slider value never changes. */
+  touch-action: none;
 }
 
 .slider::-webkit-slider-thumb {
@@ -1104,13 +1194,15 @@ body.is-paused .btn-play {
 
   /* Drawers: full-width at bottom of phones */
   .controls-drawer,
+  .sound-drawer,
   .settings-drawer {
     right: 0;
     left: 0;
     width: auto;
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 175px;
-    max-height: calc(100vh - 280px);
+    height: calc(100dvh - 260px);
+    max-height: calc(100dvh - 260px);
   }
 
   /* Two-row transport layout so Controls and Effects buttons are never hidden.
@@ -1118,7 +1210,7 @@ body.is-paused .btn-play {
      Row 2: total time + fullscreen + settings + Controls + Effects. */
   .transport-row {
     flex-wrap: wrap;
-    padding: 6px 12px 2px;
+    padding: 4px 10px 2px;
     gap: 4px 6px;
   }
 
@@ -1132,8 +1224,8 @@ body.is-paused .btn-play {
     flex-basis: 100%;
     margin-left: 0;
     justify-content: center;
-    gap: 8px;
-    padding-bottom: 4px;
+    gap: 6px;
+    padding-bottom: max(4px, env(safe-area-inset-bottom, 4px));
   }
 
   /* Landing page: scale down rings and text on mobile */
@@ -1677,6 +1769,23 @@ body.is-paused .site-footer {
   --aurora-filter: grayscale(1) brightness(0.50);
 }
 
+/* Meridian — v3.0 default: electric chartreuse primary, deep azure secondary.
+   The only theme in the lineup built on yellow-green — instantly distinctive
+   against all other themes. Lime + azure = hyper-futuristic, zero hue overlap
+   with Neon (cyan), Void (indigo), Ember (orange) or Frost (light blue). */
+[data-theme="meridian"] {
+  --accent:        #b4ff00;
+  --accent-dim:    rgba(180, 255, 0, 0.18);
+  --accent-glow:   rgba(180, 255, 0, 0.52);
+  --accent-bright: #ccff33;
+  --accent-subtle: rgba(180, 255, 0, 0.24);
+  --accent-faint:  rgba(180, 255, 0, 0.08);
+  --teal:          #1a66ff;
+  --teal-dim:      rgba(26, 102, 255, 0.20);
+  /* Rotate purple aurora blobs 180° → lands in yellow-green / lime territory */
+  --aurora-filter: hue-rotate(180deg) saturate(2.0) brightness(0.72);
+}
+
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
@@ -1699,6 +1808,9 @@ body.is-paused .site-footer {
   padding: 8px 12px;
   border-bottom: 1px solid var(--glass-border);
   margin-bottom: 4px;
+  flex-shrink: 0; /* never compressed by flex: pinned header */
+  position: relative;
+  z-index: 2;
 }
 
 .controls-drawer-title {
@@ -1768,51 +1880,226 @@ body.is-paused .site-footer {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-/* Hidden state — added by JS when drawer is open, removed when closed */
-.controls-drawer--hidden {
-  display: none !important;
+/* ── Panel animation system ────────────────────────────────────────────────
+   All drawers use pointer-events + opacity + transform instead of display:none
+   so CSS transitions can run. .panel--visible is toggled by JS.             */
+.controls-drawer,
+.sound-drawer,
+.settings-drawer {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease-in, transform 150ms ease-in;
 }
 
-/* Controls drawer — fixed panel above the bottom bar, on the right.
-   max-height accounts for header (54px) + player-top (~54px) + bottom bar (~172px)
-   so expanding the Effects Chain section never pushes the drawer above the top panel. */
+/* Right-side panels slide in from the right */
+.controls-drawer,
+.sound-drawer {
+  transform: translateX(16px);
+}
+
+/* Left-side panel slides in from the left */
+.settings-drawer {
+  transform: translateX(-16px);
+}
+
+.controls-drawer.panel--visible,
+.sound-drawer.panel--visible,
+.settings-drawer.panel--visible {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+/* On mobile, drawers are full-width bottom sheets — slide up instead of sideways */
+@media (max-width: 600px) {
+  .controls-drawer,
+  .sound-drawer,
+  .settings-drawer {
+    transform: translateY(16px);
+  }
+  .controls-drawer.panel--visible,
+  .sound-drawer.panel--visible,
+  .settings-drawer.panel--visible {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .controls-drawer, .sound-drawer, .settings-drawer {
+    transition: none !important;
+  }
+}
+
+/* Controls/Playlist drawer — fixed panel above the bottom bar, on the right */
 .controls-drawer {
   position: fixed;
   right: 20px;
   bottom: 172px;
-  width: 300px;
+  width: 310px;
   z-index: 60;
-  background: rgba(8, 8, 18, 0.90);
+  background: rgba(8, 8, 18, 0.92);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 1px solid var(--accent-subtle);
   border-radius: var(--radius);
   box-shadow: 0 0 0 1px var(--accent-faint), 0 20px 60px rgba(0, 0, 0, 0.65);
-  max-height: calc(100vh - 310px);
-  overflow-y: auto;
+  /* Definite height (not just max-height) is required for flex distribution:
+     flex children with flex-grow can only consume space from a definite height.
+     max-height alone is not "definite" in the CSS spec — the scroll body stays 0. */
+  height: calc(100dvh - 310px);
+  max-height: calc(100dvh - 310px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-/* ── Visual Settings drawer — left side, same glass style ───────────────── */
+/* ── Sound drawer (unified Audio + Effects) ─────────────────────────────── */
+.sound-drawer {
+  position: fixed;
+  right: 20px;
+  bottom: 172px;
+  width: 310px;
+  z-index: 60;
+  background: rgba(8, 8, 18, 0.92);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--accent-subtle);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px var(--accent-faint), 0 20px 60px rgba(0, 0, 0, 0.65);
+  height: calc(100dvh - 310px);
+  max-height: calc(100dvh - 310px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sound-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 14px;
+  border-bottom: 1px solid var(--border);
+  /* position:sticky inside overflow:hidden is broken on iOS and causes
+     hit-test mismatches — the header taps pass through to the scroll body.
+     Use position:relative + z-index so it stacks correctly but doesn't try to stick. */
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  background: rgba(8, 8, 18, 0.96);
+  /* backdrop-filter removed — the drawer already blurs; double-blurring the header
+     creates a compositing layer that can steal touches on iOS */
+}
+
+/* ── Shared tab nav (Sound panel + Help modal) ──────────────────────────── */
+.sound-tabs,
+.help-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 7px;
+  padding: 3px;
+  flex: 1;
+}
+
+.sound-tab,
+.help-tab {
+  flex: 1;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.sound-tab:hover,
+.help-tab:hover {
+  color: var(--text);
+}
+
+.sound-tab--active,
+.help-tab--active {
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+
+.sound-tab-panel--hidden,
+.help-tab-panel--hidden {
+  display: none;
+}
+
+/* ── Section labels inside tabs ─────────────────────────────────────────── */
+.control-section-label {
+  padding: 10px 16px 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ── EQ frequency response curve canvas ─────────────────────────────────── */
+.eq-curve-canvas {
+  display: block;
+  width: calc(100% - 32px);
+  height: 72px;
+  margin: 0 16px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Frequency hint labels inside EQ slider labels */
+.eq-freq-hint {
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.45;
+  margin-left: 4px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Visual Settings drawer — left side ─────────────────────────────────── */
 .settings-drawer {
   position: fixed;
   left: 20px;
   bottom: 172px;
   width: 290px;
   z-index: 60;
-  background: rgba(8, 8, 18, 0.90);
+  background: rgba(8, 8, 18, 0.92);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 1px solid rgba(0, 212, 170, 0.20);
   border-radius: var(--radius);
   box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.08), 0 20px 60px rgba(0, 0, 0, 0.65);
-  max-height: calc(100vh - 310px);
-  overflow-y: auto;
+  height: calc(100dvh - 310px);
+  max-height: calc(100dvh - 310px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.settings-drawer--hidden {
-  display: none !important;
+/* ── Inner scroll wrapper — the only element that actually scrolls ─────── */
+/* iOS Safari requires a dedicated scroll child inside position:fixed parents.
+   Using overflow:hidden on the drawer + overflow-y:scroll here fixes the
+   classic "can't scroll inside position:fixed" bug on iOS. */
+.drawer-scroll-body {
+  flex: 1 1 auto;
+  min-height: 0; /* lets flex child shrink below content intrinsic size */
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
+/* Drawers already blur their entire surface — inner .controls panels don't
+   need their own backdrop-filter. Extra compositing layers on iOS cause
+   touch dispatch issues inside overflow:scroll containers. */
+.sound-drawer .controls,
 .settings-drawer .controls {
   background: transparent;
   backdrop-filter: none;
@@ -1929,6 +2216,11 @@ body.is-paused .site-footer {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.theme-swatch--meridian {
+  background: linear-gradient(135deg, #b4ff00, #1a66ff);
+  box-shadow: 0 0 6px rgba(180, 255, 0, 0.5);
 }
 
 .theme-swatch--prism {
@@ -2261,20 +2553,14 @@ body.is-paused .site-footer {
 }
 
 /* ── Safe-area-aware drawer positioning on notched phones ───────────────── */
-/* The drawers sit 148px above the transport bar. On notched phones that bar
+/* The drawers sit above the transport bar. On notched phones that bar
    itself gets extra bottom padding, so the drawers need to shift up too. */
 @media (max-width: 600px) {
   .controls-drawer,
+  .sound-drawer,
   .settings-drawer {
     bottom: calc(175px + env(safe-area-inset-bottom));
   }
-}
-
-/* ── iOS momentum scroll for drawers ────────────────────────────────────── */
-/* Gives the panel scroll areas a native rubber-band feel on iOS Safari. */
-.controls-drawer,
-.settings-drawer {
-  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Fullscreen button ──────────────────────────────────────────────────── */
@@ -2307,8 +2593,8 @@ body.is-paused .site-footer {
 /* ── Fullscreen layout fill ─────────────────────────────────────────────── */
 :fullscreen #app,
 :-webkit-full-screen #app {
-  width: 100vw;
-  height: 100vh;
+  width: 100dvw;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -2319,6 +2605,7 @@ body.is-paused .site-footer {
   .waveform { height: 80px; }
 
   .controls-drawer,
+  .sound-drawer,
   .settings-drawer {
     max-width: 380px;
   }
@@ -2336,8 +2623,7 @@ body.is-paused .site-footer {
   list-style: none;
   padding: 4px 0;
   margin: 0;
-  overflow-y: auto;
-  max-height: calc(100vh - 180px);
+  /* overflow handled by .drawer-scroll-body parent — no nested scroll */
 }
 .playlist-item {
   display: flex;
@@ -2379,12 +2665,54 @@ body.is-paused .site-footer {
   outline: 2px solid var(--accent, #9b6dff);
   outline-offset: 2px;
 }
+/* ── Playlist search ─────────────────────────────────────────────────────── */
+.playlist-search-wrap {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; /* pinned above scroll body */
+}
+.playlist-search {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.playlist-search::placeholder { color: var(--text-muted); }
+.playlist-search:focus { border-color: rgba(155, 109, 255, 0.40); }
+
+/* ── Playlist item info (name + meta) ───────────────────────────────────── */
+.playlist-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.playlist-item-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Playlist footer ─────────────────────────────────────────────────────── */
 .playlist-footer {
-  padding: 10px 16px 14px;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 14px;
   border-top: 1px solid rgba(155, 109, 255, 0.08);
+  flex-shrink: 0; /* pinned footer below scroll body */
 }
 .btn-playlist-add {
-  width: 100%;
+  flex: 1;
   padding: 7px 12px;
   background: rgba(155, 109, 255, 0.10);
   border: 1px solid rgba(155, 109, 255, 0.25);
@@ -2399,16 +2727,66 @@ body.is-paused .site-footer {
   outline: 2px solid var(--accent, #9b6dff);
   outline-offset: 2px;
 }
+.btn-playlist-clear {
+  padding: 7px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn-playlist-clear:hover {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: var(--red, #f87171);
+}
+.btn-playlist-clear:focus-visible {
+  outline: 2px solid var(--red, #f87171);
+  outline-offset: 2px;
+}
 
-/* ── Help button ────────────────────────────────────────────────────────── */
+/* ── Playlist drag-and-drop + move buttons ──────────────────────────────── */
+.playlist-drag-handle {
+  cursor: grab;
+  opacity: 0.35;
+  padding: 0 4px 0 0;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.playlist-item.dragging { opacity: 0.4; }
+.playlist-item.drag-over { border-top: 2px solid var(--accent, #9b6dff); }
+.playlist-move-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.35;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.playlist-move-btn:hover:not(:disabled) { opacity: 0.85; }
+.playlist-move-btn:disabled { opacity: 0.15; cursor: default; }
+
+/* ── Help button: fixed top-right corner ────────────────────────────────── */
 .btn-help {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  z-index: 105;
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
-  min-width: 28px;
+  min-width: 36px;
 }
 
-/* ── Keyboard shortcut help modal ───────────────────────────────────────── */
+/* ── Help modal ─────────────────────────────────────────────────────────── */
 #help-modal {
   border: 1px solid var(--accent-subtle, rgba(155, 109, 255, 0.3));
   border-radius: var(--radius, 12px);
@@ -2417,54 +2795,64 @@ body.is-paused .site-footer {
   -webkit-backdrop-filter: blur(32px);
   color: var(--text, rgba(240, 240, 255, 0.92));
   padding: 0;
-  max-width: 460px;
-  width: calc(100vw - 40px);
+  max-width: 600px;
+  width: calc(100dvw - 40px);
+  max-height: calc(100dvh - 80px);
+  overflow: hidden;
   box-shadow: 0 0 0 1px rgba(155, 109, 255, 0.12), 0 20px 60px rgba(0, 0, 0, 0.75);
+  margin: auto;
 }
 #help-modal::backdrop {
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
 }
 .help-modal-inner {
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 80px);
 }
 .help-modal-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px 12px;
+  gap: 8px;
+  padding: 12px 14px 12px 16px;
   border-bottom: 1px solid rgba(155, 109, 255, 0.15);
+  flex-shrink: 0;
 }
-.help-modal-title {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--accent, #9b6dff);
+
+/* ── Shortcuts tab content ──────────────────────────────────────────────── */
+.help-tab-panel {
+  overflow-y: auto;
+  max-height: calc(100dvh - 160px);
+  padding: 16px 20px 20px;
 }
-.help-modal-close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  font-size: 1.2rem;
-  line-height: 1;
-  opacity: 0.65;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: opacity 0.15s;
+.shortcut-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
 }
-.help-modal-close:hover { opacity: 1; }
-.help-modal-close:focus-visible {
-  outline: 2px solid var(--accent, #9b6dff);
-  outline-offset: 2px;
+@media (max-width: 480px) {
+  .shortcut-sections { grid-template-columns: 1fr; }
+}
+.shortcut-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  grid-column: 1 / -1;
+}
+.shortcut-section {
+  display: contents;
 }
 .shortcut-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 12px;
-  padding: 14px 20px 20px;
-  margin: 0;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0 0 2px;
 }
 .shortcut-row {
   display: contents;
@@ -2472,24 +2860,895 @@ body.is-paused .site-footer {
 .shortcut-row dt {
   display: flex;
   align-items: center;
-  padding: 5px 0;
+  padding: 4px 0;
 }
 .shortcut-row dd {
   display: flex;
   align-items: center;
-  padding: 5px 0;
+  padding: 4px 0;
   margin: 0;
-  font-size: 0.82rem;
-  opacity: 0.8;
+  font-size: 0.8rem;
+  color: var(--text-dim);
 }
 .shortcut-row dt kbd {
   font-family: ui-monospace, SFMono-Regular, monospace;
   border: 1px solid rgba(155, 109, 255, 0.35);
   border-radius: 5px;
   padding: 3px 8px;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   background: rgba(155, 109, 255, 0.10);
   color: var(--accent, #9b6dff);
   white-space: nowrap;
+}
+
+/* ── Feature Guide tab ──────────────────────────────────────────────────── */
+.guide-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+@media (max-width: 520px) { .guide-grid { grid-template-columns: 1fr; } }
+.guide-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.guide-list {
+  margin: 0 0 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.guide-row {
+  display: contents;
+}
+.guide-row dt {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  padding: 5px 0 1px;
+}
+.guide-row dd {
+  font-size: 0.77rem;
+  color: var(--text-dim);
+  margin: 0 0 4px;
+  line-height: 1.4;
+}
+
+/* ── About tab ──────────────────────────────────────────────────────────── */
+.about-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 12px 0 4px;
+}
+.about-logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--accent-bright);
+}
+.about-version {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  margin-top: -6px;
+}
+.about-desc {
+  font-size: 0.83rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+  max-width: 340px;
+  margin: 4px 0;
+}
+.about-github {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--accent-bright);
+  opacity: 0.7;
+  text-decoration: none;
+  margin-top: 8px;
+  transition: opacity 0.15s;
+}
+.about-github:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+.about-stack-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.about-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+.about-stack span {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  padding: 3px 10px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-subtle);
+  border-radius: 100px;
+  color: var(--accent-bright);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OBSIDIAN STUDIO — Visual Redesign
+   All rules in this section override earlier declarations in the cascade.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Design token overrides ──────────────────────────────────────────────── */
+:root {
+  --bg:            #020208;
+  --surface:       #07070f;
+  --surface-2:     #0c0c18;
+  --surface-3:     #111120;
+  --border:        #181828;
+  --border-2:      #202033;
+  --text:          #d6d6ee;
+  --text-dim:      #74748e;
+  --text-muted:    #36364a;
+  --accent:        #7c4dff;
+  --accent-dim:    rgba(124, 77, 255, 0.18);
+  --accent-glow:   rgba(124, 77, 255, 0.38);
+  --accent-bright: #a37bff;
+  --teal:          #00c9a0;
+  --teal-dim:      rgba(0, 201, 160, 0.15);
+  --accent-subtle: rgba(124, 77, 255, 0.22);
+  --accent-faint:  rgba(124, 77, 255, 0.10);
+  --glass-bg:      rgba(7, 7, 18, 0.68);
+  --glass-blur:    28px;
+  --radius:        12px;
+  --radius-sm:     7px;
+  --btn-glass-bg:  rgba(8, 8, 20, 0.50);
+  --btn-glass-border: rgba(255, 255, 255, 0.07);
+  --btn-glass-edge:   rgba(255, 255, 255, 0.11);
+}
+
+/* ── Header — compact monogram bar ──────────────────────────────────────── */
+.header {
+  background: rgba(2, 2, 8, 0.95);
+  border-bottom: 1px solid rgba(124, 77, 255, 0.07);
+}
+
+.header-inner {
+  padding: 10px 24px;
+}
+
+.logo-icon {
+  color: var(--accent);
+  filter: drop-shadow(0 0 10px var(--accent-glow));
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  background: linear-gradient(130deg, #c8a8ff 0%, var(--accent-bright) 40%, var(--teal) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent; /* fallback */
+}
+
+.tagline {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Header is ~46px tall — fix dependent fixed panels */
+.dropzone  { top: 46px; }
+.player-top { top: 46px; }
+
+/* ── Landing page — cinematic hero ───────────────────────────────────────── */
+
+/* Kill the orbit rings — they date the design */
+.landing-rings {
+  display: none;
+}
+
+/* Scan line: slimmer, more subtle */
+.landing-scan-line {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(124, 77, 255, 0.55) 30%,
+    rgba(0, 201, 160, 0.65) 70%,
+    transparent 100%);
+  opacity: 0.5;
+}
+
+/* Hero stack: tighter */
+.landing-hero {
+  gap: 28px;
+  max-width: 560px;
+}
+
+/* MEGA title — confident, massive */
+.landing-logo-text {
+  font-size: clamp(88px, 14vw, 152px);
+  font-weight: 900;
+  letter-spacing: -6px;
+  line-height: 0.88;
+  margin-bottom: 16px;
+  background: linear-gradient(
+    150deg,
+    #ffffff        0%,
+    var(--accent-bright) 30%,
+    var(--teal)    65%,
+    #ffffff       100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 7s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (max-width: 600px) {
+  .landing-logo-text {
+    font-size: 58px;
+    letter-spacing: -2px;
+    margin-bottom: 10px;
+  }
+}
+
+.landing-tagline {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+/* Feature badge pills — cleaner, minimal */
+.landing-badge {
+  padding: 5px 16px;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  background: rgba(124, 77, 255, 0.06);
+  border: 1px solid rgba(124, 77, 255, 0.16);
+  border-radius: 100px;
+  color: var(--text-dim);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  gap: 8px;
+}
+
+/* Drop zone card — luminous glass slab, no dashes */
+.dropzone-content {
+  padding: 52px 52px;
+  border: 1px solid rgba(124, 77, 255, 0.18);
+  border-radius: 20px;
+  background: rgba(8, 8, 22, 0.75);
+  backdrop-filter: blur(36px);
+  -webkit-backdrop-filter: blur(36px);
+  box-shadow:
+    0 0 0 1px rgba(124, 77, 255, 0.05),
+    0 32px 100px rgba(0, 0, 0, 0.60),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.25s, box-shadow 0.25s;
+  min-width: 300px;
+}
+
+.dropzone:hover .dropzone-content,
+.dropzone:focus-visible .dropzone-content {
+  border-color: rgba(124, 77, 255, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(124, 77, 255, 0.12),
+    0 0 50px rgba(124, 77, 255, 0.12),
+    0 32px 100px rgba(0, 0, 0, 0.60),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.dropzone.drag-over .dropzone-content {
+  border-color: var(--accent);
+  background: rgba(124, 77, 255, 0.10);
+  box-shadow:
+    0 0 0 2px rgba(124, 77, 255, 0.28),
+    0 0 70px rgba(124, 77, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.dropzone-icon {
+  color: var(--accent);
+  opacity: 0.70;
+}
+
+.dropzone:hover .dropzone-icon,
+.dropzone.drag-over .dropzone-icon {
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.dropzone-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.dropzone-hint {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+
+/* ── Player top bar — elevated track info ────────────────────────────────── */
+.player-top {
+  background: rgba(2, 2, 8, 0.96);
+  backdrop-filter: blur(44px);
+  -webkit-backdrop-filter: blur(44px);
+  border-bottom: 1px solid rgba(124, 77, 255, calc(0.05 + var(--ui-bass, 0) * 0.48));
+  box-shadow: 0 2px 28px rgba(124, 77, 255, calc(var(--ui-bass, 0) * 0.14));
+  padding: 10px 24px;
+  gap: 20px;
+}
+
+.track-info {
+  max-width: 260px;
+}
+
+.track-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.track-bpm {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+
+.track-meta {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+/* Preset cards — flatter, more tab-like */
+.preset-card {
+  min-width: 82px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-top-color: rgba(255, 255, 255, 0.06);
+  gap: 3px;
+}
+
+.preset-card::before {
+  height: 2px;
+  top: 0;
+  border-radius: 0;
+}
+
+.preset-card:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
+.preset-card--active {
+  background: rgba(124, 77, 255, 0.12);
+  border-color: rgba(124, 77, 255, 0.32);
+  border-top-color: var(--accent);
+  box-shadow: 0 0 20px rgba(124, 77, 255, 0.12);
+}
+
+.preset-card-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.preset-card-hint {
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Player bottom — waveform + transport ────────────────────────────────── */
+.player-bottom {
+  background: rgba(2, 2, 8, 0.97);
+  backdrop-filter: blur(44px);
+  -webkit-backdrop-filter: blur(44px);
+  border-top: 1px solid rgba(124, 77, 255, calc(0.05 + var(--ui-bass, 0) * 0.48));
+  box-shadow:
+    0 -6px 48px rgba(0, 0, 0, 0.55),
+    0 -1px 0 rgba(124, 77, 255, calc(var(--ui-bass, 0) * 0.20));
+}
+
+/* Taller, more prominent waveform */
+.waveform {
+  height: 120px;
+}
+
+@media (max-width: 480px) {
+  .waveform { height: 68px; }
+}
+
+@media (min-width: 601px) and (max-width: 768px) {
+  .waveform { height: 88px; }
+}
+
+/* Transport row — more breathing room */
+.transport-row {
+  padding: 10px 24px;
+  gap: 16px;
+}
+
+/* Time display — tabular numerals, cleaner */
+.time-current,
+.time-total {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  min-width: 38px;
+}
+
+/* Transport buttons — slightly more spaced */
+.transport {
+  gap: 14px;
+}
+
+/* Play button — bigger glow */
+.btn-play {
+  width: 60px;
+  height: 60px;
+}
+
+@media (max-width: 600px) {
+  .btn-play { width: 52px; height: 52px; }
+}
+
+/* Icon buttons — rounded rectangle style */
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: none;
+}
+
+.btn-icon:hover {
+  background: rgba(124, 77, 255, 0.08);
+  border-color: rgba(124, 77, 255, 0.28);
+  color: var(--accent-bright);
+  transform: none;
+  box-shadow: 0 0 14px rgba(124, 77, 255, 0.12);
+}
+
+.btn-icon:active {
+  transform: scale(0.93);
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Transport-right buttons — pill style */
+.transport-right {
+  gap: 5px;
+}
+
+.btn-controls-show {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-dim);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.btn-controls-show:hover,
+.btn-controls-show--active {
+  background: rgba(124, 77, 255, 0.12);
+  border-color: rgba(124, 77, 255, 0.40);
+  color: var(--accent-bright);
+  box-shadow: 0 0 12px rgba(124, 77, 255, 0.12);
+}
+
+.btn-settings-show {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.btn-settings-show:hover,
+.btn-settings-show--active {
+  background: rgba(0, 201, 160, 0.09);
+  border-color: rgba(0, 201, 160, 0.36);
+  color: var(--teal);
+  box-shadow: 0 0 12px rgba(0, 201, 160, 0.10);
+}
+
+/* ── Control drawers — refined dark panels ───────────────────────────────── */
+.controls-drawer,
+.sound-drawer {
+  background: rgba(3, 3, 12, 0.97);
+  backdrop-filter: blur(44px);
+  -webkit-backdrop-filter: blur(44px);
+  border: 1px solid rgba(124, 77, 255, 0.18);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(124, 77, 255, 0.05),
+    0 28px 90px rgba(0, 0, 0, 0.80);
+  /* Updated bottom offset: waveform 120px + transport ~64px + gap */
+  bottom: 190px;
+}
+
+.settings-drawer {
+  background: rgba(3, 3, 12, 0.97);
+  backdrop-filter: blur(44px);
+  -webkit-backdrop-filter: blur(44px);
+  border: 1px solid rgba(0, 201, 160, 0.18);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(0, 201, 160, 0.05),
+    0 28px 90px rgba(0, 0, 0, 0.80);
+  bottom: 190px;
+}
+
+@media (max-width: 600px) {
+  .controls-drawer,
+  .sound-drawer,
+  .settings-drawer {
+    bottom: calc(190px + env(safe-area-inset-bottom));
+    border-radius: 14px 14px 0 0;
+    right: 0;
+    left: 0;
+    width: auto;
+    height: calc(100dvh - 275px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 275px - env(safe-area-inset-bottom));
+  }
+}
+
+.controls-drawer-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  color: var(--text-muted);
+}
+
+.controls-drawer-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.controls-drawer-btn:hover {
+  border-color: rgba(124, 77, 255, 0.35);
+  color: var(--accent-bright);
+  background: rgba(124, 77, 255, 0.08);
+}
+
+/* Control groups inside drawers — more padding */
+.control-group {
+  padding: 13px 18px;
+}
+
+.control-header label {
+  font-size: 10px;
+  letter-spacing: 0.11em;
+}
+
+/* Sliders — cleaner track */
+.slider {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.slider::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+}
+
+.slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+}
+
+/* Value badges */
+.value-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ── Stop/Rewind hover — updated colors ──────────────────────────────────── */
+#stopBtn:hover {
+  background: rgba(0, 201, 160, 0.08);
+  color: var(--teal);
+  border-color: rgba(0, 201, 160, 0.28);
+  box-shadow: 0 0 12px rgba(0, 201, 160, 0.10);
+}
+
+#rewindBtn:hover {
+  background: rgba(124, 77, 255, 0.08);
+  color: var(--accent-bright);
+  border-color: rgba(124, 77, 255, 0.28);
+  box-shadow: 0 0 12px rgba(124, 77, 255, 0.10);
+}
+
+#rewindBtn:active {
+  transform: scale(0.93) rotate(-12deg);
+}
+
+/* Loop button active state */
+.btn-loop--active {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  background: rgba(124, 77, 255, 0.10);
+  box-shadow:
+    inset 0 1px 6px rgba(124, 77, 255, 0.18),
+    0 0 16px rgba(124, 77, 255, 0.18);
+  filter: none;
+}
+
+.btn-loop--active:hover {
+  background: rgba(124, 77, 255, 0.15);
+  filter: none;
+}
+
+/* Export button */
+.btn-export {
+  color: var(--teal);
+  border-color: rgba(0, 201, 160, 0.18);
+  box-shadow: none;
+}
+
+.btn-export:hover {
+  background: rgba(0, 201, 160, 0.07);
+  color: var(--teal);
+  border-color: rgba(0, 201, 160, 0.40);
+  box-shadow: 0 0 16px rgba(0, 201, 160, 0.14);
+  filter: none;
+  transform: none;
+}
+
+/* ── Settings drawer internals ───────────────────────────────────────────── */
+.controls-section-header {
+  background: transparent;
+  padding: 10px 18px;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+}
+
+.controls-section-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+}
+
+.settings-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.settings-themes {
+  padding: 14px 18px 12px;
+}
+
+/* Theme chips */
+.theme-chip {
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.theme-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.theme-chip--active {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: rgba(0, 201, 160, 0.08);
+}
+
+/* Toggle switch */
+.toggle-input:checked + .toggle-track {
+  background: rgba(0, 201, 160, 0.20);
+  border-color: var(--teal);
+}
+
+.toggle-input:checked + .toggle-track::after {
+  background: var(--teal);
+}
+
+.toggle-label {
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+}
+
+/* Hz buttons */
+.btn-hz {
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 10px;
+}
+
+/* ── Paused-state dim — less harsh ───────────────────────────────────────── */
+body.is-paused .player-top,
+body.is-paused .player-bottom {
+  opacity: 0.70;
+}
+
+/* ── Playlist ─────────────────────────────────────────────────────────────── */
+.playlist-item {
+  padding: 9px 18px;
+  border-bottom-color: rgba(124, 77, 255, 0.06);
+}
+
+.playlist-item:hover {
+  background: rgba(124, 77, 255, 0.05);
+}
+
+.playlist-item[aria-current="true"] {
+  background: rgba(124, 77, 255, 0.09);
+  border-left-color: var(--accent);
+}
+
+.playlist-item-name {
+  font-size: 0.80rem;
+}
+
+.playlist-footer {
+  padding: 10px 18px 14px;
+  border-top-color: rgba(124, 77, 255, 0.07);
+}
+
+.btn-playlist-add {
+  background: rgba(124, 77, 255, 0.08);
+  border-color: rgba(124, 77, 255, 0.20);
+  border-radius: 8px;
+  color: var(--accent-bright);
+}
+
+.btn-playlist-add:hover {
+  background: rgba(124, 77, 255, 0.15);
+}
+
+/* ── Scrollbars — thinner ────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 77, 255, 0.22);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 77, 255, 0.42);
+}
+
+/* ── Site footer link ────────────────────────────────────────────────────── */
+.footer-link {
+  border-radius: 100px;
+  font-size: 10.5px;
+  background: rgba(7, 7, 18, 0.75);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.footer-link:hover {
+  border-color: rgba(124, 77, 255, 0.28);
+  color: var(--accent-bright);
+  box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.08);
+}
+
+/* ── Help button ─────────────────────────────────────────────────────────── */
+.btn-help {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: none;
+}
+
+/* ── Help modal ──────────────────────────────────────────────────────────── */
+#help-modal {
+  background: rgba(3, 3, 12, 0.98);
+  border-color: rgba(124, 77, 255, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.08), 0 24px 80px rgba(0, 0, 0, 0.85);
+}
+
+.help-modal-header {
+  border-bottom-color: rgba(124, 77, 255, 0.12);
+}
+
+.help-modal-title {
+  color: var(--accent-bright);
+  font-size: 0.85rem;
+}
+
+.shortcut-row dt kbd {
+  border-color: rgba(124, 77, 255, 0.30);
+  background: rgba(124, 77, 255, 0.08);
+  color: var(--accent-bright);
+  border-radius: 6px;
+}
+
+/* ── Aurora: slightly richer for the darker bg ───────────────────────────── */
+body::before {
+  opacity: 0.85;
+}
+
+body::after {
+  opacity: 0.80;
+}
+
+/* ── Page loader: accent sync ────────────────────────────────────────────── */
+#page-loader {
+  background: #020208;
+}
+
+.page-loader-icon {
+  color: #7c4dff;
+  filter: drop-shadow(0 0 12px rgba(124, 77, 255, 0.55));
+}
+
+/* ── Mobile drawer backdrop ─────────────────────────────────────────────── */
+/* Appears behind open drawers on phones so users can tap-to-close.
+   Hidden on desktop (min-width: 601px) via !important so it never shows. */
+.drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.50);
+  z-index: 45;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.drawer-backdrop.backdrop--visible {
+  display: block;
+}
+@media (min-width: 601px) {
+  .drawer-backdrop { display: none !important; }
+}
+
+/* ── Aurora idle animation (mobile) ────────────────────────────────────── */
+/* On mobile, JS stops updating --aurora-* CSS vars to avoid style-recalc
+   on every backdrop-filter layer. The aurora stays alive via this keyframe. */
+@keyframes aurora-idle {
+  from { opacity: 0.30; }
+  to   { opacity: 0.60; }
+}
+@media (max-width: 600px) {
+  body::before,
+  body::after {
+    animation: aurora-idle 8s ease-in-out infinite alternate;
+  }
 }
 

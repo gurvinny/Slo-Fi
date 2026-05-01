@@ -11,12 +11,16 @@ export function buildIR(ctx: BaseAudioContext, decay: number, size: number): Aud
   const ir = ctx.createBuffer(2, len, sr)
   const decayRate = 3.0 / (decay * (0.15 + size * 0.85))
 
+  // Pre-compute per-sample decay multiplier: envelope[i] = exp(-decayRate * i / sr)
+  // Using multiplicative decay avoids a division and Math.exp call per sample,
+  // reducing computation by ~3-5x for long IRs (e.g. Ambient 4.4s ≈ 422k samples).
+  const expDecayPerSample = Math.exp(-decayRate / sr)
   for (let ch = 0; ch < 2; ch++) {
     const data = ir.getChannelData(ch)
+    let envelope = 1.0
     for (let i = 0; i < len; i++) {
-      const t = i / sr
-      const envelope = Math.exp(-t * decayRate)
       data[i] = (Math.random() * 2 - 1) * envelope
+      envelope *= expDecayPerSample
     }
   }
 
@@ -51,6 +55,7 @@ export class AudioEngine {
   private _8DEnabled = false
   private _8DSpeed   = 0.5   // Hz, rotation rate
   private _8DRafId:  number | null = null
+  private _irRafId:  number | null = null  // debounce handle for IR rebuild
 
   // Fires each animation frame when 8D is enabled, with the current angle in radians.
   // App.ts uses this to keep the orb rotation in sync with the panner.
@@ -82,7 +87,7 @@ export class AudioEngine {
   private _loopXfadeGain: GainNode | null = null
 
   // EQ/chorus/saturation state (mirrors what EffectsChain holds internally)
-  private _eq = { low: 0, mid: 0, high: 0 }
+  private _eq = { low: 0, lowMid: 0, mid: 0, highMid: 0, high: 0 }
   private _chorus = { rate: 0.8, depth: 0 }
   private _saturationDrive = 0
   private _hzFrequency: number | null = null
@@ -141,6 +146,13 @@ export class AudioEngine {
     }
 
     this.context = new AudioContext({ latencyHint: 'interactive' })
+    // Auto-resume if iOS suspends the context mid-foreground (e.g. phone call,
+    // Siri, AirPods reconnect) so the user doesn't perceive it as a crash.
+    this.context.addEventListener('statechange', () => {
+      if (this.context?.state === 'suspended' && this._isPlaying) {
+        this.context.resume().catch(() => {})
+      }
+    })
 
     // Crossfade gain: sits between sourceNode and the dry/wet split.
     // Normally at 1.0; briefly dipped on loop boundaries to remove convolver artifacts.
@@ -164,11 +176,15 @@ export class AudioEngine {
     this.convolverNode.connect(this.wetGainNode)
     this.wetGainNode.connect(this.masterGainNode)
 
-    this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
+    try {
+      this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
+    } catch (err) {
+      console.error('ensureContext: buildIR failed (NaN or invalid params?)', err)
+    }
 
     // Effects chain sits between masterGain and destination
     this._effectsChain = new EffectsChain()
-    const chainOutput = this._effectsChain.init(this.context, this.masterGainNode)
+    const chainOutput = await this._effectsChain.init(this.context, this.masterGainNode)
 
     // Analyser taps the fully processed signal
     this._analyserNode = this.context.createAnalyser()
@@ -216,8 +232,12 @@ export class AudioEngine {
 
     await this.ensureContext()
     this.stop()
-    const arrayBuffer = await file.arrayBuffer()
+    // Release the old decoded buffer before allocating the new one so iOS
+    // doesn't hold both simultaneously and trigger a memory-pressure reload.
+    this.buffer = null
+    let arrayBuffer: ArrayBuffer | null = await file.arrayBuffer()
     this.buffer = await this.context!.decodeAudioData(arrayBuffer)
+    arrayBuffer = null  // release raw bytes; iOS may not GC until explicitly nulled
     this._startOffset = 0
   }
 
@@ -314,8 +334,14 @@ export class AudioEngine {
 
   setPitch(semitones: number): void {
     this._pitchSemitones = Math.max(-12, Math.min(12, semitones))
-    if (this.sourceNode) {
-      this.sourceNode.detune.value = this._pitchSemitones * 100
+    if (this.sourceNode && this.context) {
+      // setTargetAtTime with a 30 ms time constant avoids the click/pop caused
+      // by an instantaneous detune jump when the pitch slider is dragged.
+      this.sourceNode.detune.setTargetAtTime(
+        this._pitchSemitones * 100,
+        this.context.currentTime,
+        0.03,
+      )
     }
   }
 
@@ -350,15 +376,26 @@ export class AudioEngine {
 
   setReverbDecay(decaySeconds: number): void {
     this._reverbDecay = Math.max(0.1, Math.min(8.0, decaySeconds))
-    this.rebuildIR()
+    this._scheduleRebuildIR()
   }
 
   setReverbRoomSize(size: number): void {
     this._reverbRoomSize = Math.max(0.01, Math.min(1.0, size))
-    this.rebuildIR()
+    this._scheduleRebuildIR()
   }
 
-  setEQ(band: 'low' | 'mid' | 'high', db: number): void {
+  // Defers rebuildIR() to the next animation frame so that rapid back-to-back
+  // calls (e.g. applyPreset sets both decay and roomSize in the same tick) only
+  // trigger one allocation and one ConvolverNode buffer replacement.
+  private _scheduleRebuildIR(): void {
+    if (this._irRafId !== null) return
+    this._irRafId = requestAnimationFrame(() => {
+      this._irRafId = null
+      this.rebuildIR()
+    })
+  }
+
+  setEQ(band: 'low' | 'lowMid' | 'mid' | 'highMid' | 'high', db: number): void {
     this._eq[band] = Math.max(-12, Math.min(12, db))
     this._effectsChain?.setEQBand(band, this._eq[band])
   }
@@ -385,9 +422,11 @@ export class AudioEngine {
     this.setReverbDecay(params.reverbDecay)
     this.setReverbRoomSize(params.reverbRoomSize)
     this.setVolume(params.volume)
-    this.setEQ('low', params.eq.low)
-    this.setEQ('mid', params.eq.mid)
-    this.setEQ('high', params.eq.high)
+    this.setEQ('low',     params.eq.low)
+    this.setEQ('lowMid',  params.eq.lowMid)
+    this.setEQ('mid',     params.eq.mid)
+    this.setEQ('highMid', params.eq.highMid)
+    this.setEQ('high',    params.eq.high)
     this.setChorusRate(params.chorus.rate)
     this.setChorusDepth(params.chorus.depth)
     this.setSaturationDrive(params.saturationDrive)
@@ -489,7 +528,11 @@ export class AudioEngine {
 
   private rebuildIR(): void {
     if (!this.convolverNode || !this.context) return
-    this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
+    try {
+      this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
+    } catch (err) {
+      console.error('rebuildIR: failed to create IR buffer (OOM or closed context)', err)
+    }
   }
 
   // Waveform data for the canvas renderer

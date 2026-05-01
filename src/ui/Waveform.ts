@@ -1,8 +1,24 @@
-const UNPLAYED_COLOR = '#1a1a2c'
-
 // Reads a CSS custom property from :root so waveform colours follow the theme.
 function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+// Blends the theme accent at low opacity over the base dark bar colour,
+// giving unplayed bars a subtle tint that changes with the active theme.
+function unplayedColor(accent: string): string {
+  // accent is a hex like #b4ff00; parse R/G/B and mix 12% over the dark base
+  const hex = accent.replace('#', '')
+  if (hex.length === 6) {
+    const r = parseInt(hex.slice(0, 2), 16)
+    const g = parseInt(hex.slice(2, 4), 16)
+    const b = parseInt(hex.slice(4, 6), 16)
+    const t = 0.12   // tint strength
+    const br = Math.round(0x25 + (r - 0x25) * t)
+    const bg = Math.round(0x25 + (g - 0x25) * t)
+    const bb = Math.round(0x38 + (b - 0x38) * t)
+    return `rgb(${br},${bg},${bb})`
+  }
+  return '#252538'
 }
 
 export class Waveform {
@@ -51,6 +67,10 @@ export class Waveform {
 
   setLoopEnabled(enabled: boolean): void {
     this._loopEnabled = enabled
+    this.draw()
+  }
+
+  redraw(): void {
     this.draw()
   }
 
@@ -110,15 +130,17 @@ export class Waveform {
       ctx.fillRect(0, 0, hoverX, H)
     }
 
-    // Played bars — gradient between the two theme accent colours
+    // Played bars — gradient anchored at accentBright (always has sufficient contrast
+    // against the dark player background, even in dark themes like void/mono where
+    // `teal` can be dim purple that blends into the background)
     const playGrad = ctx.createLinearGradient(0, 0, W, 0)
-    playGrad.addColorStop(0,    teal)
-    playGrad.addColorStop(0.45, accent)
-    playGrad.addColorStop(0.75, accentBright)
-    playGrad.addColorStop(1,    teal)
+    playGrad.addColorStop(0,    accentBright)
+    playGrad.addColorStop(0.45, teal)
+    playGrad.addColorStop(0.75, accent)
+    playGrad.addColorStop(1,    accentBright)
 
-    // Draw all unplayed bars first (dark)
-    ctx.fillStyle = UNPLAYED_COLOR
+    // Draw all unplayed bars first — dark base tinted with the theme accent
+    ctx.fillStyle = unplayedColor(accent)
     for (let i = 0; i < data.length; i++) {
       const x = i * bw
       const h = Math.max(1, (data[i] ?? 0) * cy * 0.92)

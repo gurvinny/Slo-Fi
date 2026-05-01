@@ -5,3 +5,10 @@ dist/
 # Generated at build time by scripts/generate-icons.mjs
 public/icon-192.png
 public/icon-512.png
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example

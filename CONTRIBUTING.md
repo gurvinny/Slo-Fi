@@ -100,6 +100,18 @@ npm run preview
 
 The project has no runtime dependencies — everything ships bundled. The only dev tools are TypeScript and Vite.
 
+### Docker (alternative)
+
+If you prefer not to install Node locally, the full production build runs in Docker:
+
+```bash
+docker compose up -d        # build image and start nginx container
+docker compose down         # stop and remove container
+docker compose build --no-cache && docker compose up -d  # full rebuild
+```
+
+This uses a multi-stage build: Node 20-alpine compiles the TypeScript + Vite bundle, then nginx-alpine serves the `dist/` folder. The nginx config sets `no-cache` on `sw.js` and immutable caching on hashed assets.
+
 <br/>
 
 ---
@@ -174,8 +186,10 @@ The project uses **TypeScript in strict mode**. The compiler enforces:
 **Module structure** — code is organized into two modules:
 ```
 src/audio/    Web Audio API engine (AudioEngine, EffectsChain, BpmDetector, KeyDetector, Exporter, etc.)
-src/ui/       DOM controllers (App, AnomalySphere, Waveform, SpectrumAnalyzer, MobileController, etc.)
+src/ui/       DOM controllers (App, AnomalySphere, Waveform, MobileController, etc.)
 ```
+
+> Note: `SpectrumAnalyzer` was merged into `App` in v2.1.
 
 **Web Audio API** — prefer native nodes over manual DSP. The `AudioContext` instance is owned by `AudioEngine` and passed down — never create a second context.
 

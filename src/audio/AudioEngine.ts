@@ -87,7 +87,7 @@ export class AudioEngine {
   private _loopXfadeGain: GainNode | null = null
 
   // EQ/chorus/saturation state (mirrors what EffectsChain holds internally)
-  private _eq = { low: 0, mid: 0, high: 0 }
+  private _eq = { low: 0, lowMid: 0, mid: 0, highMid: 0, high: 0 }
   private _chorus = { rate: 0.8, depth: 0 }
   private _saturationDrive = 0
   private _hzFrequency: number | null = null
@@ -184,7 +184,7 @@ export class AudioEngine {
 
     // Effects chain sits between masterGain and destination
     this._effectsChain = new EffectsChain()
-    const chainOutput = this._effectsChain.init(this.context, this.masterGainNode)
+    const chainOutput = await this._effectsChain.init(this.context, this.masterGainNode)
 
     // Analyser taps the fully processed signal
     this._analyserNode = this.context.createAnalyser()
@@ -395,7 +395,7 @@ export class AudioEngine {
     })
   }
 
-  setEQ(band: 'low' | 'mid' | 'high', db: number): void {
+  setEQ(band: 'low' | 'lowMid' | 'mid' | 'highMid' | 'high', db: number): void {
     this._eq[band] = Math.max(-12, Math.min(12, db))
     this._effectsChain?.setEQBand(band, this._eq[band])
   }
@@ -422,9 +422,11 @@ export class AudioEngine {
     this.setReverbDecay(params.reverbDecay)
     this.setReverbRoomSize(params.reverbRoomSize)
     this.setVolume(params.volume)
-    this.setEQ('low', params.eq.low)
-    this.setEQ('mid', params.eq.mid)
-    this.setEQ('high', params.eq.high)
+    this.setEQ('low',     params.eq.low)
+    this.setEQ('lowMid',  params.eq.lowMid)
+    this.setEQ('mid',     params.eq.mid)
+    this.setEQ('highMid', params.eq.highMid)
+    this.setEQ('high',    params.eq.high)
     this.setChorusRate(params.chorus.rate)
     this.setChorusDepth(params.chorus.depth)
     this.setSaturationDrive(params.saturationDrive)

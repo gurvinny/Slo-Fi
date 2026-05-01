@@ -10,17 +10,17 @@
 //   • visual is optional — omit any field to inherit from DEFAULTS (defaults.ts).
 //
 // AUDIO RANGES (params)
-//   playbackRate    0.50 – 1.70   (1.0 = normal speed)
-//   reverbMix       0.00 – 1.00   (0 = dry, 1 = full wet)
-//   reverbDecay     0.50 – 8.00   seconds
-//   reverbRoomSize  0.00 – 1.00
-//   volume          0.00 – 1.00
-//   eq.low/mid/high -12 – +12     dB
-//   chorus.rate     0.10 – 5.00   Hz
-//   chorus.depth    0.00 – 1.00
-//   saturationDrive 0.00 – 1.00
-//   pitchSemitones  -12 – +12     (0 = no shift)
-//   hzFrequency     432 | 528 | 639 | 741 | 852 | 963 | null (off)
+//   playbackRate             0.50 – 1.70   (1.0 = normal speed)
+//   reverbMix                0.00 – 1.00   (0 = dry, 1 = full wet)
+//   reverbDecay              0.50 – 8.00   seconds
+//   reverbRoomSize           0.00 – 1.00
+//   volume                   0.00 – 1.00
+//   eq.low/lowMid/mid/highMid/high  -12 – +12  dB
+//   chorus.rate              0.10 – 5.00   Hz
+//   chorus.depth             0.00 – 1.00
+//   saturationDrive          0.00 – 1.00
+//   pitchSemitones           -12 – +12     (0 = no shift)
+//   hzFrequency              432 | 528 | 639 | 741 | 852 | 963 | null (off)
 //
 // VISUAL RANGES (visual)
 //   reactivity      0.00 – 1.00
@@ -32,11 +32,12 @@
 //   wireframe / bassPulse / lightning / crack / crystal / glitch: true | false
 //
 // COLOR THEMES
-//   'prism'  — audio-reactive hue cycling
-//   'void'   — deep purple / indigo
-//   'neon'   — electric cyan / magenta
-//   'mono'   — desaturated silver / white
-//   'ember'  — warm orange / red
+//   'meridian' — v3 default: electric cyan + deep violet
+//   'prism'    — audio-reactive hue cycling
+//   'void'     — deep purple / indigo
+//   'neon'     — electric cyan / magenta
+//   'mono'     — desaturated silver / white
+//   'ember'    — warm orange / red
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { PresetDefinition } from './types'
@@ -56,7 +57,7 @@ export const PRESETS: PresetDefinition[] = [
       reverbDecay:     2.5,
       reverbRoomSize:  0.68,
       volume:          0.80,
-      eq:              { low: 3, mid: -1, high: -5 },
+      eq:              { low: 3, lowMid: 1.5, mid: -1, highMid: -2, high: -5 },
       chorus:          { rate: 0, depth: 0 },
       saturationDrive: 0,
       hzFrequency:     null,
@@ -86,7 +87,7 @@ export const PRESETS: PresetDefinition[] = [
       reverbDecay:     3.3,
       reverbRoomSize:  0.52,
       volume:          0.80,
-      eq:              { low: 1.5, mid: 1, high: 2 },
+      eq:              { low: 1.5, lowMid: 0.5, mid: 1, highMid: 1.5, high: 2 },
       chorus:          { rate: 0.2, depth: 0 },
       saturationDrive: 0,
       hzFrequency:     null,
@@ -116,7 +117,7 @@ export const PRESETS: PresetDefinition[] = [
       reverbDecay:     4.4,
       reverbRoomSize:  0.81,
       volume:          0.75,
-      eq:              { low: 0, mid: -3, high: -2 },
+      eq:              { low: 0, lowMid: -1, mid: -3, highMid: -1.5, high: -2 },
       chorus:          { rate: 0.5, depth: 0.10 },
       saturationDrive: 0,
       hzFrequency:     432,
@@ -149,7 +150,7 @@ export const PRESETS: PresetDefinition[] = [
       reverbDecay:     1.7,
       reverbRoomSize:  0.59,
       volume:          0.80,
-      eq:              { low: 1, mid: -3.5, high: 1 },
+      eq:              { low: 1, lowMid: -1.5, mid: -3.5, highMid: 2, high: 1 },
       chorus:          { rate: 0.8, depth: 0.08 },
       saturationDrive: 0.07,
       hzFrequency:     null,

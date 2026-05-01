@@ -1169,8 +1169,9 @@ export class App {
     }
     this.sphere?.setColorTheme(theme)
     this.saveSettings()
-    // Redraw immediately so the new theme's CSS colour vars are picked up.
-    this.waveform.redraw()
+    // rAF ensures the browser has recalculated the CSS cascade before we read
+    // the new --accent / --teal vars from getComputedStyle inside waveform.draw().
+    requestAnimationFrame(() => this.waveform.redraw())
   }
 
   private updateBpmDisplay(): void {

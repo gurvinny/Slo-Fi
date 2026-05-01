@@ -8,12 +8,13 @@
 export const DEFAULTS = {
 
   // ── Color Theme ─────────────────────────────────────────────────────────────
-  // 'prism'  — fully audio-reactive hue cycling (recommended)
-  // 'void'   — deep purple / indigo
-  // 'neon'   — electric cyan / magenta
-  // 'mono'   — desaturated silver / white
-  // 'ember'  — warm orange / red
-  colorTheme: 'prism' as 'prism' | 'void' | 'neon' | 'mono' | 'ember',
+  // 'meridian' — v3.0 default: electric cyan + deep violet (celestial)
+  // 'prism'    — fully audio-reactive hue cycling
+  // 'void'     — deep purple / indigo
+  // 'neon'     — electric cyan / magenta
+  // 'mono'     — desaturated silver / white
+  // 'ember'    — warm orange / red
+  colorTheme: 'meridian' as 'meridian' | 'prism' | 'void' | 'neon' | 'mono' | 'ember',
 
   // ── Audio ────────────────────────────────────────────────────────────────────
   speed:          1.00,   // playback rate  [0.50 – 1.70]

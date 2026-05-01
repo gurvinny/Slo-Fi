@@ -1769,6 +1769,23 @@ body.is-paused .site-footer {
   --aurora-filter: grayscale(1) brightness(0.50);
 }
 
+/* Meridian — v3.0 default: electric chartreuse primary, deep azure secondary.
+   The only theme in the lineup built on yellow-green — instantly distinctive
+   against all other themes. Lime + azure = hyper-futuristic, zero hue overlap
+   with Neon (cyan), Void (indigo), Ember (orange) or Frost (light blue). */
+[data-theme="meridian"] {
+  --accent:        #b4ff00;
+  --accent-dim:    rgba(180, 255, 0, 0.18);
+  --accent-glow:   rgba(180, 255, 0, 0.52);
+  --accent-bright: #ccff33;
+  --accent-subtle: rgba(180, 255, 0, 0.24);
+  --accent-faint:  rgba(180, 255, 0, 0.08);
+  --teal:          #1a66ff;
+  --teal-dim:      rgba(26, 102, 255, 0.20);
+  /* Rotate purple aurora blobs 180° → lands in yellow-green / lime territory */
+  --aurora-filter: hue-rotate(180deg) saturate(2.0) brightness(0.72);
+}
+
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
@@ -2026,6 +2043,26 @@ body.is-paused .site-footer {
   color: var(--text-muted);
 }
 
+/* ── EQ frequency response curve canvas ─────────────────────────────────── */
+.eq-curve-canvas {
+  display: block;
+  width: calc(100% - 32px);
+  height: 72px;
+  margin: 0 16px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Frequency hint labels inside EQ slider labels */
+.eq-freq-hint {
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.45;
+  margin-left: 4px;
+  letter-spacing: 0.03em;
+}
+
 /* ── Visual Settings drawer — left side ─────────────────────────────────── */
 .settings-drawer {
   position: fixed;
@@ -2179,6 +2216,11 @@ body.is-paused .site-footer {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.theme-swatch--meridian {
+  background: linear-gradient(135deg, #b4ff00, #1a66ff);
+  box-shadow: 0 0 6px rgba(180, 255, 0, 0.5);
 }
 
 .theme-swatch--prism {

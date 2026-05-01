@@ -1,9 +1,11 @@
 // Shared types used across the app
 
 export interface EQParams {
-  low: number   // dB, -12 to +12
-  mid: number
-  high: number
+  low:     number   // dB, -12 to +12  (lowshelf  @ 80 Hz)
+  lowMid:  number   // dB, -12 to +12  (peaking   @ 250 Hz)
+  mid:     number   // dB, -12 to +12  (peaking   @ 1 kHz)
+  highMid: number   // dB, -12 to +12  (peaking   @ 4 kHz)
+  high:    number   // dB, -12 to +12  (highshelf @ 12 kHz)
 }
 
 export interface ChorusParams {

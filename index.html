@@ -289,19 +289,30 @@
             <div id="soundTab-effects" class="sound-tab-panel sound-tab-panel--hidden" role="tabpanel">
               <div class="controls">
                 <div class="control-section-label">Equalizer</div>
+                <canvas id="eqCurveCanvas" class="eq-curve-canvas" aria-hidden="true"></canvas>
                 <div class="control-group">
-                  <div class="control-header"><label for="eqLowSlider">Low</label><span class="value-badge value-badge--green" id="eqLowValue">0 dB</span></div>
-                  <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf" />
+                  <div class="control-header"><label for="eqLowSlider">Low <span class="eq-freq-hint">80 Hz</span></label><span class="value-badge value-badge--green" id="eqLowValue">0 dB</span></div>
+                  <input type="range" id="eqLowSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low shelf 80Hz" />
                   <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
                 </div>
                 <div class="control-group">
-                  <div class="control-header"><label for="eqMidSlider">Mid</label><span class="value-badge value-badge--green" id="eqMidValue">0 dB</span></div>
-                  <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak" />
+                  <div class="control-header"><label for="eqLowMidSlider">Low-Mid <span class="eq-freq-hint">250 Hz</span></label><span class="value-badge value-badge--green" id="eqLowMidValue">0 dB</span></div>
+                  <input type="range" id="eqLowMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ low-mid peak 250Hz" />
                   <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
                 </div>
                 <div class="control-group">
-                  <div class="control-header"><label for="eqHighSlider">High</label><span class="value-badge value-badge--green" id="eqHighValue">0 dB</span></div>
-                  <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf" />
+                  <div class="control-header"><label for="eqMidSlider">Mid <span class="eq-freq-hint">1 kHz</span></label><span class="value-badge value-badge--green" id="eqMidValue">0 dB</span></div>
+                  <input type="range" id="eqMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ mid peak 1kHz" />
+                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="eqHighMidSlider">High-Mid <span class="eq-freq-hint">4 kHz</span></label><span class="value-badge value-badge--green" id="eqHighMidValue">0 dB</span></div>
+                  <input type="range" id="eqHighMidSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high-mid peak 4kHz" />
+                  <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="eqHighSlider">High <span class="eq-freq-hint">12 kHz</span></label><span class="value-badge value-badge--green" id="eqHighValue">0 dB</span></div>
+                  <input type="range" id="eqHighSlider" class="slider slider--green" min="-12" max="12" value="0" step="0.5" aria-label="EQ high shelf 12kHz" />
                   <div class="slider-ticks"><span>-12</span><span>0</span><span>+12</span></div>
                 </div>
 
@@ -377,7 +388,10 @@
             <div class="settings-themes">
               <div class="settings-label">Color Theme</div>
               <div class="theme-chips" role="group" aria-label="Color theme">
-                <button class="theme-chip theme-chip--active" data-theme="prism" title="Hue reacts to music">
+                <button class="theme-chip" data-theme="meridian" title="Electric cyan & deep violet — v3.0 default">
+                  <span class="theme-swatch theme-swatch--meridian"></span>Meridian
+                </button>
+                <button class="theme-chip" data-theme="prism" title="Hue reacts to music">
                   <span class="theme-swatch theme-swatch--prism"></span>Prism
                 </button>
                 <button class="theme-chip" data-theme="void" title="Deep violet-indigo">
@@ -653,8 +667,8 @@
         <!-- About tab -->
         <div id="helpTab-about" class="help-tab-panel help-tab-panel--hidden" role="tabpanel">
           <div class="about-content">
-            <div class="about-logo">A N O M A L Y</div>
-            <div class="about-version">v2.2.0</div>
+            <div class="about-logo">M E R I D I A N</div>
+            <div class="about-version">v3.0.0 beta</div>
             <p class="about-desc">A browser-based lo-fi music visualizer with real-time audio effects and a reactive 3D orb. Drop any audio file and tune it to your vibe.</p>
             <div class="about-stack-label">Built with</div>
             <div class="about-stack">

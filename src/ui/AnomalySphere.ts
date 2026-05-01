@@ -515,11 +515,13 @@ const GLITCH_SHADER = {
 // Audio modulates lightness (+bass) and saturation (+treble) at runtime so the
 // palette still pulses with the music while staying completely on-theme.
 const THEME_PALETTES: Record<string, Array<[number, number, number]>> = {
-  void:  [[0.75, 0.88, 0.38], [0.67, 0.78, 0.42], [0.82, 0.72, 0.40], [0.70, 0.62, 0.33]],
-  neon:  [[0.50, 0.95, 0.52], [0.40, 0.90, 0.50], [0.88, 0.95, 0.57], [0.57, 0.90, 0.55]],
-  ember: [[0.03, 0.95, 0.55], [0.09, 0.92, 0.57], [0.00, 0.88, 0.45], [0.14, 0.85, 0.55]],
-  frost: [[0.56, 0.72, 0.65], [0.51, 0.65, 0.70], [0.61, 0.60, 0.68], [0.58, 0.48, 0.78]],
-  mono:  [[0.00, 0.04, 0.55], [0.00, 0.04, 0.65], [0.00, 0.04, 0.70], [0.00, 0.04, 0.45]],
+  // [hue 0-1, saturation 0-1, lightness 0-1] — A/B/C/D color slots
+  meridian: [[0.22, 1.00, 0.60], [0.61, 0.95, 0.55], [0.19, 1.00, 0.70], [0.63, 0.90, 0.46]],
+  void:     [[0.75, 0.88, 0.38], [0.67, 0.78, 0.42], [0.82, 0.72, 0.40], [0.70, 0.62, 0.33]],
+  neon:     [[0.50, 0.95, 0.52], [0.40, 0.90, 0.50], [0.88, 0.95, 0.57], [0.57, 0.90, 0.55]],
+  ember:    [[0.03, 0.95, 0.55], [0.09, 0.92, 0.57], [0.00, 0.88, 0.45], [0.14, 0.85, 0.55]],
+  frost:    [[0.56, 0.72, 0.65], [0.51, 0.65, 0.70], [0.61, 0.60, 0.68], [0.58, 0.48, 0.78]],
+  mono:     [[0.00, 0.04, 0.55], [0.00, 0.04, 0.65], [0.00, 0.04, 0.70], [0.00, 0.04, 0.45]],
 }
 
 // ── Manual icosahedron (replaces Three.js IcosahedronGeometry) ───────────────
@@ -745,6 +747,12 @@ export class AnomalySphere {
   private _motionMQ: MediaQueryList
   private _onVisibilityChange: () => void
 
+  // WebGPU upgrade: TSL uniform nodes and node material (null when on WebGL path)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _tslUniforms: Record<string, any> | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _tslMat: any | null = null
+
   // Called each frame with smoothed bass/mid/treble for the aurora, plus
   // fast-attack uiBass/uiTreble for snappy site-wide UI reactivity.
   public onEnergyUpdate: ((bass: number, mid: number, treble: number, uiBass: number, uiTreble: number) => void) | null = null
@@ -899,6 +907,176 @@ export class AnomalySphere {
 
     this.loop()
     requestAnimationFrame(() => this.resize())
+
+    // Fire-and-forget: attempt to upgrade from WebGLRenderer to WebGPURenderer.
+    // The sphere keeps rendering on WebGL2 immediately; if WebGPU is available
+    // the renderer swaps in the background before the first user interaction.
+    this._tryWebGPUUpgrade()
+  }
+
+  // Attempts a progressive upgrade to WebGPURenderer.
+  // If WebGPU is unavailable or init fails, the existing WebGLRenderer stays active.
+  // On success: swaps the renderer, rebuilds the EffectComposer, and replaces the
+  // sphere material with a TSL NodeMaterial that compiles to WGSL on WebGPU
+  // and to GLSL on WebGL2 — one shader, both backends.
+  private async _tryWebGPUUpgrade(): Promise<void> {
+    if (!navigator.gpu) return  // WebGPU not supported in this browser
+
+    try {
+      const adapter = await navigator.gpu.requestAdapter()
+      if (!adapter) return  // WebGPU not available on this hardware
+
+      // Dynamically import the WebGPU renderer and TSL noise function.
+      // Dynamic import keeps the WebGPU bundle out of the critical path —
+      // users on WebGL2 only hardware never pay the parse cost.
+      const [{ WebGPURenderer }, { Fn, uniform, vec3, float, mix, clamp, pow, dot, normalLocal, positionLocal, cameraPosition }, { mx_noise_float }, { MeshStandardNodeMaterial }] =
+        await Promise.all([
+          import('three/webgpu'),
+          import('three/tsl'),
+          import('three/tsl'),
+          import('three/webgpu'),
+        ])
+
+      const newRenderer = new WebGPURenderer({
+        antialias: !this._isMobile,
+        alpha:     false,
+      })
+      await newRenderer.init()
+
+      // Swap canvas: remove the old WebGL canvas, attach the new WebGPU one
+      const oldCanvas = this.renderer.domElement
+      this.renderer.dispose()
+      this.container.removeChild(oldCanvas)
+
+      this.renderer = newRenderer as unknown as WebGLRenderer  // renderer API is compatible
+      const canvas  = newRenderer.domElement
+      canvas.style.display  = 'block'
+      canvas.style.position = 'absolute'
+      canvas.style.inset    = '0'
+      canvas.style.width    = '100%'
+      canvas.style.height   = '100%'
+      canvas.setAttribute('aria-hidden', 'true')
+      canvas.setAttribute('tabindex', '-1')
+      this.container.insertBefore(canvas, this.container.firstChild)
+
+      newRenderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 2 : 3))
+      newRenderer.setClearColor(new Color('#080810'), 1)
+      newRenderer.toneMapping        = ACESFilmicToneMapping
+      newRenderer.toneMappingExposure = 0.50
+
+      // Rebuild the EffectComposer with the new renderer
+      const { EffectComposer } = await import('three/examples/jsm/postprocessing/EffectComposer.js')
+      const { RenderPass }     = await import('three/examples/jsm/postprocessing/RenderPass.js')
+      const { UnrealBloomPass }= await import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
+      const { OutputPass }     = await import('three/examples/jsm/postprocessing/OutputPass.js')
+
+      this.composer = new EffectComposer(newRenderer as unknown as WebGLRenderer)
+      this.composer.addPass(new RenderPass(this.scene, this.camera))
+      const bloomRes = this._isMobile ? 150 : 300
+      this.bloom = new UnrealBloomPass(new Vector2(bloomRes, bloomRes), 0.45, 0.38, 0.22)
+      this.composer.addPass(this.bloom)
+      // Grain and glitch passes use GLSL ShaderPass — skip on WebGPU path for now;
+      // they'll be ported to TSL in a follow-up PR
+      this.grainPass  = undefined
+      this.glitchPass = undefined
+      this.composer.addPass(new OutputPass())
+
+      // Build TSL node material for the sphere.
+      // TSL compiles to WGSL on WebGPU and GLSL on WebGL2 — no separate shaders needed.
+      // Uniform nodes mirror the existing this.uniforms object values, updated each frame.
+      const uTime    = uniform(0.0)
+      const uBass    = uniform(0.0)
+      const uMid     = uniform(0.0)
+      const uTreble  = uniform(0.0)
+      const uSubBass = uniform(0.0)
+      const uSpeed   = uniform(this.speed)
+      const uCrystal = uniform(0.0)
+      const uColorA  = uniform(this.uniforms.uColorA.value.clone())
+      const uColorB  = uniform(this.uniforms.uColorB.value.clone())
+      const uColorC  = uniform(this.uniforms.uColorC.value.clone())
+      const uColorD  = uniform(this.uniforms.uColorD.value.clone())
+
+      // Store refs so the render loop can update them alongside the GLSL uniforms
+      this._tslUniforms = { uTime, uBass, uMid, uTreble, uSubBass, uSpeed, uCrystal, uColorA, uColorB, uColorC, uColorD }
+
+      // Vertex displacement: 5 perlin-noise layers scaled by audio band energy.
+      // Replicates the GLSL vertex shader displacement logic using TSL math nodes.
+      const positionNode = Fn(() => {
+        const t = uTime.mul(float(0.4).add(uSpeed.mul(0.6)))
+
+        // Layer 1 — sub-bass: large slow bulges from 808 energy
+        const p1   = positionLocal.mul(1.8).add(vec3(t.mul(0.40), t.mul(0.30), t.mul(0.35)))
+        const dSub = mx_noise_float(p1).mul(0.28).mul(uSubBass.mul(0.8).add(uBass.mul(0.3)))
+
+        // Layer 2 — bass: the primary driver of big surface distortion
+        const p2 = positionLocal.mul(1.8).add(vec3(t.mul(0.40), t.mul(0.30), t.mul(0.35)))
+        const d1 = mx_noise_float(p2).mul(0.40).mul(uBass)
+
+        // Layer 3 — mid: medium-scale ripples
+        const p3 = positionLocal.mul(3.2).add(vec3(t.mul(0.60), t.mul(0.80), t.mul(0.55)))
+        const d2 = mx_noise_float(p3).mul(0.12).mul(uMid)
+
+        // Layer 4 — treble: fine high-frequency shimmer
+        const p4 = positionLocal.mul(5.5).add(vec3(t.mul(0.90), t.mul(0.70), t.mul(0.65)))
+        const d3 = mx_noise_float(p4).mul(0.05).mul(uTreble)
+
+        // Layer 5 — mid secondary: slow secondary ripple for texture
+        const p5 = positionLocal.mul(2.4).add(vec3(t.mul(0.25), t.mul(0.18), t.mul(0.22)))
+        const d4 = mx_noise_float(p5).mul(0.07).mul(uMid)
+
+        // Idle breathing — keeps the orb alive when music is paused
+        const pIdle = positionLocal.mul(1.2).add(vec3(t.mul(0.15), t.mul(0.12), t.mul(0.18)))
+        const idle  = mx_noise_float(pIdle).mul(0.028)
+
+        // Crystal: flatten displacement to zero as crystalAmount → 1
+        const disp = dSub.add(d1).add(d2).add(d3).add(d4).add(idle)
+                        .mul(float(1.0).sub(uCrystal.mul(0.90)))
+
+        return positionLocal.add(normalLocal.mul(disp))
+      })()
+
+      // Fragment color: hemisphere gradient + Fresnel rim.
+      // Colors A/B/C/D are driven by theme palette and hue-cycling (updated each frame).
+      const colorNode = Fn(() => {
+        // Fresnel: bright rim on silhouette edges (nDotV → 0 at grazing angles)
+        const viewDir  = cameraPosition.normalize()
+        const nDotV    = clamp(dot(normalLocal, viewDir), 0.001, 1.0)
+        const fresnel  = pow(float(1.0).sub(nDotV), 3.0)
+
+        // Height gradient: y goes -1 → +1 on unit sphere; remap to 0 → 1
+        const t01 = clamp(positionLocal.y.mul(0.5).add(0.5), 0.0, 1.0)
+
+        // Bottom hemisphere blends A→D with bass energy
+        const bottom = mix(uColorA, uColorD, clamp(uBass.mul(0.5).add(t01.mul(0.5)), 0.0, 1.0))
+        // Top hemisphere blends B→C with treble
+        const top    = mix(uColorB, uColorC, clamp(uTreble.mul(0.3).add(t01.mul(0.7)), 0.0, 1.0))
+
+        // Blend top/bottom by height
+        const baseColor = mix(bottom, top, t01)
+
+        // Fresnel rim tinted toward colorB (the "cool" accent color)
+        const rimColor  = uColorB.mul(fresnel.mul(float(0.7).add(uBass.mul(0.3))))
+
+        // Crystal tint: icy blue-white overlay as crystal → 1
+        const crystalTint = vec3(0.7, 0.9, 1.0)
+        const withCrystal = mix(baseColor.add(rimColor), crystalTint, uCrystal.mul(0.45))
+
+        return withCrystal
+      })()
+
+      const tslMat = new MeshStandardNodeMaterial()
+      tslMat.positionNode = positionNode
+      tslMat.colorNode    = colorNode
+      tslMat.wireframe    = (this.mesh.material as RawShaderMaterial).wireframe
+
+      this.mesh.material = tslMat
+      this._tslMat = tslMat
+
+      this.resize()
+      console.log('[AnomalySphere] Upgraded to WebGPU renderer with TSL node materials')
+    } catch (e) {
+      console.log('[AnomalySphere] WebGPU upgrade skipped:', e)
+    }
   }
 
   // Builds the particle field spread across the full scene volume.
@@ -1264,6 +1442,21 @@ export class AnomalySphere {
     this.uniforms.uReverb.value = this.reverb
     this.uniforms.uSpeed.value  = this.speed
 
+    // Mirror values to TSL uniform nodes when WebGPU renderer is active
+    if (this._tslUniforms) {
+      this._tslUniforms.uTime.value    = elapsed
+      this._tslUniforms.uSubBass.value = this.uniforms.uSubBass.value
+      this._tslUniforms.uBass.value    = kickVis
+      this._tslUniforms.uMid.value     = mVis
+      this._tslUniforms.uTreble.value  = tVis
+      this._tslUniforms.uSpeed.value   = this.speed
+      this._tslUniforms.uCrystal.value = this.uniforms.uCrystal.value
+      this._tslUniforms.uColorA.value.copy(this.uniforms.uColorA.value)
+      this._tslUniforms.uColorB.value.copy(this.uniforms.uColorB.value)
+      this._tslUniforms.uColorC.value.copy(this.uniforms.uColorC.value)
+      this._tslUniforms.uColorD.value.copy(this.uniforms.uColorD.value)
+    }
+
     // Smooth fade for pause/play — slow lerp for an organic, weighty feel
     this.visualFade += (this.targetFade - this.visualFade) * 0.028
     // Clamp introProgress so it never over-brighten the exposure
@@ -1455,6 +1648,7 @@ export class AnomalySphere {
   setWireframe(v: boolean): void {
     ;(this.mesh.material as RawShaderMaterial).wireframe = v
     this.uniforms.uWireframe.value = v ? 1.0 : 0.0
+    if (this._tslMat) this._tslMat.wireframe = v
   }
 
   // Change the color theme. 'prism' = fully audio-reactive hue cycling.

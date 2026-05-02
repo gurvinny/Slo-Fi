@@ -556,6 +556,13 @@
 
       </main>
 
+      <!-- Mobile drawer backdrop — tap to close any open drawer on phones.
+           Must be inside #app so its z-index (45) is evaluated in the same
+           stacking context as the drawers (z-index 60). If left outside #app,
+           the root context sees #app at z-index 1 and the backdrop at z-index 45,
+           so the backdrop paints over the drawers and eats all touch events. -->
+      <div id="drawerBackdrop" class="drawer-backdrop"></div>
+
     </div><!-- /#app -->
 
     <!-- Footer: GitHub link, visible on landing screen only -->
@@ -684,9 +691,6 @@
 
       </div>
     </dialog>
-
-    <!-- Mobile drawer backdrop — tap to close any open drawer on phones -->
-    <div id="drawerBackdrop" class="drawer-backdrop"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

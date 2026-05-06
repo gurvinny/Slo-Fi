@@ -2043,16 +2043,70 @@ body.is-paused .site-footer {
   color: var(--text-muted);
 }
 
+/* ── EQ canvas wrapper — provides position:relative for tooltip/toggle ───── */
+.eq-canvas-wrap {
+  position: relative;
+  width: calc(100% - 32px);
+  margin: 0 16px 10px;
+}
+
 /* ── EQ frequency response curve canvas ─────────────────────────────────── */
 .eq-curve-canvas {
   display: block;
-  width: calc(100% - 32px);
-  height: 72px;
-  margin: 0 16px 10px;
+  width: 100%;
+  height: 120px;
   border-radius: 8px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.06);
+  cursor: crosshair;
+  touch-action: none;
 }
+
+.eq-curve-canvas.eq-dragging { cursor: none; }
+
+/* ── EQ slider toggle button — top-right corner of canvas wrap ───────────── */
+.eq-sliders-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.35);
+  color: var(--text-dim, rgba(255,255,255,0.4));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: border-color 0.15s, color 0.15s;
+  padding: 0;
+}
+.eq-sliders-btn:hover { border-color: var(--accent); color: var(--accent); }
+.eq-sliders-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+/* ── EQ tooltip — absolutely positioned inside .eq-canvas-wrap ───────────── */
+.eq-tooltip {
+  position: absolute;
+  pointer-events: none;
+  display: none;
+  background: rgba(8,8,18,0.92);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text, #fff);
+  white-space: nowrap;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.eq-tooltip.eq-tooltip--visible { display: block; }
+
+/* ── Collapsed EQ sliders ─────────────────────────────────────────────────── */
+.eq-sliders-hidden { display: none !important; }
 
 /* Frequency hint labels inside EQ slider labels */
 .eq-freq-hint {

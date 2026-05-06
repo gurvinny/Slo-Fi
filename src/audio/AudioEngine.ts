@@ -400,6 +400,24 @@ export class AudioEngine {
     this._effectsChain?.setEQBand(band, this._eq[band])
   }
 
+  private _eqFreq: Record<string, number> = { low: 80, lowMid: 250, mid: 1000, highMid: 4000, high: 12000 }
+  private _eqQ:    Record<string, number> = { low: 1,  lowMid: 1.0, mid: 1.5,  highMid: 1.0,  high: 1    }
+
+  setEQFreq(band: 'low' | 'lowMid' | 'mid' | 'highMid' | 'high', hz: number): void {
+    this._eqFreq[band] = hz
+    this._effectsChain?.setEQFreq(band, hz)
+  }
+
+  setEQQ(band: 'low' | 'lowMid' | 'mid' | 'highMid' | 'high', q: number): void {
+    this._eqQ[band] = q
+    this._effectsChain?.setEQQ(band, q)
+  }
+
+  setEQSlope(band: 'low' | 'high', slope: number): void {
+    this._eqQ[band] = slope
+    this._effectsChain?.setEQSlope(band, slope)
+  }
+
   setChorusRate(hz: number): void {
     this._chorus.rate = Math.max(0.1, Math.min(5, hz))
     this._effectsChain?.setChorusRate(this._chorus.rate)

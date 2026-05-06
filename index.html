@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="has-splash">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -37,54 +37,324 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
-    #page-loader {
+    /* ── Splash screen — inline for instant paint before the JS/CSS bundle loads ── */
+
+    /* Ambient radial glow behind the mark — depth layer */
+    #splash::before {
+      content: '';
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -58%);
+      background: radial-gradient(
+        ellipse at center,
+        rgba(124, 77, 255, 0.10) 0%,
+        rgba(0, 201, 160, 0.04) 45%,
+        transparent 70%
+      );
+      pointer-events: none;
+      animation: _glow-breathe 3s ease-in-out infinite;
+    }
+    @keyframes _glow-breathe {
+      0%, 100% { opacity: 0.6; transform: translate(-50%, -58%) scale(0.92); }
+      50%       { opacity: 1;   transform: translate(-50%, -58%) scale(1.08); }
+    }
+
+    #splash {
       position: fixed;
       inset: 0;
-      background: #080810;
+      /* Deep violet-core dark — richer than a flat black */
+      background: radial-gradient(
+        ellipse 90% 80% at 50% 38%,
+        #0d0720 0%,
+        #020208 65%
+      );
       z-index: 9999;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      transition: opacity 0.2s ease;
+      overflow: hidden;
+      /* clip-path collapse is the exit animation — collapses to mark center */
+      clip-path: circle(150% at var(--clip-cx, 50%) var(--clip-cy, 34%));
+      transition: clip-path 0.62s cubic-bezier(0.65, 0, 1, 0.82);
+      will-change: clip-path;
     }
-    #page-loader.fade-out {
+    #splash.splash--out {
+      clip-path: circle(0% at var(--clip-cx, 50%) var(--clip-cy, 34%));
+    }
+    /* Fast collapse for repeat visitors */
+    #splash.splash--fast {
+      transition: clip-path 0.22s ease-in, opacity 0.18s ease 0.12s;
+      clip-path: circle(0% at 50% 34%);
       opacity: 0;
+    }
+
+    /* ── Corner bracket decorations ── */
+    .splash-bracket {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: rgba(124, 77, 255, 0.32);
+      border-style: solid;
+      opacity: 0;
+    }
+    .splash-bracket--tl { top: 28px;    left: 28px;   border-width: 1.5px 0 0 1.5px; }
+    .splash-bracket--tr { top: 28px;    right: 28px;  border-width: 1.5px 1.5px 0 0; }
+    .splash-bracket--bl { bottom: 28px; left: 28px;   border-width: 0 0 1.5px 1.5px; }
+    .splash-bracket--br { bottom: 28px; right: 28px;  border-width: 0 1.5px 1.5px 0; }
+    #splash.splash--animate .splash-bracket {
+      animation: _bracket-in 0.3s ease-out 0.68s both;
+    }
+    @keyframes _bracket-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    /* ── Scan line — one pass from top to bottom ── */
+    .splash-scanline {
+      position: absolute;
+      left: 0; right: 0; top: -2px;
+      height: 1.5px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(124, 77, 255, 0.75) 30%,
+        rgba(0, 201, 160, 0.60) 70%,
+        transparent 100%
+      );
       pointer-events: none;
     }
-    .page-loader-icon {
-      color: #9b6dff;
-      filter: drop-shadow(0 0 10px rgba(155, 109, 255, 0.45));
-      animation: _loader-pulse 1.4s ease-in-out infinite;
+    #splash.splash--animate .splash-scanline {
+      animation: _scanline-sweep 0.88s ease-in-out 0.08s both;
     }
-    .page-loader-inner {
-      transform-origin: 14px 14px;
-      animation: _loader-spin 4s linear infinite;
+    @keyframes _scanline-sweep {
+      from { top: -2px; opacity: 0; }
+      6%   { opacity: 1; }
+      90%  { opacity: 0.5; }
+      to   { top: 100%; opacity: 0; }
     }
-    @keyframes _loader-pulse {
-      0%, 100% { opacity: 0.45; transform: scale(0.91); }
-      50%       { opacity: 1;    transform: scale(1.06); }
+
+    /* ── Central content column ── */
+    .splash-center {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
     }
-    @keyframes _loader-spin {
-      to { transform: rotate(360deg); }
+
+    /* ── Geometric mark ── */
+    .splash-mark {
+      color: #7c4dff;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 12px rgba(124, 77, 255, 0.55));
+      animation: _mark-glow-pulse 1.5s ease-out;
     }
+    @keyframes _mark-glow-pulse {
+      0%  { filter: drop-shadow(0 0 2px  rgba(124, 77, 255, 0.08)); }
+      45% { filter: drop-shadow(0 0 28px rgba(124, 77, 255, 0.90)) drop-shadow(0 0 50px rgba(0, 201, 160, 0.22)); }
+      100%{ filter: drop-shadow(0 0 12px rgba(124, 77, 255, 0.55)); }
+    }
+
+    /* Hex trace-in via CSS transition (not keyframe) */
+    #splash-mark-hex {
+      stroke-dasharray: 85;
+      stroke-dashoffset: 85;
+      transition: stroke-dashoffset 0.50s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    #splash.splash--animate #splash-mark-hex {
+      stroke-dashoffset: 0;
+    }
+    /* Inner detail fades in after hex completes */
+    #splash-mark-detail {
+      opacity: 0;
+      transform: scale(0.88);
+      transition: opacity 0.3s ease 0.42s, transform 0.3s ease 0.42s;
+    }
+    #splash.splash--animate #splash-mark-detail {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* ── Mini EQ visualizer ── */
+    .splash-eq {
+      display: flex;
+      align-items: flex-end;
+      gap: 3.5px;
+      height: 22px;
+      opacity: 0;
+      transition: opacity 0.28s ease 0.46s;
+    }
+    #splash.splash--animate .splash-eq { opacity: 1; }
+
+    .splash-eq-bar {
+      width: 3px;
+      border-radius: 2px;
+      background: linear-gradient(to top, #7c4dff, #a37bff);
+      transform-origin: bottom;
+    }
+    .splash-eq-bar:nth-child(1) { height: 7px; }
+    .splash-eq-bar:nth-child(2) { height: 18px; }
+    .splash-eq-bar:nth-child(3) { height: 11px; }
+    .splash-eq-bar:nth-child(4) { height: 22px; }
+    .splash-eq-bar:nth-child(5) { height: 9px; }
+    .splash-eq-bar:nth-child(6) { height: 19px; }
+    .splash-eq-bar:nth-child(7) { height: 13px; }
+    #splash.splash--animate .splash-eq-bar {
+      animation: _eq-bounce calc(0.36s + var(--i, 0) * 0.055s) ease-in-out infinite alternate both;
+      animation-delay: calc(0.48s + var(--i, 0) * 0.07s);
+    }
+    @keyframes _eq-bounce {
+      from { transform: scaleY(0.15); opacity: 0.3; }
+      to   { transform: scaleY(1);    opacity: 1;   }
+    }
+
+    /* ── Wordmark ── */
+    .splash-wordmark {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 30px;
+      font-weight: 300;
+      letter-spacing: 0.48em;
+      padding-left: 0.48em; /* optical balance */
+      color: #e2e2f0;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.38s ease 0.47s, transform 0.38s ease 0.47s;
+    }
+    #splash.splash--animate .splash-wordmark {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ── Tagline ── */
+    .splash-tagline {
+      margin: -4px 0 0;
+      font-size: 10.5px;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: rgba(124, 77, 255, 0.55);
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.3s ease 0.62s, transform 0.3s ease 0.62s;
+    }
+    #splash.splash--animate .splash-tagline {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ── CTA button ── */
+    .splash-cta {
+      margin-top: 6px;
+      padding: 11px 32px;
+      border: 1px solid rgba(124, 77, 255, 0.38);
+      border-radius: 9px;
+      background: rgba(124, 77, 255, 0.06);
+      color: #a37bff;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 11.5px;
+      letter-spacing: 0.18em;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .splash-cta.splash-cta--visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .splash-cta:hover {
+      background: rgba(124, 77, 255, 0.14);
+      border-color: rgba(124, 77, 255, 0.62);
+      box-shadow: 0 0 18px rgba(124, 77, 255, 0.18);
+    }
+    .splash-cta:active {
+      background: rgba(124, 77, 255, 0.22);
+    }
+
+    /* ── Version badge ── */
+    .splash-version {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 10px;
+      letter-spacing: 0.20em;
+      color: rgba(255, 255, 255, 0.16);
+      white-space: nowrap;
+      opacity: 0;
+      z-index: 1;
+    }
+    #splash.splash--animate .splash-version {
+      animation: _version-in 0.3s ease 0.90s both;
+    }
+    @keyframes _version-in {
+      to { opacity: 1; }
+    }
+
+    /* ── Reduced motion — skip all transitions/animations ── */
     @media (prefers-reduced-motion: reduce) {
-      .page-loader-icon { animation: none; }
-      .page-loader-inner { animation: none; }
+      #splash::before { animation: none; }
+      .splash-mark    { animation: none; filter: drop-shadow(0 0 12px rgba(124, 77, 255, 0.55)); }
+      #splash.splash--animate .splash-scanline  { animation: none; opacity: 0; }
+      #splash.splash--animate .splash-bracket   { animation: none; opacity: 1; }
+      #splash.splash--animate #splash-mark-hex    { stroke-dashoffset: 0; transition: none; }
+      #splash.splash--animate #splash-mark-detail { opacity: 1; transform: none; transition: none; }
+      #splash.splash--animate .splash-eq          { opacity: 1; transition: none; }
+      #splash.splash--animate .splash-eq-bar      { animation: none; transform: none; opacity: 1; }
+      #splash.splash--animate .splash-wordmark    { opacity: 1; transform: none; transition: none; }
+      #splash.splash--animate .splash-tagline     { opacity: 1; transform: none; transition: none; }
     }
   </style>
   </head>
   <body>
-    <div id="page-loader" aria-hidden="true">
-      <svg class="page-loader-icon" width="48" height="48" viewBox="0 0 28 28" fill="none">
-        <polygon points="14,2 26,8 26,20 14,26 2,20 2,8"
-          fill="currentColor" fill-opacity="0.06"
-          stroke="currentColor" stroke-width="1.5"/>
-        <polygon class="page-loader-inner"
-          points="14,7 21,11 21,17 14,21 7,17 7,11"
-          stroke="currentColor" stroke-width="0.9" opacity="0.55"
-          transform="rotate(30, 14, 14)"/>
-        <circle cx="14" cy="14" r="2" fill="currentColor"/>
-      </svg>
+    <div id="splash" aria-hidden="true">
+      <!-- Corner brackets — appear after mark traces in -->
+      <span class="splash-bracket splash-bracket--tl" aria-hidden="true"></span>
+      <span class="splash-bracket splash-bracket--tr" aria-hidden="true"></span>
+      <span class="splash-bracket splash-bracket--bl" aria-hidden="true"></span>
+      <span class="splash-bracket splash-bracket--br" aria-hidden="true"></span>
+
+      <!-- Scan line: one sweep from top to bottom during load -->
+      <div class="splash-scanline" aria-hidden="true"></div>
+
+      <!-- Central content: mark → EQ bars → wordmark → tagline → CTA -->
+      <div class="splash-center">
+        <svg id="splash-mark" class="splash-mark" width="92" height="92" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon id="splash-mark-hex"
+            points="16,2 28,9 28,23 16,30 4,23 4,9"
+            fill="currentColor" fill-opacity="0.08"
+            stroke="currentColor" stroke-width="1.3"/>
+          <g id="splash-mark-detail">
+            <polygon points="16,8 22,11.5 22,18.5 16,22 10,18.5 10,11.5"
+              stroke="currentColor" stroke-width="0.7" fill="none" opacity="0.28"/>
+            <line x1="12" y1="20" x2="12" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="16" y1="20" x2="16" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="20" y1="20" x2="20" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+        </svg>
+
+        <!-- Mini frequency visualizer — animates after mark appears -->
+        <div class="splash-eq" aria-hidden="true">
+          <span class="splash-eq-bar" style="--i:0"></span>
+          <span class="splash-eq-bar" style="--i:1"></span>
+          <span class="splash-eq-bar" style="--i:2"></span>
+          <span class="splash-eq-bar" style="--i:3"></span>
+          <span class="splash-eq-bar" style="--i:4"></span>
+          <span class="splash-eq-bar" style="--i:5"></span>
+          <span class="splash-eq-bar" style="--i:6"></span>
+        </div>
+
+        <div class="splash-wordmark">SLO&#8209;FI</div>
+        <p class="splash-tagline">browser audio studio</p>
+        <button id="splashCta" class="splash-cta" type="button">Drop a track</button>
+      </div>
+
+      <!-- Version badge — bottom center -->
+      <div class="splash-version" aria-hidden="true">v3 &middot; Meridian</div>
     </div>
 
     <!-- Full-page orb canvas — direct child of body so it shares the same stacking
@@ -101,10 +371,12 @@
       <header class="header">
         <div class="header-inner">
           <div class="logo">
-            <svg class="logo-icon" width="26" height="26" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-width="1.5"/>
-              <polygon points="14,7 21,11 21,17 14,21 7,17 7,11" stroke="currentColor" stroke-width="0.9" opacity="0.5" transform="rotate(30, 14, 14)"/>
-              <circle cx="14" cy="14" r="2" fill="currentColor"/>
+            <svg class="logo-icon" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-width="1.5"/>
+              <polygon points="16,8 22,11.5 22,18.5 16,22 10,18.5 10,11.5" stroke="currentColor" stroke-width="0.8" fill="none" opacity="0.4"/>
+              <line x1="12" y1="20" x2="12" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              <line x1="16" y1="20" x2="16" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              <line x1="20" y1="20" x2="20" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
             </svg>
             <span class="logo-text">Slo‑Fi</span>
           </div>
@@ -150,10 +422,12 @@
             </ul>
 
             <div class="dropzone-content">
-              <svg class="dropzone-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M24 4 L44 14 L44 34 L24 44 L4 34 L4 14 Z" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.4"/>
-                <path d="M24 14 L34 19 L34 29 L24 34 L14 29 L14 19 Z" stroke="currentColor" stroke-width="1" fill="none" opacity="0.3"/>
-                <path d="M20 24 L24 20 L28 24 M24 20 L24 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <svg class="dropzone-icon dropzone-mark" width="48" height="48" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-width="1.5"/>
+                <polygon points="16,8 22,11.5 22,18.5 16,22 10,18.5 10,11.5" stroke="currentColor" stroke-width="0.8" fill="none" opacity="0.4"/>
+                <line x1="12" y1="20" x2="12" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <line x1="16" y1="20" x2="16" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <line x1="20" y1="20" x2="20" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
               </svg>
               <p class="dropzone-title">Drop your audio file here</p>
               <p class="dropzone-hint">or click to browse &nbsp;&middot;&nbsp; mp3 &nbsp;wav &nbsp;flac &nbsp;ogg &nbsp;aac</p>

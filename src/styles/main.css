@@ -4,22 +4,28 @@
 /* ── Design tokens → Tailwind theme ────────────────────────────────────── */
 /* All @theme variables become both CSS custom props AND Tailwind utilities:
    e.g. --color-accent → `bg-accent`, `text-accent`, `border-accent` etc.
-   Dynamic JS-updated vars (--aurora-bass, --ui-bass) stay in @layer base. */
+   Dynamic JS-updated vars (--aurora-bass, --ui-bass) stay in @layer base.
+   ── Brand palette ────────────────────────────────────────────────────────
+   Violet:  #7c4dff  (--color-accent)   /  bright: #a37bff
+   Teal:    #00c9a0  (--color-teal)
+   Dark bg: #020208  (--color-bg)
+   Surface: #07070f  (--color-surface)
+   ───────────────────────────────────────────────────────────────────────── */
 @theme {
-  --color-bg:           #080810;
-  --color-surface:      #0f0f1a;
-  --color-surface-2:    #141424;
-  --color-surface-3:    #1a1a2e;
-  --color-border:       #1e1e32;
-  --color-border-2:     #28283d;
+  --color-bg:           #020208;
+  --color-surface:      #07070f;
+  --color-surface-2:    #0c0c18;
+  --color-surface-3:    #111120;
+  --color-border:       #181828;
+  --color-border-2:     #202033;
 
-  --color-text:         #e2e2f0;
-  --color-text-dim:     #8888a8;
-  --color-text-muted:   #44445a;
+  --color-text:         #d6d6ee;
+  --color-text-dim:     #74748e;
+  --color-text-muted:   #36364a;
 
-  --color-accent:       #9b6dff;
-  --color-accent-bright:#b48aff;
-  --color-teal:         #00d4aa;
+  --color-accent:       #7c4dff;
+  --color-accent-bright:#a37bff;
+  --color-teal:         #00c9a0;
   --color-error:        #ff5f7e;
 
   --color-green:        #4ade80;
@@ -29,41 +35,42 @@
   --color-indigo:       #818cf8;
 
   --font-mono:          'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-  --radius:             10px;
-  --radius-sm:          6px;
+  --radius:             12px;
+  --radius-sm:          7px;
 }
 
 /* ── Base styles ────────────────────────────────────────────────────────── */
 /* Tailwind preflight handles the box-sizing reset. We add app-specific base. */
 @layer base {
   :root {
-    /* Semantic aliases kept as CSS vars — referenced throughout the stylesheet */
-    --bg: #080810;
-    --surface: #0f0f1a;
-    --surface-2: #141424;
-    --surface-3: #1a1a2e;
-    --border: #1e1e32;
-    --border-2: #28283d;
-    --text: #e2e2f0;
-    --text-dim: #8888a8;
-    --text-muted: #44445a;
-    --accent: #9b6dff;
-    --accent-dim: rgba(155, 109, 255, 0.18);
-    --accent-glow: rgba(155, 109, 255, 0.35);
-    --accent-bright: #b48aff;
-    --teal: #00d4aa;
-    --teal-dim: rgba(0, 212, 170, 0.15);
-    --error-color: #ff5f7e;
-    --glass-bg: rgba(12, 12, 22, 0.55);
-    --glass-border: rgba(255, 255, 255, 0.07);
-    --glass-blur: 24px;
-    --glass-glow: 0 0 0 1px var(--accent-dim), 0 8px 32px rgba(0, 0, 0, 0.4);
-    --accent-subtle: rgba(155, 109, 255, 0.22);
-    --accent-faint:  rgba(155, 109, 255, 0.10);
+    /* Semantic aliases — single source of truth is @theme above */
+    --bg:          var(--color-bg);
+    --surface:     var(--color-surface);
+    --surface-2:   var(--color-surface-2);
+    --surface-3:   var(--color-surface-3);
+    --border:      var(--color-border);
+    --border-2:    var(--color-border-2);
+    --text:        var(--color-text);
+    --text-dim:    var(--color-text-dim);
+    --text-muted:  var(--color-text-muted);
+    --accent:      var(--color-accent);
+    --accent-bright: var(--color-accent-bright);
+    --teal:        var(--color-teal);
+    --error-color: var(--color-error);
+    /* Derived composite vars (rgb channels of #7c4dff = 124,77,255 | #00c9a0 = 0,201,160) */
+    --accent-dim:    rgba(124, 77, 255, 0.18);
+    --accent-glow:   rgba(124, 77, 255, 0.35);
+    --accent-subtle: rgba(124, 77, 255, 0.22);
+    --accent-faint:  rgba(124, 77, 255, 0.10);
+    --teal-dim:      rgba(0, 201, 160, 0.15);
+    --glass-bg:      rgba(7, 7, 18, 0.68);
+    --glass-border:  rgba(255, 255, 255, 0.07);
+    --glass-blur:    28px;
+    --glass-glow:    0 0 0 1px var(--accent-dim), 0 8px 32px rgba(0, 0, 0, 0.4);
     --aurora-filter: none;
-    --btn-glass-bg:         rgba(10, 10, 15, 0.40);
-    --btn-glass-border:     rgba(255, 255, 255, 0.09);
-    --btn-glass-edge:       rgba(255, 255, 255, 0.13);
+    --btn-glass-bg:         rgba(8, 8, 20, 0.50);
+    --btn-glass-border:     rgba(255, 255, 255, 0.07);
+    --btn-glass-edge:       rgba(255, 255, 255, 0.11);
     --btn-glass-blur:       16px;
     --btn-tilt-perspective: 300px;
     /* JS-driven reactive values — updated each RAF frame by AnomalySphere */
@@ -314,7 +321,8 @@ body::after {
 
 .logo-icon {
   color: var(--accent);
-  filter: drop-shadow(0 0 8px var(--accent-glow));
+  filter: drop-shadow(0 0 calc(4px + var(--ui-bass) * 12px) rgba(124, 77, 255, calc(0.32 + var(--ui-bass) * 0.48)));
+  transition: filter 0.08s linear;
 }
 
 .logo-text {
@@ -2991,31 +2999,10 @@ body.is-paused .site-footer {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Design token overrides ──────────────────────────────────────────────── */
+/* All color aliases and radius values are now canonical in @theme at the top.
+   Only glass/button overrides remain that aren't expressible as @theme vars. */
 :root {
-  --bg:            #020208;
-  --surface:       #07070f;
-  --surface-2:     #0c0c18;
-  --surface-3:     #111120;
-  --border:        #181828;
-  --border-2:      #202033;
-  --text:          #d6d6ee;
-  --text-dim:      #74748e;
-  --text-muted:    #36364a;
-  --accent:        #7c4dff;
-  --accent-dim:    rgba(124, 77, 255, 0.18);
-  --accent-glow:   rgba(124, 77, 255, 0.38);
-  --accent-bright: #a37bff;
-  --teal:          #00c9a0;
-  --teal-dim:      rgba(0, 201, 160, 0.15);
-  --accent-subtle: rgba(124, 77, 255, 0.22);
-  --accent-faint:  rgba(124, 77, 255, 0.10);
-  --glass-bg:      rgba(7, 7, 18, 0.68);
-  --glass-blur:    28px;
-  --radius:        12px;
-  --radius-sm:     7px;
-  --btn-glass-bg:  rgba(8, 8, 20, 0.50);
-  --btn-glass-border: rgba(255, 255, 255, 0.07);
-  --btn-glass-edge:   rgba(255, 255, 255, 0.11);
+  --accent-glow: rgba(124, 77, 255, 0.38);
 }
 
 /* ── Header — compact monogram bar ──────────────────────────────────────── */
@@ -3030,7 +3017,9 @@ body.is-paused .site-footer {
 
 .logo-icon {
   color: var(--accent);
-  filter: drop-shadow(0 0 10px var(--accent-glow));
+  /* Audio-reactive glow: --ui-bass is updated each RAF frame (range 0–1) */
+  filter: drop-shadow(0 0 calc(4px + var(--ui-bass) * 12px) rgba(124, 77, 255, calc(0.32 + var(--ui-bass) * 0.48)));
+  transition: filter 0.08s linear;
 }
 
 .logo-text {
@@ -3751,4 +3740,58 @@ body::after {
     animation: aurora-idle 8s ease-in-out infinite alternate;
   }
 }
+
+/* ── Splash ↔ Landing fusion ────────────────────────────────────────────── */
+/* While the splash is active, hide landing UI so the clip-path reveal is the
+   intentional "first sight" of the app — not a double-exposure during the
+   splice sequence. The orb and aurora (body::before/after, #anomaly) are NOT
+   hidden so the 3D scene bleeds through the collapsing clip-path.             */
+
+html.has-splash .header,
+html.has-splash .landing-hero,
+html.has-splash .landing-rings,
+html.has-splash .landing-scan-line {
+  opacity: 0;
+  pointer-events: none;
+  transition: none !important;
+}
+
+/* Badge animations are paused while splash is active; they restart fresh on reveal */
+html.has-splash .landing-badge {
+  animation-play-state: paused;
+}
+
+/* Staggered reveal as has-splash is removed — each element fades in with a
+   slight delay so the landing "blooms" into view behind the collapsing circle */
+html:not(.has-splash) .landing-rings {
+  opacity: 1;
+  transition: opacity 0.55s ease 0.05s;
+}
+html:not(.has-splash) .landing-scan-line {
+  opacity: 1;
+  transition: opacity 0.4s ease 0.12s;
+}
+html:not(.has-splash) .header {
+  opacity: 1;
+  transition: opacity 0.4s ease 0.18s;
+}
+html:not(.has-splash) .landing-hero {
+  opacity: 1;
+  transition: opacity 0.5s ease 0.22s;
+}
+html:not(.has-splash) .landing-badge {
+  animation-play-state: running;
+}
+
+/* ── Drop-zone brand mark — idle glow pulse ─────────────────────────────── */
+/* Slow ambient pulse on the mark shown before any file is loaded.
+   No JS needed — pure CSS keyframe on the .dropzone-mark class. */
+.dropzone-mark {
+  animation: _mark-idle-pulse 3.5s ease-in-out infinite;
+}
+@keyframes _mark-idle-pulse {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(124, 77, 255, 0.22)); }
+  50%       { filter: drop-shadow(0 0 16px rgba(124, 77, 255, 0.55)) drop-shadow(0 0 32px rgba(0, 201, 160, 0.12)); }
+}
+/* Paused state: glow dims as --ui-bass decays to 0 — handled by .logo-icon rule above, no extra CSS needed */
 

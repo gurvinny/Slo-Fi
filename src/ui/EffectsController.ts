@@ -81,7 +81,7 @@ export class EffectsController {
   private _eqTooltip:     HTMLDivElement    | null = null
   private _eqToggleBtn:   HTMLButtonElement | null = null
   private _eqSliderGroups: HTMLElement[] = []
-  private _slidersVisible = true
+  private _slidersVisible = false
 
   // Pinch state
   private _pinchBandIdx:    number | null = null
@@ -206,6 +206,11 @@ export class EffectsController {
       sibling = sibling.nextElementSibling
     }
 
+    // Sliders hidden by default — toggle button reveals them
+    for (const group of this._eqSliderGroups) {
+      group.classList.add('eq-sliders-hidden')
+    }
+
     // Floating tooltip
     const tooltip = document.createElement('div')
     tooltip.className = 'eq-tooltip'
@@ -217,7 +222,7 @@ export class EffectsController {
     const btn = document.createElement('button')
     btn.className = 'eq-sliders-btn'
     btn.setAttribute('aria-label', 'Show EQ sliders')
-    btn.setAttribute('aria-pressed', 'false')
+    btn.setAttribute('aria-pressed', 'true')
     btn.setAttribute('title', 'Toggle EQ sliders')
     btn.innerHTML = `<svg width="12" height="10" viewBox="0 0 12 10" fill="none" aria-hidden="true">
       <line x1="0" y1="2" x2="12" y2="2" stroke="currentColor" stroke-width="1.2"/>

@@ -153,6 +153,32 @@ export class EffectsChain {
     nodeMap[band].gain.setTargetAtTime(clamped, t, 0.01)
   }
 
+  setEQFreq(band: 'low' | 'lowMid' | 'mid' | 'highMid' | 'high', hz: number): void {
+    const limits: Record<string, [number, number]> = {
+      low: [40, 300], lowMid: [100, 800], mid: [400, 4000], highMid: [1000, 10000], high: [5000, 20000],
+    }
+    const [min, max] = limits[band]
+    const clamped = Math.max(min, Math.min(max, hz))
+    const t = (this.ctx as AudioContext).currentTime
+    const nodeMap = { low: this.eqLow, lowMid: this.eqLowMid, mid: this.eqMid, highMid: this.eqHighMid, high: this.eqHigh }
+    nodeMap[band].frequency.setTargetAtTime(clamped, t, 0.01)
+  }
+
+  setEQQ(band: 'low' | 'lowMid' | 'mid' | 'highMid' | 'high', q: number): void {
+    const clamped = Math.max(0.1, Math.min(10, q))
+    const t = (this.ctx as AudioContext).currentTime
+    const nodeMap = { low: this.eqLow, lowMid: this.eqLowMid, mid: this.eqMid, highMid: this.eqHighMid, high: this.eqHigh }
+    nodeMap[band].Q.setTargetAtTime(clamped, t, 0.01)
+  }
+
+  // For lowshelf/highshelf, Q controls the shelf slope (0.5=gentle, 2.0=steep).
+  setEQSlope(band: 'low' | 'high', slope: number): void {
+    const clamped = Math.max(0.5, Math.min(2.0, slope))
+    const t = (this.ctx as AudioContext).currentTime
+    const node = band === 'low' ? this.eqLow : this.eqHigh
+    node.Q.setTargetAtTime(clamped, t, 0.01)
+  }
+
   setChorusRate(hz: number): void {
     const clamped = Math.max(0.1, Math.min(5, hz))
     const t = (this.ctx as AudioContext).currentTime

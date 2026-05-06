@@ -1,11 +1,21 @@
 // Shared types used across the app
 
+export type EQBand = 'low' | 'lowMid' | 'mid' | 'highMid' | 'high'
+
 export interface EQParams {
   low:     number   // dB, -12 to +12  (lowshelf  @ 80 Hz)
   lowMid:  number   // dB, -12 to +12  (peaking   @ 250 Hz)
   mid:     number   // dB, -12 to +12  (peaking   @ 1 kHz)
   highMid: number   // dB, -12 to +12  (peaking   @ 4 kHz)
   high:    number   // dB, -12 to +12  (highshelf @ 12 kHz)
+}
+
+export interface EQNodeState {
+  band:  EQBand
+  freq:  number   // Hz — draggable center/shelf frequency
+  db:    number   // gain dB ±12
+  q:     number   // Q for peaking bands
+  slope: number   // shelf slope 0.5–2.0 for low/high bands
 }
 
 export interface ChorusParams {

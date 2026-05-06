@@ -1,5 +1,5 @@
 import type { AudioEngine } from '../audio/AudioEngine'
-import type { AudioParams } from '../types'
+import type { AudioParams, EQNodeState } from '../types'
 
 // Owns the effects chain control section (EQ, chorus, saturation sliders).
 export class EffectsController {
@@ -56,6 +56,42 @@ export class EffectsController {
   private readonly _phArr:   Float32Array<ArrayBuffer>
   private _curveRafId: number | null = null
 
+  // ── EQ interactive node configuration ───────────────────────────────────
+  private readonly EQ_BANDS = [
+    { band: 'low'     as const, label: 'Low',      defaultFreq: 80,    freqMin: 40,   freqMax: 300,   isShelf: true,  defaultQ: 1.0 },
+    { band: 'lowMid'  as const, label: 'Low-Mid',  defaultFreq: 250,   freqMin: 100,  freqMax: 800,   isShelf: false, defaultQ: 1.0 },
+    { band: 'mid'     as const, label: 'Mid',       defaultFreq: 1000,  freqMin: 400,  freqMax: 4000,  isShelf: false, defaultQ: 1.5 },
+    { band: 'highMid' as const, label: 'High-Mid', defaultFreq: 4000,  freqMin: 1000, freqMax: 10000, isShelf: false, defaultQ: 1.0 },
+    { band: 'high'    as const, label: 'High',      defaultFreq: 12000, freqMin: 5000, freqMax: 20000, isShelf: true,  defaultQ: 1.0 },
+  ]
+
+  // Per-band live state — initialized to defaults, mutated during interaction
+  private _eqNodeState: EQNodeState[] = this.EQ_BANDS.map(b => ({
+    band: b.band, freq: b.defaultFreq, db: 0, q: b.defaultQ, slope: b.defaultQ,
+  }))
+
+  // Drag state
+  private _dragBandIdx:  number | null = null
+  private _dragStartY    = 0
+  private _dragStartDb   = 0
+  private _dragStartX    = 0
+  private _dragStartFreq = 0
+
+  // Programmatically created DOM elements
+  private _eqTooltip:     HTMLDivElement    | null = null
+  private _eqToggleBtn:   HTMLButtonElement | null = null
+  private _eqSliderGroups: HTMLElement[] = []
+  private _slidersVisible = false
+
+  // Pinch state
+  private _pinchBandIdx:    number | null = null
+  private _pinchInitialDist = 0
+  private _pinchInitialQ    = 1
+
+  private readonly NODE_R   = 10   // node radius in CSS pixels
+  private readonly DB_RANGE = 15   // visual dB range (±15 dB axis, ±12 dB clamped)
+  private readonly DB_MAX   = 12
+
   public on8DChange: ((enabled: boolean, speed: number) => void) | null = null
   public onChanged:  (() => void) | null = null
 
@@ -76,6 +112,9 @@ export class EffectsController {
   }
 
   private wire(): void {
+    // Build interactive EQ DOM first (wraps canvas, creates tooltip + toggle)
+    this._buildEQInteractiveDOM()
+
     const eqSliders: [HTMLInputElement, HTMLElement, 'low' | 'lowMid' | 'mid' | 'highMid' | 'high'][] = [
       [this.eqLowSlider,     this.eqLowValue,     'low'],
       [this.eqLowMidSlider,  this.eqLowMidValue,  'lowMid'],
@@ -84,11 +123,14 @@ export class EffectsController {
       [this.eqHighSlider,    this.eqHighValue,     'high'],
     ]
 
-    for (const [slider, badge, band] of eqSliders) {
+    for (let i = 0; i < eqSliders.length; i++) {
+      const [slider, badge, band] = eqSliders[i]
+      const nodeIdx = i
       slider.addEventListener('input', () => {
         const db = parseFloat(slider.value)
         this.engine.setEQ(band, db)
         badge.textContent = `${db > 0 ? '+' : ''}${db} dB`
+        this._eqNodeState[nodeIdx].db = db
         this._scheduleCurveDraw()
         this.onChanged?.()
       })
@@ -142,6 +184,345 @@ export class EffectsController {
     })
   }
 
+  // ── EQ interactive DOM setup ──────────────────────────────────────────────
+
+  private _buildEQInteractiveDOM(): void {
+    const canvas = this.eqCurveCanvas
+    const parent = canvas.parentElement!
+
+    // Wrap canvas in a positioned container for tooltip + toggle button
+    const wrap = document.createElement('div')
+    wrap.className = 'eq-canvas-wrap'
+    parent.insertBefore(wrap, canvas)
+    wrap.appendChild(canvas)
+    // Collect the 5 slider .control-group siblings that follow the wrapper
+    let sibling = wrap.nextElementSibling
+    let count = 0
+    while (sibling && count < 5) {
+      if (sibling.classList.contains('control-group')) {
+        this._eqSliderGroups.push(sibling as HTMLElement)
+        count++
+      }
+      sibling = sibling.nextElementSibling
+    }
+
+    // Sliders hidden by default — toggle button reveals them
+    for (const group of this._eqSliderGroups) {
+      group.classList.add('eq-sliders-hidden')
+    }
+
+    // Floating tooltip
+    const tooltip = document.createElement('div')
+    tooltip.className = 'eq-tooltip'
+    tooltip.setAttribute('aria-hidden', 'true')
+    wrap.appendChild(tooltip)
+    this._eqTooltip = tooltip
+
+    // Slider toggle button (mixer-lines icon)
+    const btn = document.createElement('button')
+    btn.className = 'eq-sliders-btn'
+    btn.setAttribute('aria-label', 'Show EQ sliders')
+    btn.setAttribute('aria-pressed', 'true')
+    btn.setAttribute('title', 'Toggle EQ sliders')
+    btn.innerHTML = `<svg width="12" height="10" viewBox="0 0 12 10" fill="none" aria-hidden="true">
+      <line x1="0" y1="2" x2="12" y2="2" stroke="currentColor" stroke-width="1.2"/>
+      <circle cx="4" cy="2" r="1.5" fill="currentColor"/>
+      <line x1="0" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.2"/>
+      <circle cx="8" cy="7" r="1.5" fill="currentColor"/>
+    </svg>`
+    wrap.appendChild(btn)
+    this._eqToggleBtn = btn
+    btn.addEventListener('click', () => this._toggleSliders())
+
+    this._wireCanvasEvents()
+
+    // ResizeObserver handles the drawer-open case where canvas starts at 0px
+    const ro = new ResizeObserver(() => {
+      this._resizeCanvas()
+      this._scheduleCurveDraw()
+    })
+    ro.observe(canvas)
+  }
+
+  private _wireCanvasEvents(): void {
+    const canvas = this.eqCurveCanvas
+
+    canvas.addEventListener('pointerdown',   (e) => this._onPointerDown(e))
+    canvas.addEventListener('pointermove',   (e) => this._onPointerMove(e))
+    canvas.addEventListener('pointerup',     (e) => this._onPointerUp(e))
+    canvas.addEventListener('pointercancel', ()  => this._endDrag())
+
+    // passive:false so we can call preventDefault() inside the handler
+    canvas.addEventListener('wheel', (e) => this._onWheel(e), { passive: false })
+
+    canvas.addEventListener('touchstart', (e) => this._onTouchStart(e), { passive: true })
+    canvas.addEventListener('touchmove',  (e) => this._onTouchMove(e),  { passive: false })
+    canvas.addEventListener('touchend',   ()  => this._onTouchEnd())
+  }
+
+  // ── Coordinate conversions (log-scale freq axis, linear gain axis) ────────
+
+  // Canvas x [0..W] → frequency Hz  (log-scale 20 Hz – 20 kHz)
+  private _xToFreq(x: number, W: number): number {
+    return 20 * Math.pow(1000, x / W)
+  }
+
+  // Frequency Hz → canvas x [0..W]
+  private _freqToX(hz: number, W: number): number {
+    return (Math.log10(hz / 20) / Math.log10(1000)) * W
+  }
+
+  // Gain dB → canvas y [0..H]  (0 dB = H/2, +DB_RANGE = top)
+  private _dbToY(db: number, H: number): number {
+    return H * 0.5 - (db / this.DB_RANGE) * H * 0.45
+  }
+
+  // ── Node hit detection ────────────────────────────────────────────────────
+
+  private _hitNode(cssPx: { x: number; y: number }, rect: DOMRect): number | null {
+    const W = rect.width
+    const H = rect.height
+    for (let i = 0; i < this._eqNodeState.length; i++) {
+      const s  = this._eqNodeState[i]
+      const nx = this._freqToX(s.freq, W)
+      const ny = this._dbToY(s.db, H)
+      const dx = cssPx.x - nx
+      const dy = cssPx.y - ny
+      if (Math.sqrt(dx * dx + dy * dy) <= this.NODE_R + 4) return i   // +4px grace for touch
+    }
+    return null
+  }
+
+  // ── Pointer event handlers (single-finger drag: gain + freq) ─────────────
+
+  private _onPointerDown(e: PointerEvent): void {
+    const rect  = this.eqCurveCanvas.getBoundingClientRect()
+    const cssPx = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    const idx   = this._hitNode(cssPx, rect)
+    if (idx === null) return
+
+    e.preventDefault()
+    this.eqCurveCanvas.setPointerCapture(e.pointerId)
+
+    this._dragBandIdx   = idx
+    this._dragStartY    = e.clientY
+    this._dragStartDb   = this._eqNodeState[idx].db
+    this._dragStartX    = e.clientX
+    this._dragStartFreq = this._eqNodeState[idx].freq
+
+    this.eqCurveCanvas.classList.add('eq-dragging')
+    this._showTooltip(idx, rect)
+  }
+
+  private _onPointerMove(e: PointerEvent): void {
+    const rect = this.eqCurveCanvas.getBoundingClientRect()
+
+    if (this._dragBandIdx === null) {
+      // Hover — update cursor and show tooltip when over a node
+      const cssPx = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      const idx   = this._hitNode(cssPx, rect)
+      this.eqCurveCanvas.style.cursor = idx !== null ? 'grab' : 'crosshair'
+      if (idx !== null) this._showTooltip(idx, rect)
+      else              this._hideTooltip()
+      return
+    }
+
+    e.preventDefault()
+    const idx  = this._dragBandIdx
+    const meta = this.EQ_BANDS[idx]
+    const W    = rect.width
+    const H    = rect.height
+
+    // Vertical drag → gain
+    const pxPerDb = (H * 0.45) / this.DB_RANGE
+    const newDb   = Math.max(-this.DB_MAX, Math.min(this.DB_MAX,
+      this._dragStartDb - (e.clientY - this._dragStartY) / pxPerDb))
+    this._eqNodeState[idx].db = newDb
+
+    // Horizontal drag → frequency (grab-and-drag in log space)
+    const startX = this._freqToX(this._dragStartFreq, W)
+    const rawX   = Math.max(0, Math.min(W, startX + (e.clientX - this._dragStartX)))
+    const newHz  = Math.max(meta.freqMin, Math.min(meta.freqMax, this._xToFreq(rawX, W)))
+    this._eqNodeState[idx].freq = newHz
+
+    this.engine.setEQ(meta.band, newDb)
+    this.engine.setEQFreq(meta.band, newHz)
+    this._syncNodeToSlider(idx)
+    this._scheduleCurveDraw()
+    this._showTooltip(idx, rect)
+    this.onChanged?.()
+  }
+
+  private _onPointerUp(e: PointerEvent): void {
+    this.eqCurveCanvas.releasePointerCapture(e.pointerId)
+    this._endDrag()
+  }
+
+  private _endDrag(): void {
+    this._dragBandIdx = null
+    this.eqCurveCanvas.classList.remove('eq-dragging')
+    this.eqCurveCanvas.style.cursor = 'crosshair'
+    this._hideTooltip()
+  }
+
+  // ── Scroll wheel: Q / slope adjustment on desktop ─────────────────────────
+
+  private _onWheel(e: WheelEvent): void {
+    const rect  = this.eqCurveCanvas.getBoundingClientRect()
+    const cssPx = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    const idx   = this._dragBandIdx ?? this._hitNode(cssPx, rect)
+    if (idx === null) return
+
+    e.preventDefault()
+    const delta = e.deltaY < 0 ? 1 : -1
+    const state = this._eqNodeState[idx]
+    const meta  = this.EQ_BANDS[idx]
+
+    if (meta.isShelf) {
+      state.slope = Math.max(0.5, Math.min(2.0, state.slope + delta * 0.1))
+      this.engine.setEQSlope(meta.band as 'low' | 'high', state.slope)
+    } else {
+      // Multiplicative Q steps feel natural (each tick = ×1.15 or ÷1.15)
+      state.q = Math.max(0.1, Math.min(10, state.q * Math.pow(1.15, delta)))
+      this.engine.setEQQ(meta.band, state.q)
+    }
+
+    this._scheduleCurveDraw()
+    this._showTooltip(idx, rect)
+  }
+
+  // ── Touch pinch: Q / slope adjustment on mobile ────────────────────────────
+
+  private _onTouchStart(e: TouchEvent): void {
+    if (e.touches.length !== 2) return
+    const rect = this.eqCurveCanvas.getBoundingClientRect()
+    const t0 = e.touches[0]
+    const t1 = e.touches[1]
+    const inCanvas = (t: Touch) =>
+      t.clientX >= rect.left && t.clientX <= rect.right &&
+      t.clientY >= rect.top  && t.clientY <= rect.bottom
+    if (!inCanvas(t0) || !inCanvas(t1)) return
+
+    const midX = (t0.clientX + t1.clientX) / 2 - rect.left
+    const midY = (t0.clientY + t1.clientY) / 2 - rect.top
+    const idx  = this._hitNode({ x: midX, y: midY }, rect)
+    if (idx === null) return
+
+    this._pinchBandIdx     = idx
+    this._pinchInitialDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY)
+    const state = this._eqNodeState[idx]
+    this._pinchInitialQ = this.EQ_BANDS[idx].isShelf ? state.slope : state.q
+  }
+
+  private _onTouchMove(e: TouchEvent): void {
+    if (this._pinchBandIdx === null || e.touches.length !== 2) return
+    e.preventDefault()
+
+    const t0    = e.touches[0]
+    const t1    = e.touches[1]
+    const dist  = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY)
+    const scale = dist / this._pinchInitialDist
+    const idx   = this._pinchBandIdx
+    const meta  = this.EQ_BANDS[idx]
+    const state = this._eqNodeState[idx]
+    const rect  = this.eqCurveCanvas.getBoundingClientRect()
+
+    if (meta.isShelf) {
+      state.slope = Math.max(0.5, Math.min(2.0, this._pinchInitialQ * scale))
+      this.engine.setEQSlope(meta.band as 'low' | 'high', state.slope)
+    } else {
+      state.q = Math.max(0.1, Math.min(10, this._pinchInitialQ * scale))
+      this.engine.setEQQ(meta.band, state.q)
+    }
+
+    this._scheduleCurveDraw()
+    this._showTooltip(idx, rect)
+  }
+
+  private _onTouchEnd(): void {
+    this._pinchBandIdx = null
+    this._hideTooltip()
+  }
+
+  // ── Tooltip ───────────────────────────────────────────────────────────────
+
+  private _showTooltip(idx: number, rect: DOMRect): void {
+    const tooltip = this._eqTooltip
+    if (!tooltip) return
+
+    const state = this._eqNodeState[idx]
+    const meta  = this.EQ_BANDS[idx]
+
+    const fmtFreq = (hz: number) => hz >= 1000 ? `${(hz / 1000).toFixed(1)}kHz` : `${Math.round(hz)}Hz`
+    const fmtDb   = (db: number) => `${db >= 0 ? '+' : ''}${db.toFixed(1)}dB`
+
+    if (meta.isShelf) {
+      tooltip.textContent = `${fmtFreq(state.freq)} | ${fmtDb(state.db)} | Slope: ${state.slope.toFixed(1)}`
+    } else {
+      tooltip.textContent = `${fmtFreq(state.freq)} | ${fmtDb(state.db)} | Q: ${state.q.toFixed(1)}`
+    }
+
+    tooltip.classList.add('eq-tooltip--visible')
+
+    // Position tooltip above node, clamped within wrapper bounds
+    const W  = rect.width
+    const H  = rect.height
+    const nx = this._freqToX(state.freq, W)
+    const ny = this._dbToY(state.db, H)
+    const tw = tooltip.offsetWidth  || 120
+    const th = tooltip.offsetHeight || 22
+
+    let tx = nx - tw / 2
+    let ty = ny - th - 10
+
+    tx = Math.max(4, Math.min(W - tw - 4, tx))
+    if (ty < 4) ty = ny + 16   // flip below if not enough space above
+
+    tooltip.style.left = `${tx}px`
+    tooltip.style.top  = `${ty}px`
+  }
+
+  private _hideTooltip(): void {
+    this._eqTooltip?.classList.remove('eq-tooltip--visible')
+  }
+
+  // ── Slider toggle ─────────────────────────────────────────────────────────
+
+  private _toggleSliders(): void {
+    this._slidersVisible = !this._slidersVisible
+    const btn = this._eqToggleBtn!
+    btn.setAttribute('aria-pressed', String(!this._slidersVisible))
+    btn.setAttribute('aria-label', this._slidersVisible ? 'Hide EQ sliders' : 'Show EQ sliders')
+    for (const group of this._eqSliderGroups) {
+      group.classList.toggle('eq-sliders-hidden', !this._slidersVisible)
+    }
+  }
+
+  // ── Bidirectional sync: node → slider ────────────────────────────────────
+
+  private _syncNodeToSlider(idx: number): void {
+    const state   = this._eqNodeState[idx]
+    const sliders = [this.eqLowSlider, this.eqLowMidSlider, this.eqMidSlider, this.eqHighMidSlider, this.eqHighSlider]
+    const badges  = [this.eqLowValue,  this.eqLowMidValue,  this.eqMidValue,  this.eqHighMidValue,  this.eqHighValue]
+    const db = parseFloat(state.db.toFixed(1))
+    sliders[idx].value      = String(db)
+    badges[idx].textContent = this._fmtDb(db)
+  }
+
+  // ── Canvas DPR-aware resize ───────────────────────────────────────────────
+
+  private _resizeCanvas(): void {
+    const canvas = this.eqCurveCanvas
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+    const dpr = window.devicePixelRatio || 1
+    canvas.width  = Math.round(rect.width  * dpr)
+    canvas.height = Math.round(rect.height * dpr)
+  }
+
+  // ── Curve drawing ─────────────────────────────────────────────────────────
+
   // Schedules a curve redraw on the next animation frame (debounced).
   private _scheduleCurveDraw(): void {
     if (this._curveRafId !== null) return
@@ -151,31 +532,31 @@ export class EffectsController {
     })
   }
 
-  // Renders the composite frequency response of all 5 EQ bands onto the canvas.
-  // Uses BiquadFilterNode.getFrequencyResponse() for accuracy — the same
-  // computation the Web Audio engine uses internally.
+  // Renders the composite EQ frequency response curve + interactive nodes.
+  // Uses BiquadFilterNode.getFrequencyResponse() for accuracy — same computation
+  // the Web Audio engine uses internally.
   private _drawEQCurve(): void {
     const canvas = this.eqCurveCanvas
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    const rect = canvas.getBoundingClientRect()
+    const W = rect.width
+    const H = rect.height
+    if (!W || !H) return
+
+    // Scale context to device pixels so all draw calls use CSS px coordinates
+    const dpr = window.devicePixelRatio || 1
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
     const filters = this.engine.effectsChain?.getEQNodes()
     if (!filters || filters.length < 5) {
-      // Audio context not yet initialized — draw flat line
-      this._drawFlatCurve(ctx, canvas.width, canvas.height)
+      this._drawFlatCurve(ctx, W, H)
       return
     }
 
     const N = this._freqArr.length
-    const W = canvas.width  || canvas.offsetWidth  || 300
-    const H = canvas.height || canvas.offsetHeight || 80
-
-    // Resize backing store to match display size
-    if (canvas.width !== W || canvas.height !== H) {
-      canvas.width  = W
-      canvas.height = H
-    }
 
     // Compute composite magnitude response (product of all 5 filters)
     const composite = new Float32Array(N).fill(1)
@@ -188,11 +569,9 @@ export class EffectsController {
     const dbArr = new Float32Array(N)
     for (let i = 0; i < N; i++) dbArr[i] = 20 * Math.log10(Math.max(composite[i], 1e-6))
 
-    // Map: ±15 dB range → canvas Y (dB=0 → midpoint)
-    const DB_RANGE = 15
-    const toY = (db: number) => H * 0.5 - (db / DB_RANGE) * H * 0.45
+    // Map: ±DB_RANGE dB range → canvas Y (0 dB = midpoint)
+    const toY = (db: number) => H * 0.5 - (db / this.DB_RANGE) * H * 0.45
 
-    // Draw background
     ctx.clearRect(0, 0, W, H)
 
     // 0 dB reference line
@@ -203,15 +582,13 @@ export class EffectsController {
     ctx.lineTo(W, H * 0.5)
     ctx.stroke()
 
-    // Fill under the curve
     const accentRgb = this._getAccentRGB()
+
+    // Fill under the curve
     ctx.beginPath()
     ctx.moveTo(0, H)
     for (let i = 0; i < N; i++) {
-      const x = (i / (N - 1)) * W
-      const y = toY(dbArr[i])
-      if (i === 0) ctx.lineTo(x, y)
-      else ctx.lineTo(x, y)
+      ctx.lineTo((i / (N - 1)) * W, toY(dbArr[i]))
     }
     ctx.lineTo(W, H)
     ctx.closePath()
@@ -224,12 +601,47 @@ export class EffectsController {
       const x = (i / (N - 1)) * W
       const y = toY(dbArr[i])
       if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
+      else         ctx.lineTo(x, y)
     }
     ctx.strokeStyle = `rgba(${accentRgb},0.85)`
     ctx.lineWidth = 1.5
     ctx.lineJoin = 'round'
     ctx.stroke()
+
+    this._drawEQNodes(ctx, W, H, accentRgb)
+  }
+
+  private _drawEQNodes(ctx: CanvasRenderingContext2D, W: number, H: number, accentRgb: string): void {
+    for (let i = 0; i < this._eqNodeState.length; i++) {
+      const s        = this._eqNodeState[i]
+      const x        = this._freqToX(s.freq, W)
+      const y        = this._dbToY(s.db, H)
+      const isActive = this._dragBandIdx === i
+
+      // Glow ring when actively dragging
+      if (isActive) {
+        ctx.beginPath()
+        ctx.arc(x, y, this.NODE_R + 5, 0, Math.PI * 2)
+        ctx.strokeStyle = `rgba(${accentRgb},0.30)`
+        ctx.lineWidth = 2
+        ctx.stroke()
+      }
+
+      // Main circle
+      ctx.beginPath()
+      ctx.arc(x, y, this.NODE_R, 0, Math.PI * 2)
+      ctx.fillStyle   = `rgba(${accentRgb},${isActive ? 0.95 : 0.75})`
+      ctx.strokeStyle = `rgba(${accentRgb},1)`
+      ctx.lineWidth   = 1.5
+      ctx.fill()
+      ctx.stroke()
+
+      // Center dot
+      ctx.beginPath()
+      ctx.arc(x, y, 2, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(0,0,0,0.65)'
+      ctx.fill()
+    }
   }
 
   private _drawFlatCurve(ctx: CanvasRenderingContext2D, W: number, H: number): void {
@@ -285,7 +697,7 @@ export class EffectsController {
     return `${db > 0 ? '+' : ''}${db} dB`
   }
 
-  // Syncs all slider positions and badges to a given params object.
+  // Syncs all slider positions, badges, and EQ node states to a given params object.
   syncToParams(params: AudioParams): void {
     const bands: [HTMLInputElement, HTMLElement, keyof typeof params.eq][] = [
       [this.eqLowSlider,     this.eqLowValue,     'low'],
@@ -294,10 +706,12 @@ export class EffectsController {
       [this.eqHighMidSlider, this.eqHighMidValue,  'highMid'],
       [this.eqHighSlider,    this.eqHighValue,     'high'],
     ]
-    for (const [slider, badge, key] of bands) {
+    for (let i = 0; i < bands.length; i++) {
+      const [slider, badge, key] = bands[i]
       const db = params.eq[key]
-      slider.value    = String(db)
-      badge.textContent = this._fmtDb(db)
+      slider.value            = String(db)
+      badge.textContent       = this._fmtDb(db)
+      this._eqNodeState[i].db = db
     }
 
     this.chorusRateSlider.value     = String(params.chorus.rate)

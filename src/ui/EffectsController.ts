@@ -29,6 +29,11 @@ export class EffectsController {
   private satDriveSlider = document.getElementById('satDriveSlider') as HTMLInputElement
   private satDriveValue  = document.getElementById('satDriveValue')!
 
+  private abyssDepthSlider     = document.getElementById('abyssDepthSlider')     as HTMLInputElement
+  private abyssResonanceSlider = document.getElementById('abyssResonanceSlider') as HTMLInputElement
+  private abyssDepthValue      = document.getElementById('abyssDepthValue')!
+  private abyssResonanceValue  = document.getElementById('abyssResonanceValue')!
+
   private eightDToggle      = document.getElementById('eightDToggle')      as HTMLInputElement
   private eightDSpeedSlider = document.getElementById('eightDSpeedSlider') as HTMLInputElement
   private eightDSpeedValue  = document.getElementById('eightDSpeedValue')!
@@ -163,6 +168,20 @@ export class EffectsController {
       const drive = parseFloat(this.satDriveSlider.value) / 100
       this.engine.setSaturationDrive(drive)
       this.satDriveValue.textContent = `${this.satDriveSlider.value}%`
+      this.onChanged?.()
+    })
+
+    this.abyssDepthSlider.addEventListener('input', () => {
+      const pct = parseFloat(this.abyssDepthSlider.value)
+      this.engine.setAbyssDepth(pct / 100)
+      this.abyssDepthValue.textContent = `${pct}%`
+      this.onChanged?.()
+    })
+
+    this.abyssResonanceSlider.addEventListener('input', () => {
+      const pct = parseFloat(this.abyssResonanceSlider.value)
+      this.engine.setAbyssResonance(pct / 100)
+      this.abyssResonanceValue.textContent = `${pct}%`
       this.onChanged?.()
     })
 
@@ -949,6 +968,14 @@ export class EffectsController {
     const satPct = Math.round(params.saturationDrive * 100)
     this.satDriveSlider.value     = String(satPct)
     this.satDriveValue.textContent = `${satPct}%`
+
+    const abyssDepthPct = Math.round(params.abyss.depth * 100)
+    this.abyssDepthSlider.value     = String(abyssDepthPct)
+    this.abyssDepthValue.textContent = `${abyssDepthPct}%`
+
+    const abyssResPct = Math.round(params.abyss.resonance * 100)
+    this.abyssResonanceSlider.value     = String(abyssResPct)
+    this.abyssResonanceValue.textContent = `${abyssResPct}%`
 
     this._updateHzButtons(params.hzFrequency)
     this._scheduleCurveDraw()

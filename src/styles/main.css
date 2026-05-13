@@ -33,6 +33,7 @@
   --color-red:          #f87171;
   --color-purple:       #a78bfa;
   --color-indigo:       #818cf8;
+  --color-cyan:         #22d3ee;
 
   --font-mono:          'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   --radius:             12px;
@@ -1296,6 +1297,8 @@ body.is-paused .site-footer {
   --purple-dim: rgba(167, 139, 250, 0.15);
   --indigo: #818cf8;
   --indigo-dim: rgba(129, 140, 248, 0.15);
+  --cyan: #22d3ee;
+  --cyan-dim: rgba(34, 211, 238, 0.15);
 }
 
 /* ── Preset cards ───────────────────────────────────────────────────────── */
@@ -1631,6 +1634,25 @@ body.is-paused .site-footer {
 .slider--purple::-moz-range-track {
   background: var(--purple-dim);
 }
+
+/* ── Abyss Filter controls (cyan) ───────────────────────────────────────── */
+.value-badge--cyan {
+  color: var(--cyan);
+  background: var(--cyan-dim);
+}
+
+.slider--cyan::-webkit-slider-thumb {
+  background: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-dim), 0 2px 6px rgba(0,0,0,0.4);
+}
+.slider--cyan::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 5px var(--cyan-dim), 0 2px 8px rgba(0,0,0,0.5);
+}
+.slider--cyan::-moz-range-thumb {
+  background: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-dim);
+}
+.slider--cyan + .slider-ticks { color: var(--cyan); }
 
 .control-group--8d {
   border-top: 1px solid var(--border);

@@ -611,6 +611,7 @@ export class App {
       const rate = parseInt(this.speedSlider.value) / 100
       this.engine.setPlaybackRate(rate)
       this.speedValue.textContent = `${rate.toFixed(2)}x`
+      this.triggerPulse(this.speedValue, 'value-pulse')
       this.speedSlider.setAttribute('aria-valuetext', `${rate.toFixed(2)}x`)
       this.sphere?.setSpeed(rate)
       this.presets.clearActive()
@@ -691,9 +692,22 @@ export class App {
       const vol = parseInt(this.volumeSlider.value) / 100
       this.engine.setVolume(vol)
       this.volumeValue.textContent = `${this.volumeSlider.value}%`
+      this.triggerPulse(this.volumeValue, 'value-pulse')
       this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
       this.saveSettings()
     })
+
+    // Slider thumb spring overshoot on release
+    const addSliderSpring = (slider: HTMLInputElement) => {
+      const onRelease = () => {
+        slider.classList.add('slider-spring-active')
+        slider.addEventListener('animationend', () => slider.classList.remove('slider-spring-active'), { once: true })
+      }
+      slider.addEventListener('mouseup', onRelease)
+      slider.addEventListener('touchend', onRelease)
+    }
+    addSliderSpring(this.speedSlider)
+    addSliderSpring(this.volumeSlider)
 
     // Visual settings — particle count
     this.particleCountSlider.addEventListener('change', () => {
@@ -1259,7 +1273,9 @@ export class App {
       key = ` · ${NOTE_NAMES[transposedRoot]} ${this._detectedKey.mode}`
     }
     const text = `${displayed} BPM${key}`
+    const prev = this.trackBpm.textContent
     this.trackBpm.textContent = text
+    if (prev !== text) this.triggerPulse(this.trackBpm, 'badge-pulse')
     // Announce BPM/key changes to screen readers via the sr-only live region
     const statusEl = document.getElementById('trackStatus')
     if (statusEl) statusEl.textContent = text
@@ -1318,5 +1334,12 @@ export class App {
       this.player.style.opacity = ''
       this.player.classList.add('visible')
     }, 420)
+  }
+
+  private triggerPulse(el: HTMLElement, cls: string): void {
+    el.classList.remove(cls)
+    void el.offsetWidth
+    el.classList.add(cls)
+    el.addEventListener('animationend', () => el.classList.remove(cls), { once: true })
   }
 }

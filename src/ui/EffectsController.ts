@@ -95,6 +95,15 @@ export class EffectsController {
   public on8DChange: ((enabled: boolean, speed: number) => void) | null = null
   public onChanged:  (() => void) | null = null
 
+  // ── Spectrum ghost animation ──────────────────────────────────────────────
+  private _spectrumRafId: number | null = null
+  private _spectrumOpacity = 0
+  private _isPlayingAudio  = false
+  private readonly _SPECTRUM_ALPHA = 0.88  // exponential smoothing factor (calm/fluid)
+  private _preSmoothed:  Float32Array | null = null
+  private _postSmoothed: Float32Array | null = null
+  private _spectrumBins  = 0
+
   constructor(engine: AudioEngine) {
     this.engine = engine
 
@@ -574,13 +583,8 @@ export class EffectsController {
 
     ctx.clearRect(0, 0, W, H)
 
-    // 0 dB reference line
-    ctx.beginPath()
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)'
-    ctx.lineWidth = 1
-    ctx.moveTo(0, H * 0.5)
-    ctx.lineTo(W, H * 0.5)
-    ctx.stroke()
+    this._drawGrid(ctx, W, H)
+    if (this._spectrumOpacity > 0.01) this._drawSpectrumGhosts(ctx, W, H)
 
     const accentRgb = this._getAccentRGB()
 
@@ -646,12 +650,233 @@ export class EffectsController {
 
   private _drawFlatCurve(ctx: CanvasRenderingContext2D, W: number, H: number): void {
     ctx.clearRect(0, 0, W, H)
+    this._drawGrid(ctx, W, H)
     ctx.beginPath()
     ctx.strokeStyle = 'rgba(255,255,255,0.15)'
     ctx.lineWidth = 1
     ctx.moveTo(0, H * 0.5)
     ctx.lineTo(W, H * 0.5)
     ctx.stroke()
+  }
+
+  // ── Grid (Ableton/Pro-Q style) ────────────────────────────────────────────
+
+  private _drawGrid(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+    const toY = (db: number) => H * 0.5 - (db / this.DB_RANGE) * H * 0.45
+
+    // Horizontal dB lines
+    const dbLevels = [
+      { db: 12,  label: '+12', alpha: 0.10, dash: [3, 4] },
+      { db: 6,   label: '+6',  alpha: 0.14, dash: [3, 4] },
+      { db: 0,   label: '0',   alpha: 0.28, dash: []     },
+      { db: -6,  label: '-6',  alpha: 0.14, dash: [3, 4] },
+      { db: -12, label: '-12', alpha: 0.10, dash: [3, 4] },
+    ]
+
+    ctx.save()
+    ctx.font = '9px system-ui, sans-serif'
+    ctx.textBaseline = 'middle'
+
+    for (const level of dbLevels) {
+      const y = toY(level.db)
+      ctx.beginPath()
+      ctx.setLineDash(level.dash)
+      ctx.strokeStyle = `rgba(255,255,255,${level.alpha})`
+      ctx.lineWidth = level.db === 0 ? 1.5 : 1
+      ctx.moveTo(0, y)
+      ctx.lineTo(W, y)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // Labels on both sides
+      ctx.fillStyle = `rgba(255,255,255,${level.alpha + 0.10})`
+      ctx.textAlign = 'left'
+      ctx.fillText(level.label, 4, y)
+      ctx.textAlign = 'right'
+      ctx.fillText(level.label, W - 4, y)
+    }
+
+    // Vertical frequency lines + labels
+    const freqMarkers = [
+      { hz: 20,    label: '20'   },
+      { hz: 50,    label: '50'   },
+      { hz: 100,   label: '100'  },
+      { hz: 200,   label: '200'  },
+      { hz: 500,   label: '500'  },
+      { hz: 1000,  label: '1k'   },
+      { hz: 2000,  label: '2k'   },
+      { hz: 5000,  label: '5k'   },
+      { hz: 10000, label: '10k'  },
+      { hz: 20000, label: '20k'  },
+    ]
+
+    ctx.font = '8px system-ui, sans-serif'
+    ctx.textBaseline = 'bottom'
+    ctx.textAlign = 'center'
+
+    for (const m of freqMarkers) {
+      const x = this._freqToX(m.hz, W)
+      ctx.beginPath()
+      ctx.setLineDash([2, 4])
+      ctx.strokeStyle = 'rgba(255,255,255,0.07)'
+      ctx.lineWidth = 1
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, H - 12)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      ctx.fillStyle = 'rgba(255,255,255,0.30)'
+      ctx.fillText(m.label, x, H)
+    }
+
+    ctx.restore()
+  }
+
+  // ── Spectrum ghosts (pre-EQ + post-EQ filled curves) ─────────────────────
+
+  private _drawSpectrumGhosts(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+    if (!this._preSmoothed || !this._postSmoothed) return
+    const op = this._spectrumOpacity
+    const bins = this._spectrumBins
+    if (!bins) return
+
+    // dBFS → canvas Y: -10 dBFS (loud) = top, -90 dBFS (silence) = bottom
+    const specToY = (dBFS: number) => H - ((dBFS + 90) / 80) * H
+
+    const nyquist = (this.engine.analyserPreEQ?.context.sampleRate ?? 44100) / 2
+
+    const drawGhost = (data: Float32Array, rgb: string, fillAlpha: number, strokeAlpha: number, lineW: number) => {
+      ctx.beginPath()
+      ctx.moveTo(0, H)
+      for (let xi = 0; xi <= W; xi += 2) {
+        const hz  = this._xToFreq(xi, W)
+        const bin = Math.min(Math.floor((hz / nyquist) * bins), bins - 1)
+        const y   = specToY(data[bin])
+        ctx.lineTo(xi, y)
+      }
+      ctx.lineTo(W, H)
+      ctx.closePath()
+      ctx.fillStyle = `rgba(${rgb},${fillAlpha * op})`
+      ctx.fill()
+
+      // Stroke the top edge
+      ctx.beginPath()
+      ctx.moveTo(0, specToY(data[0]))
+      for (let xi = 2; xi <= W; xi += 2) {
+        const hz  = this._xToFreq(xi, W)
+        const bin = Math.min(Math.floor((hz / nyquist) * bins), bins - 1)
+        ctx.lineTo(xi, specToY(data[bin]))
+      }
+      ctx.strokeStyle = `rgba(${rgb},${strokeAlpha * op})`
+      ctx.lineWidth = lineW
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+    }
+
+    // Pre-EQ ghost (complementary hue, drawn first so it's behind)
+    drawGhost(this._preSmoothed,  this._getComplementaryRGB(), 0.15, 0.30, 1.0)
+    // Post-EQ ghost (accent color, drawn on top)
+    drawGhost(this._postSmoothed, this._getAccentRGB(),        0.12, 0.25, 1.2)
+  }
+
+  // ── Spectrum RAF loop ─────────────────────────────────────────────────────
+
+  setPlaybackState(playing: boolean): void {
+    this._isPlayingAudio = playing
+    if (playing) this._startSpectrumLoop()
+  }
+
+  private _startSpectrumLoop(): void {
+    if (this._spectrumRafId !== null) return
+    this._spectrumRafId = requestAnimationFrame(this._spectrumRafLoop)
+  }
+
+  private _spectrumRafLoop = (): void => {
+    const target = this._isPlayingAudio ? 1 : 0
+    this._spectrumOpacity += (target - this._spectrumOpacity) * 0.04
+
+    if (this._spectrumOpacity > 0.01) this._updateSmoothedSpectrum()
+
+    this._drawEQCurve()
+
+    if (this._isPlayingAudio || this._spectrumOpacity > 0.01) {
+      this._spectrumRafId = requestAnimationFrame(this._spectrumRafLoop)
+    } else {
+      this._spectrumRafId = null
+    }
+  }
+
+  private _updateSmoothedSpectrum(): void {
+    const preA  = this.engine.analyserPreEQ
+    const postA = this.engine.analyserNode
+    if (!preA || !postA) return
+
+    const bins = preA.frequencyBinCount
+    if (!this._preSmoothed || this._spectrumBins !== bins) {
+      this._preSmoothed  = new Float32Array(bins)
+      this._postSmoothed = new Float32Array(bins)
+      this._spectrumBins = bins
+    }
+
+    const raw   = new Uint8Array(bins)
+    const alpha = this._SPECTRUM_ALPHA
+    const minDb = preA.minDecibels
+    const range = preA.maxDecibels - minDb
+
+    preA.getByteFrequencyData(raw)
+    for (let i = 0; i < bins; i++) {
+      const v = (raw[i] / 255) * range + minDb
+      this._preSmoothed![i] = alpha * this._preSmoothed![i] + (1 - alpha) * v
+    }
+
+    postA.getByteFrequencyData(raw)
+    for (let i = 0; i < bins; i++) {
+      const v = (raw[i] / 255) * range + minDb
+      this._postSmoothed![i] = alpha * this._postSmoothed![i] + (1 - alpha) * v
+    }
+  }
+
+  // Returns 180°-hue-rotated, slightly desaturated version of the accent colour.
+  private _getComplementaryRGB(): string {
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+    if (accent.startsWith('#')) {
+      const hex = accent.slice(1)
+      if (hex.length === 6) {
+        // Hex → linear [0,1] RGB
+        const r = parseInt(hex.slice(0, 2), 16) / 255
+        const g = parseInt(hex.slice(2, 4), 16) / 255
+        const b = parseInt(hex.slice(4, 6), 16) / 255
+        // RGB → HSL
+        const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+        const l = (max + min) / 2
+        const s = d === 0 ? 0 : l > 0.5 ? d / (2 - max - min) : d / (max + min)
+        let h = 0
+        if (d !== 0) {
+          if (max === r)      h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+          else if (max === g) h = ((b - r) / d + 2) / 6
+          else                h = ((r - g) / d + 4) / 6
+        }
+        // Rotate hue 180°, desaturate slightly, normalize lightness
+        const ch = (h + 0.5) % 1
+        const cs = s * 0.8
+        const cl = Math.max(0.30, Math.min(0.70, l))
+        // HSL → RGB
+        const hue2rgb = (p: number, q: number, t: number) => {
+          const tt = ((t % 1) + 1) % 1
+          if (tt < 1/6) return p + (q - p) * 6 * tt
+          if (tt < 1/2) return q
+          if (tt < 2/3) return p + (q - p) * (2/3 - tt) * 6
+          return p
+        }
+        const q2 = cl < 0.5 ? cl * (1 + cs) : cl + cs - cl * cs
+        const p2 = 2 * cl - q2
+        const cr = Math.round(hue2rgb(p2, q2, ch + 1/3) * 255)
+        const cg = Math.round(hue2rgb(p2, q2, ch      ) * 255)
+        const cb = Math.round(hue2rgb(p2, q2, ch - 1/3) * 255)
+        return `${cr},${cg},${cb}`
+      }
+    }
+    return '0,200,255'  // cyan — complements Meridian lime green
   }
 
   // Reads the current --accent CSS variable to use the active theme colour.

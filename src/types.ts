@@ -24,6 +24,11 @@ export interface ChorusParams {
   depth: number   // 0 to 1
 }
 
+export interface AbyssParams {
+  depth:     number   // 0–1: cutoff sweep 20kHz → 200Hz (exponential)
+  resonance: number   // 0–1: Q sweep 0.5 → 8.0 (linear)
+}
+
 // All audio parameters in one flat object.
 // Used by presets and getParams/applyPreset.
 export interface AudioParams {
@@ -37,6 +42,7 @@ export interface AudioParams {
   eq:             EQParams
   chorus:         ChorusParams
   saturationDrive: number      // 0 to 1
+  abyss:          AbyssParams
   hzFrequency:    number | null  // Solfeggio resonance Hz, null = off
   pitchSemitones: number       // -12 to +12 semitones (0 = no shift)
 }

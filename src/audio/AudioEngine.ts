@@ -144,10 +144,11 @@ export class AudioEngine {
   // Inserted between sourceNode and dry/convolver split for xfade dips
   private _loopXfadeGain: GainNode | null = null
 
-  // EQ/chorus/saturation state (mirrors what EffectsChain holds internally)
+  // EQ/chorus/saturation/abyss state (mirrors what EffectsChain holds internally)
   private _eq = { low: 0, lowMid: 0, mid: 0, highMid: 0, high: 0 }
   private _chorus = { rate: 0.8, depth: 0 }
   private _saturationDrive = 0
+  private _abyss = { depth: 0, resonance: 0 }
   private _hzFrequency: number | null = null
 
   private timeUpdateTimer: ReturnType<typeof setInterval> | null = null
@@ -193,6 +194,7 @@ export class AudioEngine {
       eq:             { ...this._eq },
       chorus:         { ...this._chorus },
       saturationDrive: this._saturationDrive,
+      abyss:          { ...this._abyss },
       hzFrequency:    this._hzFrequency,
       pitchSemitones: this._pitchSemitones,
     }
@@ -520,6 +522,16 @@ export class AudioEngine {
     this._effectsChain?.setSaturationDrive(this._saturationDrive)
   }
 
+  setAbyssDepth(depth: number): void {
+    this._abyss.depth = Math.max(0, Math.min(1, depth))
+    this._effectsChain?.setAbyssDepth(this._abyss.depth)
+  }
+
+  setAbyssResonance(resonance: number): void {
+    this._abyss.resonance = Math.max(0, Math.min(1, resonance))
+    this._effectsChain?.setAbyssResonance(this._abyss.resonance)
+  }
+
   // Applies a full preset in one shot. Used by PresetController.
   applyPreset(params: AudioParams): void {
     this.setPlaybackRate(params.playbackRate)
@@ -537,6 +549,8 @@ export class AudioEngine {
     this.setChorusRate(params.chorus.rate)
     this.setChorusDepth(params.chorus.depth)
     this.setSaturationDrive(params.saturationDrive)
+    this.setAbyssDepth(params.abyss.depth)
+    this.setAbyssResonance(params.abyss.resonance)
     this.setHzFrequency(params.hzFrequency)
     this.setPitch(params.pitchSemitones)
   }

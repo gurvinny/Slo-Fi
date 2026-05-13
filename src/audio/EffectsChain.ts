@@ -36,6 +36,10 @@ export class EffectsChain {
   private satDrive = 0
   private satRafId: number | null = null
 
+  // Abyss low-pass filter
+  private _abyssFilter!: BiquadFilterNode
+  private _abyssBypassed = true   // starts disconnected; inserted on first non-zero depth
+
   // Hz frequency resonance (Solfeggio peaking filter)
   private hzFilter!: BiquadFilterNode
 
@@ -109,6 +113,7 @@ export class EffectsChain {
       this._buildFallbackChain(ctx)
     }
 
+    this._initAbyssFilter(ctx)
     return this.outputNode
   }
 
@@ -132,6 +137,15 @@ export class EffectsChain {
     if (params.hzFrequency !== null) {
       this.hzFilter.frequency.value = params.hzFrequency
       this.hzFilter.gain.value = 4
+    }
+    this._initAbyssFilter(ctx)
+    if (params.abyss.depth > 0) {
+      this._satFallbackNode!.disconnect(this.hzFilter)
+      this._satFallbackNode!.connect(this._abyssFilter)
+      this._abyssFilter.connect(this.hzFilter)
+      this._abyssFilter.frequency.value = this._depthToFreq(params.abyss.depth)
+      this._abyssFilter.Q.value         = this._resonanceToQ(params.abyss.resonance)
+      this._abyssBypassed = false
     }
     this.chorusLfo.start()
 
@@ -226,6 +240,26 @@ export class EffectsChain {
     }
   }
 
+  setAbyssDepth(depth: number): void {
+    const d = Math.max(0, Math.min(1, depth))
+    const wasBypassed = this._abyssBypassed
+    const nowBypassed = d === 0
+    if (wasBypassed !== nowBypassed) {
+      this._rewireAbyss(nowBypassed)
+      this._abyssBypassed = nowBypassed
+    }
+    if (!nowBypassed) {
+      const t = (this.ctx as AudioContext).currentTime
+      this._abyssFilter.frequency.setTargetAtTime(this._depthToFreq(d), t, 0.02)
+    }
+  }
+
+  setAbyssResonance(resonance: number): void {
+    const r = Math.max(0, Math.min(1, resonance))
+    const t = (this.ctx as AudioContext).currentTime
+    this._abyssFilter.Q.setTargetAtTime(this._resonanceToQ(r), t, 0.02)
+  }
+
   getOutputNode(): AudioNode { return this.outputNode }
 
   // Returns all 5 EQ filter nodes for frequency response rendering in the UI.
@@ -234,6 +268,37 @@ export class EffectsChain {
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
+
+  private _initAbyssFilter(ctx: BaseAudioContext): void {
+    this._abyssFilter = ctx.createBiquadFilter()
+    this._abyssFilter.type = 'lowpass'
+    this._abyssFilter.frequency.value = 20000
+    this._abyssFilter.Q.value = 0.5
+    this._abyssBypassed = true
+  }
+
+  // Exponential mapping: depth 0 → 20kHz (open), depth 1 → 200Hz (deep)
+  private _depthToFreq(depth: number): number {
+    return 20000 * Math.pow(200 / 20000, depth)
+  }
+
+  // Linear mapping: resonance 0 → Q 0.5 (smooth rolloff), 1 → Q 8.0 (gurgling peak)
+  private _resonanceToQ(resonance: number): number {
+    return 0.5 + resonance * 7.5
+  }
+
+  private _rewireAbyss(bypass: boolean): void {
+    const prev: AudioNode = this._satWorkletNode ?? this._satFallbackNode!
+    if (bypass) {
+      try { prev.disconnect(this._abyssFilter) } catch (_) {}
+      try { this._abyssFilter.disconnect(this.hzFilter) } catch (_) {}
+      prev.connect(this.hzFilter)
+    } else {
+      try { prev.disconnect(this.hzFilter) } catch (_) {}
+      prev.connect(this._abyssFilter)
+      this._abyssFilter.connect(this.hzFilter)
+    }
+  }
 
   // Builds the Web Audio graph fallback for chorus + saturation (no worklet).
   private _buildFallbackChain(ctx: BaseAudioContext): void {

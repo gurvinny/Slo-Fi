@@ -97,6 +97,9 @@ export class AudioEngine {
   // Analyser tapped from effects chain output for the spectrum visualizer
   private _analyserNode: AnalyserNode | null = null
 
+  // Parallel tap before the EQ chain — used by EffectsController to show pre-EQ spectrum ghost
+  private _analyserPreEQNode: AnalyserNode | null = null
+
   // Hidden <audio> element whose srcObject is a silent MediaStream from this
   // context. Playing it keeps the iOS audio session alive in the background
   // without exposing a file duration - so Control Center shows our
@@ -174,6 +177,7 @@ export class AudioEngine {
 
   get effectsChain(): EffectsChain | null { return this._effectsChain }
   get analyserNode(): AnalyserNode | null { return this._analyserNode }
+  get analyserPreEQ(): AnalyserNode | null { return this._analyserPreEQNode }
 
   getBuffer(): AudioBuffer | null { return this.buffer }
 
@@ -241,6 +245,19 @@ export class AudioEngine {
     } catch (err) {
       console.error('ensureContext: buildIR failed (NaN or invalid params?)', err)
     }
+
+    // Pre-EQ analyser tap — parallel connection from masterGain, before the EQ chain.
+    // A silent gain (value 0) is required to keep the node active in the audio graph.
+    this._analyserPreEQNode = this.context.createAnalyser()
+    this._analyserPreEQNode.fftSize = 2048
+    this._analyserPreEQNode.smoothingTimeConstant = 0.88
+    this._analyserPreEQNode.minDecibels = -90
+    this._analyserPreEQNode.maxDecibels = -10
+    const preEQSilent = this.context.createGain()
+    preEQSilent.gain.value = 0
+    this.masterGainNode.connect(this._analyserPreEQNode)
+    this._analyserPreEQNode.connect(preEQSilent)
+    preEQSilent.connect(this.context.destination)
 
     // Effects chain sits between masterGain and destination
     this._effectsChain = new EffectsChain()

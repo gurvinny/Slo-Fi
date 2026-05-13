@@ -1297,8 +1297,8 @@ export class App {
     this.playPauseBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play')
     document.body.classList.toggle('is-playing', playing)
     document.body.classList.toggle('is-paused', !playing)
-    // Keep the OS lock screen transport badge in sync with the in-app state
     this._mobile?.updatePlaybackState(playing)
+    this.effects.setPlaybackState(playing)
   }
 
   private showPlayer(): void {

@@ -12,8 +12,10 @@
 // AUDIO RANGES (params)
 //   playbackRate             0.50 – 1.70   (1.0 = normal speed)
 //   reverbMix                0.00 – 1.00   (0 = dry, 1 = full wet)
-//   reverbDecay              0.50 – 8.00   seconds
-//   reverbRoomSize           0.00 – 1.00
+//   reverbDecay              0.20 – 10.00  seconds
+//   reverbType               room | hall | plate | church | chamber | spring
+//   reverbPreDelay           0.000 – 0.080 seconds (0–80 ms)
+//   reverbDamping            0.00 – 1.00
 //   volume                   0.00 – 1.00
 //   eq.low/lowMid/mid/highMid/high  -12 – +12  dB
 //   chorus.rate              0.10 – 5.00   Hz
@@ -55,7 +57,9 @@ export const PRESETS: PresetDefinition[] = [
       playbackRate:    0.78,
       reverbMix:       0.47,
       reverbDecay:     2.5,
-      reverbRoomSize:  0.68,
+      reverbType:      'room',
+      reverbPreDelay:  0.010,
+      reverbDamping:   0.50,
       volume:          0.80,
       eq:              { low: 3, lowMid: 1.5, mid: -1, highMid: -2, high: -5 },
       chorus:          { rate: 0, depth: 0 },
@@ -85,7 +89,9 @@ export const PRESETS: PresetDefinition[] = [
       playbackRate:    0.69,
       reverbMix:       0.74,
       reverbDecay:     3.3,
-      reverbRoomSize:  0.52,
+      reverbType:      'hall',
+      reverbPreDelay:  0.020,
+      reverbDamping:   0.30,
       volume:          0.80,
       eq:              { low: 1.5, lowMid: 0.5, mid: 1, highMid: 1.5, high: 2 },
       chorus:          { rate: 0.2, depth: 0 },
@@ -115,7 +121,9 @@ export const PRESETS: PresetDefinition[] = [
       playbackRate:    0.65,
       reverbMix:       0.70,
       reverbDecay:     4.4,
-      reverbRoomSize:  0.81,
+      reverbType:      'church',
+      reverbPreDelay:  0.030,
+      reverbDamping:   0.20,
       volume:          0.75,
       eq:              { low: 0, lowMid: -1, mid: -3, highMid: -1.5, high: -2 },
       chorus:          { rate: 0.5, depth: 0.10 },
@@ -138,7 +146,7 @@ export const PRESETS: PresetDefinition[] = [
   },
 
   // ── Hyperpop ─────────────────────────────────────────────────────────────────
-  // Sped-up and chaotic. Saturation drive, scooped mids, and a tight room.
+  // Sped-up and chaotic. Saturation drive, scooped mids, and a tight plate.
   // High reactivity and crack veins for maximum visual aggression.
   {
     id:    'hyperpop',
@@ -148,7 +156,9 @@ export const PRESETS: PresetDefinition[] = [
       playbackRate:    1.25,
       reverbMix:       0.27,
       reverbDecay:     1.7,
-      reverbRoomSize:  0.59,
+      reverbType:      'plate',
+      reverbPreDelay:  0.005,
+      reverbDamping:   0.15,
       volume:          0.80,
       eq:              { low: 1, lowMid: -1.5, mid: -3.5, highMid: 2, high: 1 },
       chorus:          { rate: 0.8, depth: 0.08 },

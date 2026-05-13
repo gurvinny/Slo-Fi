@@ -1,25 +1,78 @@
 import { EffectsChain } from './EffectsChain'
-import type { AudioParams } from '../types'
+import type { AudioParams, ReverbType } from '../types'
 
 export const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024
 
-// Builds an exponential-decay noise IR that models room acoustics.
-// Extracted to module scope so Exporter.ts can use it without importing AudioEngine.
-export function buildIR(ctx: BaseAudioContext, decay: number, size: number): AudioBuffer {
-  const sr = ctx.sampleRate
-  const len = Math.floor(sr * Math.max(0.1, decay))
-  const ir = ctx.createBuffer(2, len, sr)
-  const decayRate = 3.0 / (decay * (0.15 + size * 0.85))
+// Per-type base damping offsets — each type has an inherent brightness character
+// independent of the user's Damping slider.
+const TYPE_DAMP_BASE: Record<ReverbType, number> = {
+  room:    0.05,
+  hall:    0.15,
+  plate:  -0.05,
+  church:  0.10,
+  chamber: 0.00,
+  spring:  0.20,
+}
 
-  // Pre-compute per-sample decay multiplier: envelope[i] = exp(-decayRate * i / sr)
-  // Using multiplicative decay avoids a division and Math.exp call per sample,
-  // reducing computation by ~3-5x for long IRs (e.g. Ambient 4.4s ≈ 422k samples).
+// Per-type decay rate scale — affects how quickly the tail fades.
+const TYPE_DECAY_SCALE: Record<ReverbType, number> = {
+  room:    1.00,
+  hall:    0.85,
+  plate:   1.10,
+  church:  0.70,
+  chamber: 1.20,
+  spring:  1.00,
+}
+
+// Builds a synthetic IR for the given reverb type.
+// Extracted to module scope so Exporter.ts can use it without importing AudioEngine.
+export function buildIR(
+  ctx: BaseAudioContext,
+  type: ReverbType,
+  decay: number,
+  preDelay: number,   // seconds, 0–0.08
+  damping: number,    // 0.0–1.0
+): AudioBuffer {
+  const sr = ctx.sampleRate
+  const preDelaySamples = Math.floor(sr * Math.max(0, preDelay))
+  const tailSamples = Math.floor(sr * Math.max(0.1, decay))
+  const totalLen = preDelaySamples + tailSamples
+
+  const ir = ctx.createBuffer(2, totalLen, sr)
+
+  // decayRate drives the exponential envelope; scaled per type so types sound
+  // characteristically longer or shorter at the same Decay slider value.
+  const scale = TYPE_DECAY_SCALE[type]
+  const decayRate = (3.0 / Math.max(0.1, decay)) * scale
+
+  // LP coefficient: higher = darker/more damped. Clamped below 0.98 so the
+  // filter doesn't fully freeze. Combined type offset + user damping param.
+  const lpCoeff = Math.max(0, Math.min(0.98, TYPE_DAMP_BASE[type] + damping * 0.85))
+
+  // Spring reverb: add a sinusoidal resonance at ~12 Hz to create the metallic
+  // boing — this frequency sits above audible but aliases into the tail as
+  // a repeating amplitude pattern, similar to a physical spring coil.
+  const springFreq = type === 'spring' ? (2 * Math.PI * 12) / sr : 0
+
+  // Pre-compute multiplicative decay multiplier to avoid Math.exp per sample.
   const expDecayPerSample = Math.exp(-decayRate / sr)
+
   for (let ch = 0; ch < 2; ch++) {
     const data = ir.getChannelData(ch)
+    // Pre-delay region: silence
+    for (let i = 0; i < preDelaySamples; i++) {
+      data[i] = 0
+    }
+    // IR tail: exponential-decay noise passed through a 1-pole IIR LP filter
     let envelope = 1.0
-    for (let i = 0; i < len; i++) {
-      data[i] = (Math.random() * 2 - 1) * envelope
+    let lpState = 0
+    for (let i = 0; i < tailSamples; i++) {
+      const noise = Math.random() * 2 - 1
+      // 1-pole IIR low-pass: lpState smooths toward the noise input
+      lpState = lpState * lpCoeff + noise * (1 - lpCoeff)
+      let sample = lpState * envelope
+      if (springFreq > 0) sample *= Math.sin(springFreq * i)
+      data[preDelaySamples + i] = sample
       envelope *= expDecayPerSample
     }
   }
@@ -67,15 +120,17 @@ export class AudioEngine {
   private _sourceGeneration = 0
 
   // State
-  private _playbackRate = 1.0
-  private _pitchSemitones = 0
-  private _reverbMix = 0.2
-  private _volume = 0.8
-  private _reverbDecay = 2.5
-  private _reverbRoomSize = 0.5
-  private _isPlaying = false
+  private _playbackRate    = 1.0
+  private _pitchSemitones  = 0
+  private _reverbMix       = 0.2
+  private _volume          = 0.8
+  private _reverbDecay     = 2.5
+  private _reverbType:     ReverbType = 'room'
+  private _reverbPreDelay  = 0.005   // seconds
+  private _reverbDamping   = 0.35
+  private _isPlaying       = false
   private _startContextTime = 0
-  private _startOffset = 0
+  private _startOffset     = 0
 
   // Loop region
   private _loopEnabled  = false
@@ -124,15 +179,17 @@ export class AudioEngine {
 
   getParams(): AudioParams {
     return {
-      playbackRate: this._playbackRate,
-      reverbMix: this._reverbMix,
-      reverbDecay: this._reverbDecay,
-      reverbRoomSize: this._reverbRoomSize,
-      volume: this._volume,
-      eq: { ...this._eq },
-      chorus: { ...this._chorus },
+      playbackRate:   this._playbackRate,
+      reverbMix:      this._reverbMix,
+      reverbDecay:    this._reverbDecay,
+      reverbType:     this._reverbType,
+      reverbPreDelay: this._reverbPreDelay,
+      reverbDamping:  this._reverbDamping,
+      volume:         this._volume,
+      eq:             { ...this._eq },
+      chorus:         { ...this._chorus },
       saturationDrive: this._saturationDrive,
-      hzFrequency: this._hzFrequency,
+      hzFrequency:    this._hzFrequency,
       pitchSemitones: this._pitchSemitones,
     }
   }
@@ -177,7 +234,10 @@ export class AudioEngine {
     this.wetGainNode.connect(this.masterGainNode)
 
     try {
-      this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
+      this.convolverNode.buffer = buildIR(
+        this.context, this._reverbType, this._reverbDecay,
+        this._reverbPreDelay, this._reverbDamping,
+      )
     } catch (err) {
       console.error('ensureContext: buildIR failed (NaN or invalid params?)', err)
     }
@@ -375,17 +435,27 @@ export class AudioEngine {
   }
 
   setReverbDecay(decaySeconds: number): void {
-    this._reverbDecay = Math.max(0.1, Math.min(8.0, decaySeconds))
+    this._reverbDecay = Math.max(0.2, Math.min(10.0, decaySeconds))
     this._scheduleRebuildIR()
   }
 
-  setReverbRoomSize(size: number): void {
-    this._reverbRoomSize = Math.max(0.01, Math.min(1.0, size))
+  setReverbType(type: ReverbType): void {
+    this._reverbType = type
+    this._scheduleRebuildIR()
+  }
+
+  setReverbPreDelay(seconds: number): void {
+    this._reverbPreDelay = Math.max(0, Math.min(0.08, seconds))
+    this._scheduleRebuildIR()
+  }
+
+  setReverbDamping(damping: number): void {
+    this._reverbDamping = Math.max(0, Math.min(1, damping))
     this._scheduleRebuildIR()
   }
 
   // Defers rebuildIR() to the next animation frame so that rapid back-to-back
-  // calls (e.g. applyPreset sets both decay and roomSize in the same tick) only
+  // calls (e.g. applyPreset sets multiple reverb params in the same tick) only
   // trigger one allocation and one ConvolverNode buffer replacement.
   private _scheduleRebuildIR(): void {
     if (this._irRafId !== null) return
@@ -437,8 +507,10 @@ export class AudioEngine {
   applyPreset(params: AudioParams): void {
     this.setPlaybackRate(params.playbackRate)
     this.setReverbMix(params.reverbMix)
+    this.setReverbType(params.reverbType)
     this.setReverbDecay(params.reverbDecay)
-    this.setReverbRoomSize(params.reverbRoomSize)
+    this.setReverbPreDelay(params.reverbPreDelay)
+    this.setReverbDamping(params.reverbDamping)
     this.setVolume(params.volume)
     this.setEQ('low',     params.eq.low)
     this.setEQ('lowMid',  params.eq.lowMid)
@@ -547,7 +619,10 @@ export class AudioEngine {
   private rebuildIR(): void {
     if (!this.convolverNode || !this.context) return
     try {
-      this.convolverNode.buffer = buildIR(this.context, this._reverbDecay, this._reverbRoomSize)
+      this.convolverNode.buffer = buildIR(
+        this.context, this._reverbType, this._reverbDecay,
+        this._reverbPreDelay, this._reverbDamping,
+      )
     } catch (err) {
       console.error('rebuildIR: failed to create IR buffer (OOM or closed context)', err)
     }

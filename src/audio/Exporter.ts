@@ -33,7 +33,7 @@ export async function exportAudio(engine: AudioEngine, trackName: string): Promi
   source.playbackRate.value = params.playbackRate
 
   const convolver = offline.createConvolver()
-  convolver.buffer = buildIR(offline, params.reverbDecay, params.reverbRoomSize)
+  convolver.buffer = buildIR(offline, params.reverbType, params.reverbDecay, params.reverbPreDelay, params.reverbDamping)
 
   const dryGain = offline.createGain()
   dryGain.gain.value = 1 - params.reverbMix

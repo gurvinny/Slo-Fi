@@ -1,6 +1,7 @@
 // Shared types used across the app
 
 export type EQBand = 'low' | 'lowMid' | 'mid' | 'highMid' | 'high'
+export type ReverbType = 'room' | 'hall' | 'plate' | 'church' | 'chamber' | 'spring'
 
 export interface EQParams {
   low:     number   // dB, -12 to +12  (lowshelf  @ 80 Hz)
@@ -26,16 +27,18 @@ export interface ChorusParams {
 // All audio parameters in one flat object.
 // Used by presets and getParams/applyPreset.
 export interface AudioParams {
-  playbackRate: number      // 0.25 to 1.0
-  reverbMix: number         // 0 to 1
-  reverbDecay: number       // 0.1 to 8.0 seconds
-  reverbRoomSize: number    // 0.01 to 1.0
-  volume: number            // 0 to 1
-  eq: EQParams
-  chorus: ChorusParams
-  saturationDrive: number   // 0 to 1
-  hzFrequency: number | null  // Solfeggio resonance Hz, null = off
-  pitchSemitones: number    // -12 to +12 semitones (0 = no shift)
+  playbackRate:   number       // 0.50 to 1.70
+  reverbMix:      number       // 0 to 1
+  reverbDecay:    number       // 0.2 to 10.0 seconds
+  reverbType:     ReverbType   // room | hall | plate | church | chamber | spring
+  reverbPreDelay: number       // 0 to 0.08 seconds (0–80 ms)
+  reverbDamping:  number       // 0.0 to 1.0
+  volume:         number       // 0 to 1
+  eq:             EQParams
+  chorus:         ChorusParams
+  saturationDrive: number      // 0 to 1
+  hzFrequency:    number | null  // Solfeggio resonance Hz, null = off
+  pitchSemitones: number       // -12 to +12 semitones (0 = no shift)
 }
 
 export interface VisualParams {
@@ -60,4 +63,3 @@ export interface PresetDefinition {
   params: AudioParams
   visual?: VisualParams
 }
-

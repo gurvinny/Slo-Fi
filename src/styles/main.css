@@ -1689,6 +1689,47 @@ body.is-paused .site-footer {
   box-shadow: 0 0 8px rgba(129, 140, 248, 0.25);
 }
 
+.btn-reverb-type-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.btn-reverb-type {
+  flex: 1 1 auto;
+  min-width: 44px;
+  padding: 5px 6px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+.btn-reverb-type:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: var(--teal-dim);
+}
+
+.btn-reverb-type:focus-visible {
+  box-shadow: 0 0 0 2px var(--teal);
+}
+
+.btn-reverb-type--active {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: var(--teal-dim);
+  box-shadow: 0 0 8px rgba(0, 201, 160, 0.25);
+}
+
 .control-hint {
   margin: 4px 0 0;
   font-size: 11px;

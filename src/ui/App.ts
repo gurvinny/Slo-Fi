@@ -10,7 +10,7 @@ import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
 import { MobileController } from './MobileController'
-import type { AudioParams } from '../types'
+import type { AudioParams, ReverbType } from '../types'
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -57,14 +57,19 @@ export class App {
   private speedValue = document.getElementById('speedValue')!
   private pitchSlider = document.getElementById('pitchSlider') as HTMLInputElement
   private pitchValue = document.getElementById('pitchValue')!
-  private reverbSlider = document.getElementById('reverbSlider') as HTMLInputElement
-  private reverbValue = document.getElementById('reverbValue')!
-  private decaySlider = document.getElementById('decaySlider') as HTMLInputElement
-  private decayValue = document.getElementById('decayValue')!
-  private roomSlider = document.getElementById('roomSlider') as HTMLInputElement
-  private roomValue = document.getElementById('roomValue')!
-  private volumeSlider = document.getElementById('volumeSlider') as HTMLInputElement
-  private volumeValue = document.getElementById('volumeValue')!
+  private reverbSlider       = document.getElementById('reverbSlider')    as HTMLInputElement
+  private reverbValue        = document.getElementById('reverbValue')!
+  private decaySlider        = document.getElementById('decaySlider')     as HTMLInputElement
+  private decayValue         = document.getElementById('decayValue')!
+  private preDelaySlider     = document.getElementById('preDelaySlider')  as HTMLInputElement
+  private preDelayValue      = document.getElementById('preDelayValue')!
+  private dampingSlider      = document.getElementById('dampingSlider')   as HTMLInputElement
+  private dampingValue       = document.getElementById('dampingValue')!
+  private reverbTypeButtons  = Array.from(document.querySelectorAll<HTMLButtonElement>('.btn-reverb-type'))
+  private reverbTypeValue    = document.getElementById('reverbTypeValue')!
+  private _reverbType: ReverbType = 'room'
+  private volumeSlider       = document.getElementById('volumeSlider')    as HTMLInputElement
+  private volumeValue        = document.getElementById('volumeValue')!
 
   // Sound drawer refs (merged Audio + Effects)
   private soundDrawer   = document.getElementById('soundDrawer')!
@@ -624,6 +629,22 @@ export class App {
       this.saveSettings()
     })
 
+    // Reverb type chips
+    this.reverbTypeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = btn.dataset.reverbType as ReverbType
+        this._reverbType = t
+        this.reverbTypeButtons.forEach(b => {
+          b.classList.toggle('btn-reverb-type--active', b === btn)
+          b.setAttribute('aria-pressed', String(b === btn))
+        })
+        this.reverbTypeValue.textContent = btn.textContent!
+        this.engine.setReverbType(t)
+        this.presets.clearActive()
+        this.saveSettings()
+      })
+    })
+
     // Reverb mix
     this.reverbSlider.addEventListener('input', () => {
       const mix = parseInt(this.reverbSlider.value) / 100
@@ -645,12 +666,22 @@ export class App {
       this.saveSettings()
     })
 
-    // Room size
-    this.roomSlider.addEventListener('input', () => {
-      const size = parseInt(this.roomSlider.value) / 100
-      this.engine.setReverbRoomSize(size)
-      this.roomValue.textContent = `${this.roomSlider.value}%`
-      this.roomSlider.setAttribute('aria-valuetext', `${this.roomSlider.value}%`)
+    // Pre-delay
+    this.preDelaySlider.addEventListener('input', () => {
+      const ms = parseInt(this.preDelaySlider.value)
+      this.engine.setReverbPreDelay(ms / 1000)
+      this.preDelayValue.textContent = `${ms} ms`
+      this.preDelaySlider.setAttribute('aria-valuetext', `${ms} milliseconds`)
+      this.presets.clearActive()
+      this.saveSettings()
+    })
+
+    // Damping
+    this.dampingSlider.addEventListener('input', () => {
+      const d = parseInt(this.dampingSlider.value) / 100
+      this.engine.setReverbDamping(d)
+      this.dampingValue.textContent = `${this.dampingSlider.value}%`
+      this.dampingSlider.setAttribute('aria-valuetext', `${this.dampingSlider.value}%`)
       this.presets.clearActive()
       this.saveSettings()
     })
@@ -962,8 +993,19 @@ export class App {
     this.decaySlider.value = String(Math.round(params.reverbDecay * 10))
     this.decayValue.textContent = `${params.reverbDecay.toFixed(1)}s`
 
-    this.roomSlider.value = String(Math.round(params.reverbRoomSize * 100))
-    this.roomValue.textContent = `${Math.round(params.reverbRoomSize * 100)}%`
+    this._reverbType = params.reverbType
+    this.reverbTypeButtons.forEach(b => {
+      const active = b.dataset.reverbType === params.reverbType
+      b.classList.toggle('btn-reverb-type--active', active)
+      b.setAttribute('aria-pressed', String(active))
+      if (active) this.reverbTypeValue.textContent = b.textContent!
+    })
+
+    this.preDelaySlider.value = String(Math.round(params.reverbPreDelay * 1000))
+    this.preDelayValue.textContent = `${Math.round(params.reverbPreDelay * 1000)} ms`
+
+    this.dampingSlider.value = String(Math.round(params.reverbDamping * 100))
+    this.dampingValue.textContent = `${Math.round(params.reverbDamping * 100)}%`
 
     this.volumeSlider.value = String(Math.round(params.volume * 100))
     this.volumeValue.textContent = `${Math.round(params.volume * 100)}%`
@@ -985,7 +1027,8 @@ export class App {
     const decay = parseInt(this.decaySlider.value) / 10
     this.decaySlider.setAttribute('aria-valuetext', `${decay.toFixed(1)} seconds`)
 
-    this.roomSlider.setAttribute('aria-valuetext', `${this.roomSlider.value}%`)
+    this.preDelaySlider.setAttribute('aria-valuetext', `${this.preDelaySlider.value} milliseconds`)
+    this.dampingSlider.setAttribute('aria-valuetext', `${this.dampingSlider.value}%`)
     this.volumeSlider.setAttribute('aria-valuetext', `${this.volumeSlider.value}%`)
   }
 
@@ -1012,9 +1055,22 @@ export class App {
     this.decayValue.textContent  = `${d.reverbDecay.toFixed(1)}s`
     this.engine.setReverbDecay(d.reverbDecay)
 
-    this.roomSlider.value        = String(Math.round(d.reverbRoomSize * 100))
-    this.roomValue.textContent   = `${Math.round(d.reverbRoomSize * 100)}%`
-    this.engine.setReverbRoomSize(d.reverbRoomSize)
+    this._reverbType = d.reverbType
+    this.reverbTypeButtons.forEach(b => {
+      const active = b.dataset.reverbType === d.reverbType
+      b.classList.toggle('btn-reverb-type--active', active)
+      b.setAttribute('aria-pressed', String(active))
+      if (active) this.reverbTypeValue.textContent = b.textContent!
+    })
+    this.engine.setReverbType(d.reverbType)
+
+    this.preDelaySlider.value      = String(Math.round(d.reverbPreDelay * 1000))
+    this.preDelayValue.textContent = `${Math.round(d.reverbPreDelay * 1000)} ms`
+    this.engine.setReverbPreDelay(d.reverbPreDelay)
+
+    this.dampingSlider.value      = String(Math.round(d.reverbDamping * 100))
+    this.dampingValue.textContent = `${Math.round(d.reverbDamping * 100)}%`
+    this.engine.setReverbDamping(d.reverbDamping)
 
     this.volumeSlider.value      = String(Math.round(d.volume * 100))
     this.volumeValue.textContent = `${Math.round(d.volume * 100)}%`
@@ -1053,7 +1109,9 @@ export class App {
       pitch:        this.pitchSlider.value,
       reverb:       this.reverbSlider.value,
       decay:        this.decaySlider.value,
-      room:         this.roomSlider.value,
+      reverbType:   this._reverbType,
+      preDelay:     this.preDelaySlider.value,
+      damping:      this.dampingSlider.value,
       volume:       this.volumeSlider.value,
       particleCount: this.particleCountSlider.value,
       orbReactivity: this.orbReactivitySlider.value,
@@ -1111,11 +1169,28 @@ export class App {
       this.decayValue.textContent = `${decay.toFixed(1)}s`
       if (isFinite(decay)) this.engine.setReverbDecay(decay)
     }
-    if (s['room'] !== undefined) {
-      this.roomSlider.value = str(s['room'], this.roomSlider.value)
-      this.roomValue.textContent = `${this.roomSlider.value}%`
-      const room = parseInt(this.roomSlider.value) / 100
-      if (isFinite(room)) this.engine.setReverbRoomSize(room)
+    if (s['reverbType'] !== undefined) {
+      const t = str(s['reverbType'], 'room') as ReverbType
+      this._reverbType = t
+      this.reverbTypeButtons.forEach(b => {
+        const active = b.dataset.reverbType === t
+        b.classList.toggle('btn-reverb-type--active', active)
+        b.setAttribute('aria-pressed', String(active))
+        if (active) this.reverbTypeValue.textContent = b.textContent!
+      })
+      this.engine.setReverbType(t)
+    }
+    if (s['preDelay'] !== undefined) {
+      this.preDelaySlider.value = str(s['preDelay'], this.preDelaySlider.value)
+      const ms = parseInt(this.preDelaySlider.value)
+      this.preDelayValue.textContent = `${ms} ms`
+      if (isFinite(ms)) this.engine.setReverbPreDelay(ms / 1000)
+    }
+    if (s['damping'] !== undefined) {
+      this.dampingSlider.value = str(s['damping'], this.dampingSlider.value)
+      this.dampingValue.textContent = `${this.dampingSlider.value}%`
+      const d = parseInt(this.dampingSlider.value) / 100
+      if (isFinite(d)) this.engine.setReverbDamping(d)
     }
     if (s['volume'] !== undefined) {
       this.volumeSlider.value = str(s['volume'], this.volumeSlider.value)

@@ -23,8 +23,10 @@ export const DEFAULTS = {
 
   // ── Reverb ───────────────────────────────────────────────────────────────────
   reverbMix:      0.20,   // wet/dry mix    [0.00 – 1.00]
-  reverbDecay:    2.5,    // tail length    [0.50 – 8.00] seconds
-  reverbRoomSize: 0.50,   // room size      [0.00 – 1.00]
+  reverbDecay:    2.5,    // tail length    [0.20 – 10.00] seconds
+  reverbType:     'room' as import('../types').ReverbType,
+  reverbPreDelay: 0.005,  // pre-delay      [0.000 – 0.080] seconds (0–80 ms)
+  reverbDamping:  0.35,   // HF damping     [0.00 – 1.00]
 
   // ── Orb Visuals ──────────────────────────────────────────────────────────────
   reactivity:     0.80,   // beat response  [0.00 – 1.00]

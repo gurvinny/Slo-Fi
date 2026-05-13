@@ -537,6 +537,20 @@
                 <div class="control-section-label">Reverb</div>
                 <div class="control-group">
                   <div class="control-header">
+                    <label>Type</label>
+                    <span class="value-badge value-badge--teal" id="reverbTypeValue">Room</span>
+                  </div>
+                  <div class="btn-reverb-type-group" role="group" aria-label="Reverb room type">
+                    <button class="btn-reverb-type btn-reverb-type--active" data-reverb-type="room"    aria-pressed="true">Room</button>
+                    <button class="btn-reverb-type" data-reverb-type="hall"    aria-pressed="false">Hall</button>
+                    <button class="btn-reverb-type" data-reverb-type="plate"   aria-pressed="false">Plate</button>
+                    <button class="btn-reverb-type" data-reverb-type="church"  aria-pressed="false">Church</button>
+                    <button class="btn-reverb-type" data-reverb-type="chamber" aria-pressed="false">Chamber</button>
+                    <button class="btn-reverb-type" data-reverb-type="spring"  aria-pressed="false">Spring</button>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header">
                     <label for="reverbSlider">Mix</label>
                     <span class="value-badge" id="reverbValue">20%</span>
                   </div>
@@ -547,14 +561,22 @@
                     <label for="decaySlider">Decay</label>
                     <span class="value-badge" id="decayValue">2.5s</span>
                   </div>
-                  <input type="range" id="decaySlider" class="slider slider--teal" min="5" max="80" value="25" step="1" aria-label="Reverb decay" />
+                  <input type="range" id="decaySlider" class="slider slider--teal" min="2" max="100" value="25" step="1" aria-label="Reverb decay" />
                 </div>
                 <div class="control-group">
                   <div class="control-header">
-                    <label for="roomSlider">Room Size</label>
-                    <span class="value-badge" id="roomValue">50%</span>
+                    <label for="preDelaySlider">Pre-delay</label>
+                    <span class="value-badge" id="preDelayValue">5 ms</span>
                   </div>
-                  <input type="range" id="roomSlider" class="slider slider--teal" min="1" max="100" value="50" step="1" aria-label="Room size" />
+                  <input type="range" id="preDelaySlider" class="slider slider--teal" min="0" max="80" value="5" step="1" aria-label="Reverb pre-delay" />
+                  <div class="slider-ticks"><span>0 ms</span><span>40 ms</span><span>80 ms</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header">
+                    <label for="dampingSlider">Damping</label>
+                    <span class="value-badge" id="dampingValue">35%</span>
+                  </div>
+                  <input type="range" id="dampingSlider" class="slider slider--teal" min="0" max="100" value="35" step="1" aria-label="Reverb damping" />
                 </div>
               </div>
             </div>

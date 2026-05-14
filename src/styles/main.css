@@ -80,6 +80,19 @@
     --aurora-treble: 0;
     --ui-bass:    0;
     --ui-treble:  0;
+    /* ── Depth token system — blur / shadow per visual layer ─────────────── */
+    --depth-0-blur:   0px;
+    --depth-0-shadow: none;
+    --depth-1-blur:   8px;
+    --depth-1-shadow: 0 2px 12px rgba(0, 0, 0, 0.20);
+    --depth-2-blur:   16px;
+    --depth-2-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    --depth-3-blur:   28px;
+    --depth-3-shadow: 0 8px 48px rgba(0, 0, 0, 0.55);
+    --depth-4-blur:   44px;
+    --depth-4-shadow: 0 16px 80px rgba(0, 0, 0, 0.75);
+    /* depth-0: orb/aurora · depth-1: landing · depth-2: header/HUD bars
+       depth-3: drawers    · depth-4: modals/help                        */
   }
 
   html {
@@ -109,8 +122,11 @@
   /* Glassmorphism panel — base glass surface used by drawers, modals, cards */
   .glass {
     @apply backdrop-blur-xl border border-white/[0.07];
-    background: var(--glass-bg);
-    box-shadow: var(--glass-glow);
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 45%),
+      var(--glass-bg);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), var(--glass-glow);
   }
 
   /* Dark glass for player bars (player-top, player-bottom, header) */
@@ -124,19 +140,31 @@
   /* Accent glass panel — used for controls/settings drawers */
   .glass-accent {
     @apply backdrop-blur-[44px] border;
-    background: rgba(3, 3, 12, 0.97);
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 40%),
+      rgba(3, 3, 12, 0.97);
     border-color: rgba(124, 77, 255, 0.18);
     border-radius: 14px;
-    box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.05), 0 28px 90px rgba(0, 0, 0, 0.80);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 0 1px rgba(124, 77, 255, 0.05),
+      0 28px 90px rgba(0, 0, 0, 0.80);
   }
 
   /* Teal glass panel — used for settings drawer */
   .glass-teal {
     @apply backdrop-blur-[44px] border;
-    background: rgba(3, 3, 12, 0.97);
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 40%),
+      rgba(3, 3, 12, 0.97);
     border-color: rgba(0, 201, 160, 0.18);
     border-radius: 14px;
-    box-shadow: 0 0 0 1px rgba(0, 201, 160, 0.05), 0 28px 90px rgba(0, 0, 0, 0.80);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 0 1px rgba(0, 201, 160, 0.05),
+      0 28px 90px rgba(0, 0, 0, 0.80);
   }
 
   /* Pill / icon button base */
@@ -848,7 +876,7 @@ body.is-playing #iconPause    { opacity: 1; }
   height: 40px;
   border: 1px solid var(--btn-glass-border);
   transition: background 0.15s, color 0.15s, box-shadow 0.2s,
-              border-color 0.15s, transform 0.12s;
+              border-color 0.15s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Subtle spatial tilt — feels like a physical hardware button sitting in 3D space */
@@ -859,9 +887,10 @@ body.is-playing #iconPause    { opacity: 1; }
   transform: perspective(var(--btn-tilt-perspective)) rotateX(6deg) rotateY(6deg);
 }
 
-/* Heavy studio mechanism snapping into place */
+/* Heavy studio mechanism snapping into place — fast press, spring release */
 .btn-icon:active {
-  transform: scale(0.95);
+  transform: scale(0.88);
+  transition-duration: 0.08s;
   box-shadow:
     inset 2px 3px 6px rgba(0, 0, 0, 0.55),
     inset 1px 1px 0 var(--btn-glass-edge);
@@ -1341,7 +1370,8 @@ body.is-paused .site-footer {
   cursor: pointer;
   text-align: left;
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s,
+              transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   outline: none;
 }
 
@@ -1382,7 +1412,9 @@ body.is-paused .site-footer {
   border-top-color: var(--accent-dim);
   box-shadow:
     0 0 16px rgba(155, 109, 255, 0.15),
+    0 8px 24px rgba(0, 0, 0, 0.40),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
 }
 
 .preset-card:hover::before {
@@ -1390,6 +1422,7 @@ body.is-paused .site-footer {
 }
 
 .preset-card:focus-visible {
+  transform: translateY(-2px);
   box-shadow: 0 0 0 2px var(--accent);
 }
 
@@ -1959,7 +1992,8 @@ body.is-paused .site-footer {
 .settings-drawer {
   pointer-events: none;
   opacity: 0;
-  transition: opacity 150ms ease-in, transform 150ms ease-in;
+  transition: opacity 150ms cubic-bezier(0.55, 0, 0.9, 0.4),
+              transform 150ms cubic-bezier(0.55, 0, 0.9, 0.4);
 }
 
 /* Right-side panels slide in from the right */
@@ -1979,7 +2013,8 @@ body.is-paused .site-footer {
   pointer-events: auto;
   opacity: 1;
   transform: translateX(0);
-  transition: opacity 200ms ease-out, transform 200ms ease-out;
+  transition: opacity 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* On mobile, drawers are full-width bottom sheets — slide up instead of sideways */
@@ -2002,6 +2037,40 @@ body.is-paused .site-footer {
   }
 }
 
+/* Glassmorphism v2 — gradient border that responds to the active theme accent.
+   Uses border-box background-origin + mask-composite to render only the 1px
+   border strip as a gradient, leaving the panel content unaffected.           */
+.controls-drawer::before,
+.sound-drawer::before,
+.settings-drawer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  background-image: linear-gradient(
+    160deg,
+    var(--color-accent) 0%,
+    transparent 45%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-origin: border-box;
+  background-size: 100% 100%;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  transition: opacity 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.controls-drawer.panel--visible::before,
+.sound-drawer.panel--visible::before,
+.settings-drawer.panel--visible::before {
+  opacity: 0.55;
+}
+
 /* Controls/Playlist drawer — fixed panel above the bottom bar, on the right */
 .controls-drawer {
   position: fixed;
@@ -2009,12 +2078,17 @@ body.is-paused .site-footer {
   bottom: 172px;
   width: 310px;
   z-index: 60;
-  background: rgba(8, 8, 18, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 30%),
+    rgba(8, 8, 18, 0.92);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 1px solid var(--accent-subtle);
   border-radius: var(--radius);
-  box-shadow: 0 0 0 1px var(--accent-faint), 0 20px 60px rgba(0, 0, 0, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px var(--accent-faint),
+    0 20px 60px rgba(0, 0, 0, 0.65);
   /* Definite height (not just max-height) is required for flex distribution:
      flex children with flex-grow can only consume space from a definite height.
      max-height alone is not "definite" in the CSS spec — the scroll body stays 0. */
@@ -2032,12 +2106,17 @@ body.is-paused .site-footer {
   bottom: 172px;
   width: 310px;
   z-index: 60;
-  background: rgba(8, 8, 18, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 30%),
+    rgba(8, 8, 18, 0.92);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 1px solid var(--accent-subtle);
   border-radius: var(--radius);
-  box-shadow: 0 0 0 1px var(--accent-faint), 0 20px 60px rgba(0, 0, 0, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px var(--accent-faint),
+    0 20px 60px rgba(0, 0, 0, 0.65);
   height: calc(100dvh - 310px);
   max-height: calc(100dvh - 310px);
   display: flex;
@@ -2195,12 +2274,17 @@ body.is-paused .site-footer {
   bottom: 172px;
   width: 290px;
   z-index: 60;
-  background: rgba(8, 8, 18, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 30%),
+    rgba(8, 8, 18, 0.92);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 1px solid rgba(0, 212, 170, 0.20);
   border-radius: var(--radius);
-  box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.08), 0 20px 60px rgba(0, 0, 0, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(0, 212, 170, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.65);
   height: calc(100dvh - 310px);
   max-height: calc(100dvh - 310px);
   display: flex;
@@ -3911,4 +3995,67 @@ html:not(.has-splash) .landing-badge {
   50%       { filter: drop-shadow(0 0 16px rgba(124, 77, 255, 0.55)) drop-shadow(0 0 32px rgba(0, 201, 160, 0.12)); }
 }
 /* Paused state: glow dims as --ui-bass decays to 0 — handled by .logo-icon rule above, no extra CSS needed */
+
+/* ── v3 Motion & Micro-interaction system ───────────────────────────────── */
+
+/* BPM/key badge pulse — fires once when a new track value is detected */
+@keyframes badge-value-pulse {
+  0%   { transform: scale(1);    box-shadow: none; }
+  45%  { transform: scale(1.12); box-shadow: 0 0 0 5px var(--accent-dim); }
+  100% { transform: scale(1);    box-shadow: none; }
+}
+.badge-pulse {
+  animation: badge-value-pulse 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Value display fade+scale pulse — fires when slider value display changes */
+@keyframes value-display-pulse {
+  0%   { opacity: 1;   transform: scale(1); }
+  30%  { opacity: 0.4; transform: scale(0.85); }
+  100% { opacity: 1;   transform: scale(1); }
+}
+.value-pulse {
+  animation: value-display-pulse 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Slider thumb spring overshoot on mouseup/touchend release */
+@keyframes slider-thumb-spring {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.40); }
+  100% { transform: scale(1); }
+}
+.slider-spring-active::-webkit-slider-thumb {
+  animation: slider-thumb-spring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Radial ink-spread ripple — injected as a <span> by PresetController on click */
+.ink-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  transform: scale(0);
+  pointer-events: none;
+  animation: ink-spread 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes ink-spread {
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* Reduced-motion overrides for v3 animations */
+@media (prefers-reduced-motion: reduce) {
+  .badge-pulse,
+  .value-pulse,
+  .ink-ripple {
+    animation: none !important;
+  }
+  .slider-spring-active::-webkit-slider-thumb {
+    animation: none !important;
+  }
+  .preset-card,
+  .preset-card:hover,
+  .preset-card:focus-visible {
+    transform: none !important;
+    transition: border-color 0.01ms, box-shadow 0.01ms, background 0.01ms !important;
+  }
+}
 

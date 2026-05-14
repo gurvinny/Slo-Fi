@@ -363,12 +363,12 @@
          selection Chrome would flatten the WebGL compositing layer into #app's group,
          causing the orb to disappear. At body level the WebGL layer is a peer of the
          aurora layers and the compositor handles them independently. -->
-    <div id="anomaly" class="anomaly-bg" aria-hidden="true"></div>
+    <div id="anomaly" class="anomaly-bg" aria-hidden="true" data-depth="0"></div>
 
-    <div id="app">
+    <div id="app" data-depth="1">
 
       <!-- Header: minimal fixed top bar -->
-      <header class="header">
+      <header class="header" data-depth="2">
         <div class="header-inner">
           <div class="logo">
             <svg class="logo-icon" width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -476,7 +476,7 @@
           </div>
 
           <!-- Playlist drawer — right side -->
-          <div id="playlistDrawer" class="controls-drawer">
+          <div id="playlistDrawer" class="controls-drawer" data-depth="3">
             <div class="controls-drawer-header">
               <span class="controls-drawer-title">Playlist</span>
               <span id="playlistCount" class="playlist-count">0 tracks</span>
@@ -495,7 +495,7 @@
           </div>
 
           <!-- Sound drawer — unified Audio + Effects tabs, right side -->
-          <div id="soundDrawer" class="sound-drawer">
+          <div id="soundDrawer" class="sound-drawer" data-depth="3">
             <div class="sound-drawer-header">
               <nav class="sound-tabs" role="tablist" aria-label="Sound settings tabs">
                 <button class="sound-tab sound-tab--active" data-tab="audio"   role="tab" aria-selected="true"  aria-controls="soundTab-audio">Audio</button>
@@ -685,7 +685,7 @@
           </div>
 
           <!-- Visual Settings drawer — left side, opens with gear button -->
-          <div id="settingsDrawer" class="settings-drawer">
+          <div id="settingsDrawer" class="settings-drawer" data-depth="3">
             <div class="controls-drawer-header">
               <span class="controls-drawer-title">Visual</span>
               <button id="settingsCloseBtn" class="controls-drawer-btn" title="Close" aria-label="Close">&times;</button>
@@ -802,7 +802,7 @@
           </div>
 
           <!-- Bottom HUD: waveform + transport -->
-          <div class="player-bottom">
+          <div class="player-bottom" data-depth="2">
             <div class="waveform-wrap">
               <canvas id="waveform" class="waveform" role="slider" aria-label="Seek position" tabindex="0"></canvas>
             </div>
@@ -884,7 +884,7 @@
     </footer>
 
     <!-- Help modal — opened with ? key or help button -->
-    <dialog id="help-modal" aria-modal="true" aria-label="Help">
+    <dialog id="help-modal" aria-modal="true" aria-label="Help" data-depth="4">
       <div class="help-modal-inner">
         <div class="help-modal-header">
           <nav class="help-tabs" role="tablist" aria-label="Help sections">

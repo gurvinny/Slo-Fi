@@ -582,13 +582,26 @@ export class App {
         if (!dragging) return
         dragging = false
         const velocity = dy / Math.max(performance.now() - startT, 1)   // px/ms
-        sheet.style.transition = ''   // restore CSS spring transition
-        if (dy > 110 || velocity > 0.5) {
-          // Flick/drag past threshold → slide the rest of the way out, then close
-          sheet.style.transform = `translateY(${Math.max(sheet.offsetHeight, dy + 200)}px)`
-          window.setTimeout(() => { this.closePanel(); sheet.style.transform = '' }, 200)
+        if (dy > 60 || velocity > 0.25) {
+          // Flick/drag past threshold → slide the rest of the way out (opacity
+          // stays up so it doesn't flicker), then tear down without a reverse jump.
+          sheet.style.transition = 'transform 0.2s cubic-bezier(0.4, 0, 1, 1)'
+          sheet.style.transform = 'translateY(110%)'
+          let done = false
+          const finish = () => {
+            if (done) return
+            done = true
+            sheet.style.transition = 'none'   // no reverse animation on cleanup
+            this.closePanel()
+            sheet.style.transform = ''
+            requestAnimationFrame(() => { sheet.style.transition = '' })
+          }
+          sheet.addEventListener('transitionend', finish, { once: true })
+          window.setTimeout(finish, 280)       // fallback if transitionend is missed
         } else {
-          sheet.style.transform = ''   // snap back to translateY(0)
+          // Snap back to the open position using the CSS spring
+          sheet.style.transition = ''
+          sheet.style.transform = ''
         }
       }
       header.addEventListener('touchend', end)

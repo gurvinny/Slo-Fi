@@ -4145,6 +4145,52 @@ html:not(.has-splash) .landing-badge {
 /* Hidden by default (desktop); shown only on phones */
 .bottom-nav { display: none; }
 .mobile-logo { display: none; }
+.sheet-handle { display: none; }
+
+/* Playlist long-press context menu */
+.track-menu {
+  position: fixed;
+  z-index: 120;
+  display: none;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(8, 8, 18, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(124, 77, 255, 0.22);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+.track-menu--visible {
+  display: block;
+  animation: track-menu-in 0.14s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes track-menu-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+.track-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.track-menu-item:hover,
+.track-menu-item:active { background: rgba(124, 77, 255, 0.16); }
+.track-menu-item--danger { color: #ff6b8a; }
+.track-menu-item--danger:hover,
+.track-menu-item--danger:active { background: rgba(255, 107, 138, 0.14); }
+@media (prefers-reduced-motion: reduce) {
+  .track-menu--visible { animation: none; }
+}
 
 @media (max-width: 600px) {
   /* Remove desktop chrome on phones */
@@ -4213,6 +4259,25 @@ html:not(.has-splash) .landing-badge {
   .nav-tab .nav-label { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
   .nav-tab.panel-trigger--active { color: var(--accent-bright); }
   .nav-tab.panel-trigger--active svg { filter: drop-shadow(0 0 6px var(--accent)); }
+
+  /* Drag-handle pill — the sheet header is the drag-to-dismiss zone */
+  .controls-drawer-header,
+  .sound-drawer-header {
+    position: relative;
+    padding-top: 18px;
+    touch-action: none;
+  }
+  .sheet-handle {
+    display: block;
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.22);
+  }
 
   /* Sheets sit flush on top of the bottom bar (waveform + transport + nav).
      --bottombar-h is measured live in JS (updateBottomBarHeight) and already

@@ -110,6 +110,11 @@ export class App {
   private playlistList            = document.getElementById('playlistList')!
   private playlistCount           = document.getElementById('playlistCount')!
 
+  // Playlist long-press context menu
+  private _trackMenu       = document.getElementById('trackMenu')!
+  private _trackMenuIndex  = -1
+  private _trackMenuCloser: ((e: Event) => void) | null = null
+
   // Visual settings controls
   private particleCountSlider  = document.getElementById('particleCountSlider') as HTMLInputElement
   private particleCountValue   = document.getElementById('particleCountValue')!
@@ -144,6 +149,8 @@ export class App {
     this.wireKeyboard()
     this.wireCrossController()
     this.wirePanels()
+    this.wireSheetGestures()
+    this.wireTrackMenu()
     this.wireHelpModal()
     this.wirePlaylist()
     this.wireSliderTouch()
@@ -333,7 +340,26 @@ export class App {
       rmBtn.textContent = '×'
       rmBtn.addEventListener('click', (e) => { e.stopPropagation(); this.removeTrack(i) })
 
-      li.addEventListener('click', () => void this.switchTrack(i, true))
+      // Long-press (mobile) opens the context menu; a normal tap plays the track.
+      let lpTimer: number | null = null
+      let lpFired = false
+      const cancelLp = () => { if (lpTimer !== null) { clearTimeout(lpTimer); lpTimer = null } }
+      li.addEventListener('touchstart', () => {
+        lpFired = false
+        lpTimer = window.setTimeout(() => {
+          lpFired = true
+          this._mobile?.hapticSeek()
+          this.openTrackMenu(i, li)
+        }, 450)
+      }, { passive: true })
+      li.addEventListener('touchmove', cancelLp, { passive: true })
+      li.addEventListener('touchend', cancelLp)
+      li.addEventListener('touchcancel', cancelLp)
+
+      li.addEventListener('click', (e) => {
+        if (lpFired) { e.preventDefault(); e.stopPropagation(); lpFired = false; return }
+        void this.switchTrack(i, true)
+      })
       li.append(handle, info, rmBtn)
       this.playlistList.appendChild(li)
     })
@@ -363,6 +389,64 @@ export class App {
     this._trackMeta = new Map()
     metaArr.forEach((v, k) => { if (v) this._trackMeta.set(k, v) })
     this.renderPlaylist()
+  }
+
+  // ── Playlist long-press context menu ──────────────────────────────────────
+  private wireTrackMenu(): void {
+    this._trackMenu.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = this._trackMenuIndex
+        this.closeTrackMenu()
+        if (i < 0 || i >= this.playlist.length) return
+        switch (btn.dataset.action) {
+          case 'play-now':  void this.switchTrack(i, true); break
+          case 'play-next': {
+            const base = this.currentTrackIndex < 0 ? 0 : this.currentTrackIndex
+            this.reorderTrack(i, Math.min(this.playlist.length - 1, base + 1))
+            break
+          }
+          case 'move-top':  this.reorderTrack(i, 0); break
+          case 'remove':    this.removeTrack(i); break
+        }
+      })
+    })
+  }
+
+  private openTrackMenu(index: number, li: HTMLElement): void {
+    this._trackMenuIndex = index
+    const menu = this._trackMenu
+    menu.classList.add('track-menu--visible')
+    menu.setAttribute('aria-hidden', 'false')
+
+    // Anchor to the item, then clamp inside the viewport
+    const r = li.getBoundingClientRect()
+    const mw = menu.offsetWidth
+    const mh = menu.offsetHeight
+    let top = r.bottom + 6
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6)
+    let left = r.left + 12
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8
+    menu.style.top = `${top}px`
+    menu.style.left = `${Math.max(8, left)}px`
+
+    // Close on the next outside interaction (deferred so the opening tap doesn't close it)
+    window.setTimeout(() => {
+      const close = (ev: Event) => { if (!menu.contains(ev.target as Node)) this.closeTrackMenu() }
+      this._trackMenuCloser = close
+      document.addEventListener('pointerdown', close, true)
+      window.addEventListener('scroll', close, true)
+    }, 0)
+  }
+
+  private closeTrackMenu(): void {
+    this._trackMenu.classList.remove('track-menu--visible')
+    this._trackMenu.setAttribute('aria-hidden', 'true')
+    this._trackMenuIndex = -1
+    if (this._trackMenuCloser) {
+      document.removeEventListener('pointerdown', this._trackMenuCloser, true)
+      window.removeEventListener('scroll', this._trackMenuCloser, true)
+      this._trackMenuCloser = null
+    }
   }
 
   private wireHelpModal(): void {
@@ -462,6 +546,54 @@ export class App {
   private togglePanel(name: 'playlist' | 'sound' | 'visual' | 'export'): void {
     if (this._activePanel === name) this.closePanel()
     else this.openPanel(name)
+  }
+
+  // Drag-to-dismiss for mobile bottom sheets. The header (with its drag handle)
+  // is the grab zone — the scrollable body keeps its own pan-y scrolling, so the
+  // two never fight. Velocity-aware: a fast flick or a drag past threshold
+  // animates the sheet out; otherwise it springs back.
+  private wireSheetGestures(): void {
+    const sheets: HTMLElement[] = [
+      this.playlistDrawer, this.soundDrawer, this.settingsDrawer, this.exportDrawer,
+    ]
+    for (const sheet of sheets) {
+      const header = sheet.querySelector<HTMLElement>('.controls-drawer-header, .sound-drawer-header')
+      if (!header) continue
+
+      let startY = 0, startT = 0, dy = 0, dragging = false
+
+      header.addEventListener('touchstart', (e) => {
+        if (!this._isMobile) return
+        dragging = true
+        startY = e.touches[0].clientY
+        startT = performance.now()
+        dy = 0
+        sheet.style.transition = 'none'   // 1:1 finger tracking while dragging
+      }, { passive: true })
+
+      header.addEventListener('touchmove', (e) => {
+        if (!dragging) return
+        dy = Math.max(0, e.touches[0].clientY - startY)   // downward only
+        sheet.style.transform = `translateY(${dy}px)`
+        if (dy > 2) e.preventDefault()
+      }, { passive: false })
+
+      const end = () => {
+        if (!dragging) return
+        dragging = false
+        const velocity = dy / Math.max(performance.now() - startT, 1)   // px/ms
+        sheet.style.transition = ''   // restore CSS spring transition
+        if (dy > 110 || velocity > 0.5) {
+          // Flick/drag past threshold → slide the rest of the way out, then close
+          sheet.style.transform = `translateY(${Math.max(sheet.offsetHeight, dy + 200)}px)`
+          window.setTimeout(() => { this.closePanel(); sheet.style.transform = '' }, 200)
+        } else {
+          sheet.style.transform = ''   // snap back to translateY(0)
+        }
+      }
+      header.addEventListener('touchend', end)
+      header.addEventListener('touchcancel', end)
+    }
   }
 
   // Highlight the active dock/nav trigger(s) for the open panel.

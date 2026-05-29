@@ -491,6 +491,7 @@
           <!-- Playlist drawer — right side -->
           <div id="playlistDrawer" class="controls-drawer" data-depth="3">
             <div class="controls-drawer-header">
+              <span class="sheet-handle" aria-hidden="true"></span>
               <span class="controls-drawer-title">Playlist</span>
               <span id="playlistCount" class="playlist-count">0 tracks</span>
               <button id="playlistCloseBtn" class="controls-drawer-btn" aria-label="Close playlist">&times;</button>
@@ -510,6 +511,7 @@
           <!-- Sound drawer — unified Audio + Effects tabs, right side -->
           <div id="soundDrawer" class="sound-drawer" data-depth="3">
             <div class="sound-drawer-header">
+              <span class="sheet-handle" aria-hidden="true"></span>
               <nav class="sound-tabs" role="tablist" aria-label="Sound settings tabs">
                 <button class="sound-tab sound-tab--active" data-tab="audio"   role="tab" aria-selected="true"  aria-controls="soundTab-audio">Audio</button>
                 <button class="sound-tab"                   data-tab="effects" role="tab" aria-selected="false" aria-controls="soundTab-effects">Effects</button>
@@ -700,6 +702,7 @@
           <!-- Visual Settings drawer — left side, opens with gear button -->
           <div id="settingsDrawer" class="settings-drawer" data-depth="3">
             <div class="controls-drawer-header">
+              <span class="sheet-handle" aria-hidden="true"></span>
               <span class="controls-drawer-title">Visual</span>
               <button id="settingsCloseBtn" class="controls-drawer-btn" title="Close" aria-label="Close">&times;</button>
             </div>
@@ -819,6 +822,7 @@
                is a panel on both mobile (nav tab) and desktop (dock). -->
           <div id="exportDrawer" class="settings-drawer export-drawer" data-depth="3">
             <div class="controls-drawer-header">
+              <span class="sheet-handle" aria-hidden="true"></span>
               <span class="controls-drawer-title">Export</span>
               <button id="exportCloseBtn" class="controls-drawer-btn" title="Close" aria-label="Close">&times;</button>
             </div>
@@ -947,6 +951,14 @@
            the root context sees #app at z-index 1 and the backdrop at z-index 45,
            so the backdrop paints over the drawers and eats all touch events. -->
       <div id="drawerBackdrop" class="drawer-backdrop"></div>
+
+      <!-- Playlist long-press context menu (mobile). Positioned in JS. -->
+      <div id="trackMenu" class="track-menu" role="menu" aria-hidden="true">
+        <button class="track-menu-item" data-action="play-now"  role="menuitem">Play now</button>
+        <button class="track-menu-item" data-action="play-next" role="menuitem">Play next</button>
+        <button class="track-menu-item" data-action="move-top"  role="menuitem">Move to top</button>
+        <button class="track-menu-item track-menu-item--danger" data-action="remove" role="menuitem">Remove</button>
+      </div>
 
     </div><!-- /#app -->
 

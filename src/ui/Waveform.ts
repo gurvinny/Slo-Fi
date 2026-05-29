@@ -35,6 +35,12 @@ export class Waveform {
   private _loopEnabled = false
   private _dragTarget: 'start' | 'end' | null = null
 
+  // Zoom / pan for precise loop & seek on long (slowed) tracks. The visible
+  // window is [_pan, _pan + 1/_zoom] of the full track; _zoom >= 1.
+  private _zoom = 1
+  private _pan  = 0
+  private static readonly MAX_ZOOM = 12
+
   public onLoopChange: ((start: number, end: number) => void) | null = null
 
   constructor(canvas: HTMLCanvasElement) {
@@ -78,6 +84,37 @@ export class Waveform {
     return { start: this._loopStart, end: this._loopEnd }
   }
 
+  // ── Zoom / pan mapping ────────────────────────────────────────────────────
+  private clampPan(): void {
+    this._pan = Math.max(0, Math.min(this._pan, 1 - 1 / this._zoom))
+  }
+
+  // Client/screen X → track ratio (0-1), accounting for zoom & pan.
+  private screenXToRatio(clientX: number): number {
+    const rect = this.canvas.getBoundingClientRect()
+    const frac = (clientX - rect.left) / rect.width
+    return Math.max(0, Math.min(1, this._pan + frac / this._zoom))
+  }
+
+  // Track ratio → local canvas X (px) for a canvas of the given CSS width.
+  private ratioToLocalX(ratio: number, width: number): number {
+    return (ratio - this._pan) * this._zoom * width
+  }
+
+  // Set zoom while keeping anchorRatio pinned under anchorFrac (0-1 across view).
+  private setZoom(zoom: number, anchorRatio: number, anchorFrac: number): void {
+    this._zoom = Math.max(1, Math.min(Waveform.MAX_ZOOM, zoom))
+    this._pan = this._zoom === 1 ? 0 : anchorRatio - anchorFrac / this._zoom
+    this.clampPan()
+    this.draw()
+  }
+
+  resetZoom(): void {
+    this._zoom = 1
+    this._pan = 0
+    this.draw()
+  }
+
   resize(): void {
     const dpr = window.devicePixelRatio || 1
     const rect = this.canvas.getBoundingClientRect()
@@ -117,8 +154,11 @@ export class Waveform {
       return
     }
 
-    const bw = W / data.length
-    const playheadX = progress * W
+    // Map a track ratio (0-1) to a local canvas X under the current zoom/pan
+    const xOf = (r: number) => (r - this._pan) * this._zoom * W
+    const n = data.length
+    const bw = (this._zoom * W) / n         // width of one bar in the zoomed view
+    const playheadX = xOf(progress)
 
     // Hover highlight — uses theme accent
     if (hoverX >= 0) {
@@ -139,19 +179,23 @@ export class Waveform {
     playGrad.addColorStop(0.75, accent)
     playGrad.addColorStop(1,    accentBright)
 
-    // Draw all unplayed bars first — dark base tinted with the theme accent
+    // Draw all unplayed bars first — dark base tinted with the theme accent.
+    // Only iterate over bars within the visible (zoomed) window.
     ctx.fillStyle = unplayedColor(accent)
-    for (let i = 0; i < data.length; i++) {
-      const x = i * bw
+    for (let i = 0; i < n; i++) {
+      const x = xOf(i / n)
+      if (x + bw < 0) continue
+      if (x > W) break
       const h = Math.max(1, (data[i] ?? 0) * cy * 0.92)
       ctx.fillRect(x + 0.5, cy - h, Math.max(1, bw - 1), h * 2)
     }
 
     // Overdraw played bars with the rainbow gradient
     ctx.fillStyle = playGrad
-    for (let i = 0; i < data.length; i++) {
-      const x = i * bw
-      if (x >= playheadX) break
+    for (let i = 0; i < n; i++) {
+      const x = xOf(i / n)
+      if (x >= playheadX || x > W) break
+      if (x + bw < 0) continue
       const h = Math.max(1, (data[i] ?? 0) * cy * 0.92)
       ctx.fillRect(x + 0.5, cy - h, Math.max(1, bw - 1), h * 2)
     }
@@ -180,8 +224,8 @@ export class Waveform {
     // Loop region: shaded fill + handle lines with knobs
     // Always visible when markers are set (dimmer when disabled so user can still see them)
     if (this._loopEnd > this._loopStart) {
-      const lx = this._loopStart * W
-      const rx = this._loopEnd   * W
+      const lx = xOf(this._loopStart)
+      const rx = xOf(this._loopEnd)
 
       // Shaded region
       ctx.save()
@@ -196,7 +240,7 @@ export class Waveform {
         ['end',   this._loopEnd],
       ]
       for (const [which, ratio] of handles) {
-        const hx = ratio * W
+        const hx = xOf(ratio)
         const color = which === 'start' ? accentBright : teal
         ctx.save()
         ctx.globalAlpha = this._loopEnabled ? 0.9 : 0.4
@@ -227,16 +271,13 @@ export class Waveform {
     let _pendingTouchX = 0
 
     const seekAt = (clientX: number) => {
-      const rect = this.canvas.getBoundingClientRect()
-      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-      this._onSeek?.(ratio)
+      this._onSeek?.(this.screenXToRatio(clientX))
     }
 
     // Updates the waveform playhead position visually without triggering an
     // audio seek - used to give instant visual feedback during touch scrubbing.
     const updateVisualProgress = (clientX: number) => {
-      const rect = this.canvas.getBoundingClientRect()
-      this.progress = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+      this.progress = this.screenXToRatio(clientX)
       this.draw()
     }
 
@@ -254,8 +295,8 @@ export class Waveform {
     const hitHandle = (clientX: number, radius = 8): 'start' | 'end' | null => {
       const rect = this.canvas.getBoundingClientRect()
       const x = clientX - rect.left
-      if (Math.abs(x - this._loopStart * rect.width) <= radius) return 'start'
-      if (Math.abs(x - this._loopEnd   * rect.width) <= radius) return 'end'
+      if (Math.abs(x - this.ratioToLocalX(this._loopStart, rect.width)) <= radius) return 'start'
+      if (Math.abs(x - this.ratioToLocalX(this._loopEnd,   rect.width)) <= radius) return 'end'
       return null
     }
 
@@ -272,8 +313,7 @@ export class Waveform {
     window.addEventListener('mousemove', (e) => {
       // Dragging a loop handle
       if (this._dragTarget) {
-        const rect  = this.canvas.getBoundingClientRect()
-        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+        const ratio = this.screenXToRatio(e.clientX)
         if (this._dragTarget === 'start') {
           this._loopStart = Math.min(ratio, this._loopEnd - 0.01)
         } else {
@@ -319,47 +359,81 @@ export class Waveform {
       }
     })
 
-    // Touch support
+    // ── Touch: tap/scrub-seek, loop-handle drag, pinch-zoom, one-finger pan ──
+    // Gesture modes: 'handle' = dragging a loop marker; 'seek' = scrub (only
+    // when unzoomed); 'pan' = drag the timeline (only when zoomed; a tap with
+    // no movement seeks); 'pinch' = two-finger zoom about the pinch midpoint.
+    type Mode = 'none' | 'handle' | 'seek' | 'pan' | 'pinch'
+    let mode: Mode = 'none'
+    let pinchD0 = 0, pinchZ0 = 1, pinchAnchor = 0
+    let panStartX = 0, panStartPan = 0, oneStartX = 0, moved = false, lastTap = 0
+
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    const midX = (t: TouchList) => (t[0].clientX + t[1].clientX) / 2
+
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault()
-      // Use a 20px radius for touch so loop handles are easy to grab with a finger
-      const hit = hitHandle(e.touches[0].clientX, 20)
-      if (hit) {
-        this._dragTarget = hit
+      if (e.touches.length >= 2) {
+        mode = 'pinch'
+        pinchD0 = dist(e.touches)
+        pinchZ0 = this._zoom
+        pinchAnchor = this.screenXToRatio(midX(e.touches))
         return
       }
-      seekAt(e.touches[0].clientX)
+      const cx = e.touches[0].clientX
+      const hit = hitHandle(cx, 20)   // 20px finger radius
+      if (hit) { this._dragTarget = hit; mode = 'handle'; return }
+      moved = false
+      oneStartX = cx
+      if (this._zoom > 1) {
+        mode = 'pan'; panStartX = cx; panStartPan = this._pan   // tap will seek on release
+      } else {
+        mode = 'seek'; seekAt(cx)
+      }
     }, { passive: false })
 
     this.canvas.addEventListener('touchmove', (e) => {
       e.preventDefault()
-      const touch = e.touches[0]
-      if (this._dragTarget) {
-        const rect  = this.canvas.getBoundingClientRect()
-        const ratio = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width))
-        if (this._dragTarget === 'start') {
-          this._loopStart = Math.min(ratio, this._loopEnd - 0.01)
-        } else {
-          this._loopEnd = Math.max(ratio, this._loopStart + 0.01)
-        }
-        this.onLoopChange?.(this._loopStart, this._loopEnd)
-        this.draw()
+      if (mode === 'pinch' && e.touches.length >= 2) {
+        const rect = this.canvas.getBoundingClientRect()
+        const frac = (midX(e.touches) - rect.left) / rect.width
+        this.setZoom(pinchZ0 * (dist(e.touches) / Math.max(pinchD0, 1)), pinchAnchor, frac)
         return
       }
-      // Update the playhead position visually on every touchmove for smooth
-      // feedback, then throttle the actual audio seek to once per RAF so the
-      // source node isn't recreated faster than it can settle.
-      updateVisualProgress(touch.clientX)
-      seekAtThrottled(touch.clientX)
+      const cx = e.touches[0].clientX
+      if (Math.abs(cx - oneStartX) > 6) moved = true
+
+      if (mode === 'handle' && this._dragTarget) {
+        const ratio = this.screenXToRatio(cx)
+        if (this._dragTarget === 'start') this._loopStart = Math.min(ratio, this._loopEnd - 0.01)
+        else                              this._loopEnd   = Math.max(ratio, this._loopStart + 0.01)
+        this.onLoopChange?.(this._loopStart, this._loopEnd)
+        this.draw()
+      } else if (mode === 'pan') {
+        const rect = this.canvas.getBoundingClientRect()
+        this._pan = panStartPan - ((cx - panStartX) / rect.width) / this._zoom
+        this.clampPan()
+        this.draw()
+      } else if (mode === 'seek') {
+        updateVisualProgress(cx)
+        seekAtThrottled(cx)
+      }
     }, { passive: false })
 
-    this.canvas.addEventListener('touchend', () => {
+    this.canvas.addEventListener('touchend', (e) => {
+      if (mode === 'pan' && !moved) seekAt(oneStartX)   // tap-to-seek when zoomed
+      if (!moved && mode !== 'pinch') {
+        const now = performance.now()
+        if (now - lastTap < 300 && this._zoom > 1) this.resetZoom()   // double-tap resets zoom
+        lastTap = now
+      }
       this._dragTarget = null
+      mode = e.touches.length ? mode : 'none'
       if (_touchSeekRaf !== null) {
         cancelAnimationFrame(_touchSeekRaf)
         _touchSeekRaf = null
       }
-    })
+    }, { passive: false })
 
     // Keyboard
     this.canvas.addEventListener('keydown', (e) => {

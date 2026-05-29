@@ -9,6 +9,7 @@ import { StarOverlay } from './StarOverlay'
 import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
+import { GrainFieldController } from './GrainFieldController'
 import { MobileController } from './MobileController'
 import type { AudioParams, ReverbType } from '../types'
 
@@ -32,6 +33,7 @@ export class App {
   // Controllers
   private presets: PresetController
   private effects: EffectsController
+  private grain: GrainFieldController
   private exporter: ExportController
   private _mobile!: MobileController
 
@@ -128,6 +130,7 @@ export class App {
 
     this.presets = new PresetController(this.engine)
     this.effects = new EffectsController(this.engine)
+    this.grain = new GrainFieldController(this.engine)
     this.exporter = new ExportController(this.engine)
 
     this.wireEngineCallbacks()
@@ -432,11 +435,11 @@ export class App {
     })
     this.soundDrawer.querySelectorAll<HTMLButtonElement>('.sound-tab').forEach((tab) => {
       tab.addEventListener('click', () =>
-        this.switchSoundTab(tab.dataset.tab as 'audio' | 'effects'))
+        this.switchSoundTab(tab.dataset.tab as 'audio' | 'effects' | 'grain'))
     })
   }
 
-  private switchSoundTab(tab: 'audio' | 'effects'): void {
+  private switchSoundTab(tab: 'audio' | 'effects' | 'grain'): void {
     this.soundDrawer.querySelectorAll<HTMLElement>('.sound-tab').forEach((t) => {
       const isActive = t.dataset.tab === tab
       t.classList.toggle('sound-tab--active', isActive)
@@ -445,6 +448,7 @@ export class App {
     this.soundDrawer.querySelectorAll<HTMLElement>('.sound-tab-panel').forEach((p) => {
       p.classList.toggle('sound-tab-panel--hidden', p.id !== `soundTab-${tab}`)
     })
+    if (tab === 'grain') this.grain.onTabShown()
   }
 
   private wireSettingsPanel(): void {
@@ -475,6 +479,7 @@ export class App {
     this.presets.onPresetApplied = (params: AudioParams) => {
       this.syncSlidersToParams(params)
       this.effects.syncToParams(params)
+      this.grain.syncToParams(params)
       this.sphere?.setSpeed(params.playbackRate)
       this.sphere?.setReverb(params.reverbMix)
       this.saveSettings()
@@ -500,6 +505,16 @@ export class App {
     this.effects.onChanged = () => {
       this.presets.clearActive()
     }
+    this.grain.onChanged = () => {
+      this.presets.clearActive()
+    }
+    this.grain.onFreezeChanged = (bass, mid, treble) => {
+      this.sphere?.setGrainBandFreeze(bass, mid, treble)
+    }
+    // Wire the worklet → controller pad-dot + AnomalySphere particle pulses.
+    // Subscribed lazily after the audio context exists; AudioEngine sets the
+    // engine.granular only after ensureContext() — so we re-bind on first play.
+    this._bindGrainSpawnHook()
     this.effects.on8DChange = (enabled, _speed) => {
       this.sphere?.set8DMode(enabled)
       if (!enabled) this.sphere?.set8DAngle(0)
@@ -508,6 +523,20 @@ export class App {
     this.engine.on8DAngleUpdate = (angle) => {
       this.sphere?.set8DAngle(angle)
     }
+  }
+
+  // Wires AudioEngine.granular.onGrainSpawn to the GrainField pad + AnomalySphere.
+  // Safe to call repeatedly — only attaches once the worklet exists.
+  private _grainHookBound = false
+  private _bindGrainSpawnHook(): void {
+    if (this._grainHookBound) return
+    const gran = this.engine.granular
+    if (!gran) return
+    gran.onGrainSpawn = (voice, posNorm, sizeMs, pan) => {
+      this.grain.onGrainSpawn(voice, posNorm, sizeMs, pan)
+      this.sphere?.onGrainSpawn?.(voice, posNorm, sizeMs, pan)
+    }
+    this._grainHookBound = true
   }
 
   private wireEngineCallbacks(): void {
@@ -888,6 +917,8 @@ export class App {
     // NOT misreported as "Could not decode this file."
     try {
       await this.engine.loadFile(file)
+      // Now that the AudioContext + worklet exist, hook the grain spawn callback.
+      this._bindGrainSpawnHook()
     } catch (err) {
       console.error('Failed to decode audio:', err)
       showDropzoneError('Could not decode this file. Try a different format.')

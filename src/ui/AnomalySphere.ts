@@ -664,6 +664,14 @@ export class AnomalySphere {
   private prevFreqData: Uint8Array | null = null  // previous FFT frame for flux delta
   private _loopPulseAmount = 0  // decays each frame; set to 1 on each loop cycle
 
+  // ── GrainField visualisation hooks ────────────────────────────────────────
+  // _grainPulse[voice] is bumped on each grain spawn and decayed every frame.
+  // The aggregate drives a brightness lift on uParticleColor, and the
+  // (treble − bass) imbalance biases hue warm/cool. Frozen bands intensify
+  // their own pulse channel so the visual reads as "held".
+  private _grainPulse: [number, number, number] = [0, 0, 0]
+  private _grainFreezeMult: [number, number, number] = [1, 1, 1]
+
   // ── Orb effect: lightning tendrils ─────────────────────────────────────────
   // Short jagged Line arcs spawn at the orb surface and shoot outward on
   // kick transients. Each arc has a lifespan counter; opacity fades linearly as
@@ -1089,6 +1097,9 @@ export class AnomalySphere {
       uTime:          { value: 0 },
       uParticleColor: { value: new Color('#b08aff') },
     }
+    // Note: GrainField currently piggybacks on uParticleColor only — no new
+    // uniforms needed. Aggregate grain activity modulates color brightness
+    // each frame in render(); see the GrainField visualisation block below.
 
     const mat = new RawShaderMaterial({
       uniforms:       this.particleUniforms,
@@ -1196,6 +1207,22 @@ export class AnomalySphere {
   // distinct from the audio-reactive bass pulse.
   public triggerLoopPulse(): void {
     this._loopPulseAmount = 1
+  }
+
+  // GrainField — fired by the worklet on every grain start. voice 0=bass,
+  // 1=mid, 2=treble. Bumps the pulse channel by an amount that scales with
+  // grain length so longer grains read more visually than micro-grains.
+  public onGrainSpawn(voice: number, _posNorm: number, sizeMs: number, _pan: number): void {
+    if (voice < 0 || voice > 2) return
+    const bump = 0.12 + Math.min(0.18, sizeMs / 600)
+    this._grainPulse[voice as 0 | 1 | 2] = Math.min(1, this._grainPulse[voice as 0 | 1 | 2] + bump)
+  }
+
+  // Frozen bands keep their channel brighter so the visual reflects "held".
+  public setGrainBandFreeze(bass: boolean, mid: boolean, treble: boolean): void {
+    this._grainFreezeMult[0] = bass   ? 1.5 : 1
+    this._grainFreezeMult[1] = mid    ? 1.5 : 1
+    this._grainFreezeMult[2] = treble ? 1.5 : 1
   }
 
   start(): void {
@@ -1495,7 +1522,23 @@ export class AnomalySphere {
     this.particleUniforms.uTreble.value = tVis
     this.particleUniforms.uTime.value   = elapsed
     const pHue = (this.hueOffset + 0.1) % 1.0
-    this.particleUniforms.uParticleColor.value.setHSL(pHue, 0.85, 0.72)
+
+    // GrainField overlay: bump from grain spawns decays each frame; frozen
+    // bands hold their channel brighter. Aggregate lifts particle lightness;
+    // (treble − bass) imbalance biases hue warm (bass) or cool (treble).
+    for (let v = 0; v < 3; v++) {
+      this._grainPulse[v] *= 0.92
+    }
+    const gB = this._grainPulse[0] * this._grainFreezeMult[0]
+    const gM = this._grainPulse[1] * this._grainFreezeMult[1]
+    const gT = this._grainPulse[2] * this._grainFreezeMult[2]
+    const gAgg = (gB + gM + gT) / 3
+    const hueBias = 0.04 * (gT - gB)
+    this.particleUniforms.uParticleColor.value.setHSL(
+      (pHue + hueBias + 1) % 1.0,
+      0.85,
+      Math.min(0.95, 0.72 + gAgg * 0.18),
+    )
 
     // Star field twinkle
     this.starUniforms.uTime.value   = elapsed

@@ -29,6 +29,22 @@ export interface AbyssParams {
   resonance: number   // 0–1: Q sweep 0.5 → 8.0 (linear)
 }
 
+export type GrainBand = 'bass' | 'mid' | 'treble'
+
+export interface GrainFieldParams {
+  enabled:       boolean
+  position:      number       // 0..1 — playhead position to harvest grains from
+  grainSize:     number       // 0.010..0.500 seconds
+  density:       number       // 1..40 grains/sec per active band
+  spread:        number       // 0..1 — random position scatter (×5% of buffer)
+  pitchScatter:  number       // 0..12 — random pitch jitter (±semitones)
+  attack:        number       // 0..0.5 — grain envelope attack (fraction of grain)
+  decay:         number       // 0..0.5 — grain envelope decay (fraction of grain)
+  mix:           number       // 0..1 — wet send level into master
+  freeze:        { bass: boolean; mid: boolean; treble: boolean }
+  bandEnable:    { bass: boolean; mid: boolean; treble: boolean }
+}
+
 // All audio parameters in one flat object.
 // Used by presets and getParams/applyPreset.
 export interface AudioParams {
@@ -45,6 +61,7 @@ export interface AudioParams {
   abyss:          AbyssParams
   hzFrequency:    number | null  // Solfeggio resonance Hz, null = off
   pitchSemitones: number       // -12 to +12 semitones (0 = no shift)
+  grainField?:    GrainFieldParams  // optional for back-compat with pre-Meridian presets
 }
 
 export interface VisualParams {

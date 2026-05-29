@@ -500,6 +500,7 @@
               <nav class="sound-tabs" role="tablist" aria-label="Sound settings tabs">
                 <button class="sound-tab sound-tab--active" data-tab="audio"   role="tab" aria-selected="true"  aria-controls="soundTab-audio">Audio</button>
                 <button class="sound-tab"                   data-tab="effects" role="tab" aria-selected="false" aria-controls="soundTab-effects">Effects</button>
+                <button class="sound-tab"                   data-tab="grain"   role="tab" aria-selected="false" aria-controls="soundTab-grain">GrainField</button>
               </nav>
               <button id="soundCloseBtn" class="controls-drawer-btn" aria-label="Close sound settings">&times;</button>
             </div>
@@ -678,6 +679,122 @@
                     <button class="btn-hz" data-hz="963" title="963 Hz — Divine connection &amp; enlightenment"           aria-pressed="false">963</button>
                   </div>
                   <p class="control-hint" id="hzHint">Hover a frequency to learn more</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- GrainField tab — v3.0.0 Meridian signature feature -->
+            <div id="soundTab-grain" class="sound-tab-panel sound-tab-panel--hidden" role="tabpanel">
+              <div class="controls">
+                <div class="control-section-label">GrainField</div>
+                <div class="control-group control-group--grain-enable">
+                  <label class="toggle-row">
+                    <span class="toggle-label">Engine</span>
+                    <span class="toggle-wrap">
+                      <input type="checkbox" id="gfEnableToggle" class="toggle-input" aria-label="Enable GrainField engine" />
+                      <span class="toggle-track"></span>
+                    </span>
+                  </label>
+                  <p class="control-hint">Real-time granular synthesis — freeze any moment of the track and scatter it across time and pitch.</p>
+                </div>
+
+                <div class="control-section-label">Scrub Pad</div>
+                <div class="control-group">
+                  <canvas id="gfXYPad" class="gf-xy-pad" width="320" height="220" aria-label="GrainField XY pad — drag to scrub position and density"></canvas>
+                  <div class="gf-xy-legend">
+                    <span>← Position →</span>
+                    <span>↕ Density</span>
+                  </div>
+                </div>
+
+                <div class="control-section-label">Grain</div>
+                <div class="control-group">
+                  <div class="control-header"><label for="gfGrainSizeSlider">Grain Size</label><span class="value-badge value-badge--purple" id="gfGrainSizeValue">120 ms</span></div>
+                  <input type="range" id="gfGrainSizeSlider" class="slider slider--purple" min="10" max="500" value="120" step="1" aria-label="Grain size in milliseconds" />
+                  <div class="slider-ticks"><span>10 ms</span><span>250 ms</span><span>500 ms</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="gfDensitySlider">Density</label><span class="value-badge value-badge--purple" id="gfDensityValue">12 /s</span></div>
+                  <input type="range" id="gfDensitySlider" class="slider slider--purple" min="1" max="40" value="12" step="1" aria-label="Grain density per second" />
+                  <div class="slider-ticks"><span>1</span><span>20</span><span>40 /s</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="gfSpreadSlider">Spread</label><span class="value-badge value-badge--purple" id="gfSpreadValue">20%</span></div>
+                  <input type="range" id="gfSpreadSlider" class="slider slider--purple" min="0" max="100" value="20" step="1" aria-label="Position spread" />
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="gfPitchScatterSlider">Pitch Scatter</label><span class="value-badge value-badge--purple" id="gfPitchScatterValue">0 st</span></div>
+                  <input type="range" id="gfPitchScatterSlider" class="slider slider--purple" min="0" max="12" value="0" step="1" aria-label="Pitch scatter in semitones" />
+                  <div class="slider-ticks"><span>0</span><span>±6</span><span>±12 st</span></div>
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="gfAttackSlider">Attack</label><span class="value-badge value-badge--purple" id="gfAttackValue">10%</span></div>
+                  <input type="range" id="gfAttackSlider" class="slider slider--purple" min="0" max="50" value="10" step="1" aria-label="Grain envelope attack" />
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="gfDecaySlider">Decay</label><span class="value-badge value-badge--purple" id="gfDecayValue">10%</span></div>
+                  <input type="range" id="gfDecaySlider" class="slider slider--purple" min="0" max="50" value="10" step="1" aria-label="Grain envelope decay" />
+                </div>
+                <div class="control-group">
+                  <div class="control-header"><label for="gfMixSlider">Mix</label><span class="value-badge value-badge--purple" id="gfMixValue">0%</span></div>
+                  <input type="range" id="gfMixSlider" class="slider slider--purple" min="0" max="100" value="0" step="1" aria-label="GrainField wet send mix" />
+                  <div class="slider-ticks"><span>Dry</span><span>50%</span><span>Wet</span></div>
+                </div>
+
+                <div class="control-section-label">Band Freeze</div>
+                <div class="control-group">
+                  <div class="gf-band-row">
+                    <span class="gf-band-label">Bass</span>
+                    <label class="toggle-row toggle-row--inline">
+                      <span class="toggle-mini-label">On</span>
+                      <span class="toggle-wrap">
+                        <input type="checkbox" id="gfBassEnableToggle" class="toggle-input" checked aria-label="Enable bass band" />
+                        <span class="toggle-track"></span>
+                      </span>
+                    </label>
+                    <label class="toggle-row toggle-row--inline">
+                      <span class="toggle-mini-label">Freeze</span>
+                      <span class="toggle-wrap">
+                        <input type="checkbox" id="gfBassFreezeToggle" class="toggle-input" aria-label="Freeze bass band" />
+                        <span class="toggle-track"></span>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="gf-band-row">
+                    <span class="gf-band-label">Mid</span>
+                    <label class="toggle-row toggle-row--inline">
+                      <span class="toggle-mini-label">On</span>
+                      <span class="toggle-wrap">
+                        <input type="checkbox" id="gfMidEnableToggle" class="toggle-input" checked aria-label="Enable mid band" />
+                        <span class="toggle-track"></span>
+                      </span>
+                    </label>
+                    <label class="toggle-row toggle-row--inline">
+                      <span class="toggle-mini-label">Freeze</span>
+                      <span class="toggle-wrap">
+                        <input type="checkbox" id="gfMidFreezeToggle" class="toggle-input" aria-label="Freeze mid band" />
+                        <span class="toggle-track"></span>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="gf-band-row">
+                    <span class="gf-band-label">Treble</span>
+                    <label class="toggle-row toggle-row--inline">
+                      <span class="toggle-mini-label">On</span>
+                      <span class="toggle-wrap">
+                        <input type="checkbox" id="gfTrebleEnableToggle" class="toggle-input" checked aria-label="Enable treble band" />
+                        <span class="toggle-track"></span>
+                      </span>
+                    </label>
+                    <label class="toggle-row toggle-row--inline">
+                      <span class="toggle-mini-label">Freeze</span>
+                      <span class="toggle-wrap">
+                        <input type="checkbox" id="gfTrebleFreezeToggle" class="toggle-input" aria-label="Freeze treble band" />
+                        <span class="toggle-track"></span>
+                      </span>
+                    </label>
+                  </div>
+                  <p class="control-hint">Freeze locks each frequency band to its current playback moment.</p>
                 </div>
               </div>
             </div>

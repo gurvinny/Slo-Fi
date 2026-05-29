@@ -1,5 +1,22 @@
 import { EffectsChain } from './EffectsChain'
-import type { AudioParams, ReverbType } from '../types'
+import { GranularEngine, type GrainParamName } from './GranularEngine'
+import type { AudioParams, GrainBand, GrainFieldParams, ReverbType } from '../types'
+
+const DEFAULT_GRAIN_FIELD: GrainFieldParams = {
+  enabled:      false,
+  position:     0.5,
+  grainSize:    0.12,
+  density:      12,
+  spread:       0.2,
+  pitchScatter: 0,
+  attack:       0.1,
+  decay:        0.1,
+  mix:          0,
+  freeze:       { bass: false, mid: false, treble: false },
+  bandEnable:   { bass: true,  mid: true,  treble: true  },
+}
+
+export { DEFAULT_GRAIN_FIELD }
 
 export const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024
 
@@ -106,6 +123,13 @@ export class AudioEngine {
   // setPositionState values instead of a looping 0-1 second counter.
   private _keepaliveEl: HTMLAudioElement | null = null
 
+  // GrainField — parallel wet send summed into masterGainNode
+  private _granular: GranularEngine | null = null
+  private _grain: GrainFieldParams = { ...DEFAULT_GRAIN_FIELD,
+    freeze:     { ...DEFAULT_GRAIN_FIELD.freeze },
+    bandEnable: { ...DEFAULT_GRAIN_FIELD.bandEnable },
+  }
+
   // 8D binaural panner — sits after analyser, before destination
   private _panner8D: PannerNode | null = null
   private _8DEnabled = false
@@ -179,6 +203,14 @@ export class AudioEngine {
   get effectsChain(): EffectsChain | null { return this._effectsChain }
   get analyserNode(): AnalyserNode | null { return this._analyserNode }
   get analyserPreEQ(): AnalyserNode | null { return this._analyserPreEQNode }
+  get granular(): GranularEngine | null { return this._granular }
+  getGrainParams(): GrainFieldParams {
+    return {
+      ...this._grain,
+      freeze:     { ...this._grain.freeze },
+      bandEnable: { ...this._grain.bandEnable },
+    }
+  }
 
   getBuffer(): AudioBuffer | null { return this.buffer }
 
@@ -197,6 +229,7 @@ export class AudioEngine {
       abyss:          { ...this._abyss },
       hzFrequency:    this._hzFrequency,
       pitchSemitones: this._pitchSemitones,
+      grainField:     this.getGrainParams(),
     }
   }
 
@@ -265,6 +298,21 @@ export class AudioEngine {
     this._effectsChain = new EffectsChain()
     const chainOutput = await this._effectsChain.init(this.context, this.masterGainNode)
 
+    // GrainField — parallel wet send. Output sums into masterGainNode upstream
+    // of the EQ chain so grains share EQ / chorus / saturation with the source.
+    if (this.context.audioWorklet) {
+      try {
+        this._granular = new GranularEngine()
+        const grainNode = await this._granular.init(this.context)
+        grainNode.connect(this.masterGainNode)
+        // Apply current cached params so the worklet starts coherent with state
+        this._applyGrainParamsToWorklet()
+      } catch (e) {
+        console.log('[AudioEngine] GranularEngine unavailable:', e)
+        this._granular = null
+      }
+    }
+
     // Analyser taps the fully processed signal
     this._analyserNode = this.context.createAnalyser()
     this._analyserNode.fftSize = 2048
@@ -318,6 +366,17 @@ export class AudioEngine {
     this.buffer = await this.context!.decodeAudioData(arrayBuffer)
     arrayBuffer = null  // release raw bytes; iOS may not GC until explicitly nulled
     this._startOffset = 0
+
+    // Push the decoded PCM into the grain worklet so it can scrub through any
+    // moment of the track. Awaited so playback never starts before the grain
+    // buffers are loaded (avoids a brief silent grain output on first play).
+    if (this._granular && this.buffer) {
+      try {
+        await this._granular.loadPcm(this.buffer)
+      } catch (e) {
+        console.log('[AudioEngine] GranularEngine.loadPcm failed:', e)
+      }
+    }
   }
 
   // Transport
@@ -532,6 +591,69 @@ export class AudioEngine {
     this._effectsChain?.setAbyssResonance(this._abyss.resonance)
   }
 
+  // ── GrainField setters ───────────────────────────────────────────────────
+  // setGrainEnabled is a UI-level flag (drives the master enable toggle).
+  // The audio effect is gated by mix: when disabled, mix ramps to 0.
+  setGrainEnabled(enabled: boolean): void {
+    this._grain.enabled = enabled
+    if (this._granular) {
+      // Force-mute by setting the worklet 'mix' param to 0 when disabled, so
+      // the engine cannot leak grain audio while the UI says "off".
+      this._granular.setParam('mix', enabled ? this._grain.mix : 0)
+    }
+  }
+
+  setGrainParam(name: GrainParamName, value: number): void {
+    const clamp = (v: number, lo: number, hi: number): number =>
+      Math.max(lo, Math.min(hi, v))
+    switch (name) {
+      case 'position':     this._grain.position     = clamp(value, 0,     1);     break
+      case 'grainSize':    this._grain.grainSize    = clamp(value, 0.010, 0.500); break
+      case 'density':      this._grain.density      = clamp(value, 1,     40);    break
+      case 'spread':       this._grain.spread       = clamp(value, 0,     1);     break
+      case 'pitchScatter': this._grain.pitchScatter = clamp(value, 0,     12);    break
+      case 'attack':       this._grain.attack       = clamp(value, 0,     0.5);   break
+      case 'decay':        this._grain.decay        = clamp(value, 0,     0.5);   break
+      case 'mix':          this._grain.mix          = clamp(value, 0,     1);     break
+    }
+    if (!this._granular) return
+    // For mix, honour the enabled toggle: a disabled engine never sends audio.
+    if (name === 'mix') {
+      this._granular.setParam('mix', this._grain.enabled ? this._grain.mix : 0)
+    } else {
+      this._granular.setParam(name, this._grain[name] as number)
+    }
+  }
+
+  setGrainBandFreeze(band: GrainBand, frozen: boolean): void {
+    this._grain.freeze[band] = frozen
+    this._granular?.setBandFreeze(band, frozen)
+  }
+
+  setGrainBandEnable(band: GrainBand, enabled: boolean): void {
+    this._grain.bandEnable[band] = enabled
+    this._granular?.setBandEnable(band, enabled)
+  }
+
+  // Pushes the entire cached GrainField state to the worklet. Used after the
+  // worklet first becomes available so it inherits any user-set values that
+  // were applied before the context was created.
+  private _applyGrainParamsToWorklet(): void {
+    if (!this._granular) return
+    this._granular.setParam('position',     this._grain.position)
+    this._granular.setParam('grainSize',    this._grain.grainSize)
+    this._granular.setParam('density',      this._grain.density)
+    this._granular.setParam('spread',       this._grain.spread)
+    this._granular.setParam('pitchScatter', this._grain.pitchScatter)
+    this._granular.setParam('attack',       this._grain.attack)
+    this._granular.setParam('decay',        this._grain.decay)
+    this._granular.setParam('mix',          this._grain.enabled ? this._grain.mix : 0)
+    for (const band of ['bass', 'mid', 'treble'] as GrainBand[]) {
+      this._granular.setBandFreeze(band, this._grain.freeze[band])
+      this._granular.setBandEnable(band, this._grain.bandEnable[band])
+    }
+  }
+
   // Applies a full preset in one shot. Used by PresetController.
   applyPreset(params: AudioParams): void {
     this.setPlaybackRate(params.playbackRate)
@@ -553,6 +675,28 @@ export class AudioEngine {
     this.setAbyssResonance(params.abyss.resonance)
     this.setHzFrequency(params.hzFrequency)
     this.setPitch(params.pitchSemitones)
+    this.applyGrainPreset(params.grainField)
+  }
+
+  // Pre-Meridian presets do not carry a grainField block — in that case we
+  // reset to a fresh DEFAULT so a previously-customised GrainField doesn't
+  // leak into a preset that didn't intend to use it.
+  applyGrainPreset(grain: GrainFieldParams | undefined): void {
+    const g = grain ?? DEFAULT_GRAIN_FIELD
+    this._grain = {
+      enabled:      !!g.enabled,
+      position:     g.position,
+      grainSize:    g.grainSize,
+      density:      g.density,
+      spread:       g.spread,
+      pitchScatter: g.pitchScatter,
+      attack:       g.attack,
+      decay:        g.decay,
+      mix:          g.mix,
+      freeze:       { ...g.freeze },
+      bandEnable:   { ...g.bandEnable },
+    }
+    this._applyGrainParamsToWorklet()
   }
 
   setHzFrequency(hz: number | null): void {

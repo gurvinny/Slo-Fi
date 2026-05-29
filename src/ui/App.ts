@@ -11,6 +11,7 @@ import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
 import { MobileController } from './MobileController'
 import { Toast } from './Toast'
+import { InstallController } from './InstallController'
 import type { AudioParams, ReverbType } from '../types'
 
 function formatTime(seconds: number): string {
@@ -149,6 +150,7 @@ export class App {
   // Lite visual mode (battery saver): suspend the 3D orb, show a CSS aurora
   // driven by a lightweight analyser loop publishing --lite-bass.
   private _toast = new Toast()
+  private _install = new InstallController(this._toast)
   private _liteActive = false
   private _liteRaf: number | null = null
   private _liteData: Uint8Array | null = null
@@ -1630,6 +1632,8 @@ export class App {
     window.setTimeout(() => {
       this.player.style.opacity = ''
       this.player.classList.add('visible')
+      // First track is loaded and the player is up — offer to install (once/session)
+      this._install.maybePrompt()
     }, 420)
   }
 

@@ -282,22 +282,22 @@ export class AudioEngine {
     this._panner8D.positionY.value =  0
     this._panner8D.positionZ.value = -1
     this._analyserNode.connect(this._panner8D)
-    this._panner8D.connect(this.context.destination)
 
-    // Create a silent MediaStream tap from the audio graph and wire it to a
-    // hidden <audio> element. Playing a MediaStream source keeps the iOS audio
-    // session alive in the background. Because a MediaStream has no file
-    // duration, iOS cannot display a looping 0-1 s counter in Control Center,
-    // so our navigator.mediaSession.setPositionState calls take full effect.
-    const keepaliveDest = this.context.createMediaStreamDestination()
-    const keepaliveGain = this.context.createGain()
-    keepaliveGain.gain.value = 0
-    keepaliveGain.connect(keepaliveDest)
+    // Background playback (iOS PWA): route the FULL processed mix through a
+    // MediaStreamAudioDestinationNode into a hidden <audio> element, and make
+    // that element the sole audio output (we do NOT connect to ctx.destination).
+    // iOS suspends raw Web Audio when the app is backgrounded, but keeps a
+    // playing HTMLMediaElement — and the AudioContext feeding it — alive, so the
+    // song continues with the screen off / app backgrounded. A silent tap on
+    // preEQ already keeps ctx.destination referenced for the analyser path.
+    const mediaDest = this.context.createMediaStreamDestination()
+    this._panner8D.connect(mediaDest)
 
     const el = document.createElement('audio')
-    el.srcObject = keepaliveDest.stream
+    el.srcObject = mediaDest.stream
     el.setAttribute('playsinline', '')
     el.setAttribute('aria-hidden', 'true')
+    el.preload = 'auto'
     this._keepaliveEl = el
   }
 
@@ -730,14 +730,14 @@ export class AudioEngine {
     this.masterGainNode.gain.linearRampToValueAtTime(0, t + 0.03)
   }
 
-  // Resumes the AudioContext after a background suspension and fades gain
-  // back up so the return from background sounds clean rather than popping in.
+  // Resumes the AudioContext on return to foreground. Audio plays through the
+  // <audio> element so it isn't muted while backgrounded; we just make sure the
+  // context is running and the gain is at the user's volume (no 0→up dip).
   resumeFromBackground(): void {
     if (!this.context || !this.masterGainNode) return
     this.context.resume().catch(() => {})
     const t = this.context.currentTime
     this.masterGainNode.gain.cancelScheduledValues(t)
-    this.masterGainNode.gain.setValueAtTime(0, t)
-    this.masterGainNode.gain.linearRampToValueAtTime(this._volume, t + 0.05)
+    this.masterGainNode.gain.setTargetAtTime(this._volume, t, 0.02)
   }
 }

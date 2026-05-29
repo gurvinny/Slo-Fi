@@ -52,21 +52,21 @@ export class MobileController {
   private _onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') {
       if (!IS_MOBILE_PLATFORM) return
-      // Fade master gain to zero before iOS suspends the AudioContext so
-      // there is no harsh click when the app goes to the background.
-      this._engine.prepareForBackground()
-      // Keep the lock screen card visible by marking the session as paused
-      // rather than letting the OS infer it has ended.
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'paused'
+      // Background playback: the mix flows through the hidden <audio> element,
+      // which iOS keeps alive along with the AudioContext that feeds it. So we
+      // do NOT fade or suspend — we keep the media element playing and report
+      // the session as 'playing' so the OS keeps the audio route active.
+      if (this._engine.isPlaying) {
+        this.ensureSilenceLoop()
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
       }
     } else if (document.visibilityState === 'visible') {
-      // Resume the AudioContext and fade gain back up cleanly.
+      // Make sure the context is running again on return (no gain dip).
       this._engine.resumeFromBackground()
-      // Also restart the silence loop in case iOS paused the audio element
-      if (this._engine.isPlaying) this.ensureSilenceLoop()
-      // Re-acquire wake lock — it is automatically released on tab hide.
-      if (this._engine.isPlaying) void this.acquireWakeLock()
+      if (this._engine.isPlaying) {
+        this.ensureSilenceLoop()
+        void this.acquireWakeLock()   // released automatically on hide
+      }
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState =
           this._engine.isPlaying ? 'playing' : 'paused'

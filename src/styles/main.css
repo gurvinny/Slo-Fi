@@ -4386,3 +4386,21 @@ html:not(.has-splash) .landing-badge {
   .toast--visible { transform: translateY(0); }
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   Installed PWA (standalone) — fill the true device screen, no scroll/chrome.
+   With the browser UI gone there's more height available; lock the app to the
+   full dynamic viewport so the orb and HUD use every pixel (insets respected).
+   ════════════════════════════════════════════════════════════════════════ */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  html, body {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #app {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+}
+

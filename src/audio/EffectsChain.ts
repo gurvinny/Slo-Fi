@@ -160,6 +160,12 @@ export class EffectsChain {
     return this.outputNode
   }
 
+  // Lighten the audio thread while the app is backgrounded (iOS throttles it):
+  // drop the saturation waveshaper's 4× oversampling. Restored on foreground.
+  setBackgroundMode(hidden: boolean): void {
+    if (this._satFallbackNode) this._satFallbackNode.oversample = hidden ? 'none' : '4x'
+  }
+
   // ── Parameter setters ────────────────────────────────────────────────────
 
   setEQBand(band: 'low' | 'lowMid' | 'mid' | 'highMid' | 'high', db: number): void {

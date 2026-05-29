@@ -108,6 +108,7 @@ export class AudioEngine {
 
   // 8D binaural panner — sits after analyser, before destination
   private _panner8D: PannerNode | null = null
+  private _convolverBypassed = false
   private _8DEnabled = false
   private _8DSpeed   = 0.5   // Hz, rotation rate
   private _8DRafId:  number | null = null
@@ -732,6 +733,38 @@ export class AudioEngine {
     this.masterGainNode.gain.cancelScheduledValues(t)
     this.masterGainNode.gain.setValueAtTime(this._volume, t)
     this.masterGainNode.gain.linearRampToValueAtTime(0, t + 0.03)
+  }
+
+  // Background DSP reduction (iOS throttles the audio thread when hidden). Bypass
+  // the heaviest nodes so the graph keeps real time and stops stuttering:
+  //  - convolution reverb: go fully dry + disconnect the convolver (saves the most)
+  //  - HRTF spatial: downgrade to cheap equalpower panning
+  //  - saturation: drop 4× oversampling (via EffectsChain)
+  // All restored on return to foreground.
+  setBackgroundMode(hidden: boolean): void {
+    if (!this.context) return
+    const t = this.context.currentTime
+
+    if (hidden && !this._convolverBypassed) {
+      if (this.dryGainNode && this.wetGainNode && this._loopXfadeGain && this.convolverNode) {
+        this.dryGainNode.gain.setTargetAtTime(1, t, 0.05)
+        this.wetGainNode.gain.setTargetAtTime(0, t, 0.05)
+        try { this._loopXfadeGain.disconnect(this.convolverNode) } catch { /* already disconnected */ }
+      }
+      this._convolverBypassed = true
+    } else if (!hidden && this._convolverBypassed) {
+      if (this.dryGainNode && this.wetGainNode && this._loopXfadeGain && this.convolverNode) {
+        try { this._loopXfadeGain.connect(this.convolverNode) } catch { /* already connected */ }
+        this.dryGainNode.gain.setTargetAtTime(1 - this._reverbMix, t, 0.05)
+        this.wetGainNode.gain.setTargetAtTime(this._reverbMix, t, 0.05)
+      }
+      this._convolverBypassed = false
+    }
+
+    if (this._panner8D) {
+      this._panner8D.panningModel = hidden ? 'equalpower' : (this._8DEnabled ? 'HRTF' : 'equalpower')
+    }
+    this._effectsChain?.setBackgroundMode(hidden)
   }
 
   // Resumes the AudioContext on return to foreground. Audio plays through the

@@ -58,10 +58,14 @@ export class MobileController {
       // the session as 'playing' so the OS keeps the audio route active.
       if (this._engine.isPlaying) {
         this.ensureSilenceLoop()
+        // Lighten the DSP graph so it survives the OS's background throttling
+        // without stuttering (bypasses reverb/HRTF/oversampling).
+        this._engine.setBackgroundMode(true)
         if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
       }
     } else if (document.visibilityState === 'visible') {
-      // Make sure the context is running again on return (no gain dip).
+      // Restore full-quality DSP and make sure the context is running (no dip).
+      this._engine.setBackgroundMode(false)
       this._engine.resumeFromBackground()
       if (this._engine.isPlaying) {
         this.ensureSilenceLoop()

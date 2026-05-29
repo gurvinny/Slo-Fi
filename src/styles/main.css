@@ -4214,14 +4214,16 @@ html:not(.has-splash) .landing-badge {
   .nav-tab.panel-trigger--active { color: var(--accent-bright); }
   .nav-tab.panel-trigger--active svg { filter: drop-shadow(0 0 6px var(--accent)); }
 
-  /* Sheets open ABOVE the bottom nav — recompute offset to include the nav bar
-     (~58px) on top of the transport. Overrides earlier mobile drawer rules. */
+  /* Sheets sit flush on top of the bottom bar (waveform + transport + nav).
+     --bottombar-h is measured live in JS (updateBottomBarHeight) and already
+     includes the safe-area inset, so no gap regardless of waveform height or
+     notch. Falls back to a sane estimate before the first measurement. */
   .controls-drawer,
   .sound-drawer,
   .settings-drawer {
-    bottom: calc(248px + env(safe-area-inset-bottom));
-    height: calc(100dvh - 333px - env(safe-area-inset-bottom));
-    max-height: calc(100dvh - 333px - env(safe-area-inset-bottom));
+    bottom: var(--bottombar-h, 210px);
+    height: calc(100dvh - var(--bottombar-h, 210px) - 84px);
+    max-height: calc(100dvh - var(--bottombar-h, 210px) - 84px);
   }
 }
 

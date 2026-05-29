@@ -92,6 +92,7 @@ export class App {
   // bottom sheets) and desktop (control dock + side drawers).
   private _panels!: Record<'playlist' | 'sound' | 'visual' | 'export', HTMLElement>
   private _activePanel: 'playlist' | 'sound' | 'visual' | 'export' | null = null
+  private _playerBottom = document.querySelector('.player-bottom') as HTMLElement
 
   // Help modal refs
   private helpModal    = document.getElementById('help-modal') as HTMLDialogElement
@@ -417,6 +418,12 @@ export class App {
     // Tap the dimmed backdrop to dismiss whatever is open
     this._drawerBackdrop.addEventListener('click', () => this.closePanel())
 
+    // Keep the mobile bottom-sheet offset matched to the actual bottom bar
+    // height (waveform + transport + nav + safe-area), so sheets sit flush on
+    // top of it with no gap. Recompute on resize / orientation change.
+    window.addEventListener('resize', () => this.updateBottomBarHeight())
+    this.updateBottomBarHeight()
+
     // Sound panel sub-tabs (Audio / Effects)
     this.soundDrawer.querySelectorAll<HTMLButtonElement>('.sound-tab').forEach((tab) => {
       tab.addEventListener('click', () =>
@@ -429,8 +436,16 @@ export class App {
     })
   }
 
+  // Publishes the live bottom-bar height as --bottombar-h for the mobile sheet
+  // CSS to anchor against (avoids a hard-coded magic offset that left a gap).
+  private updateBottomBarHeight(): void {
+    const h = this._playerBottom?.getBoundingClientRect().height ?? 0
+    if (h > 0) document.documentElement.style.setProperty('--bottombar-h', `${Math.round(h)}px`)
+  }
+
   private openPanel(name: 'playlist' | 'sound' | 'visual' | 'export'): void {
     if (this._activePanel && this._activePanel !== name) this.closePanel()
+    this.updateBottomBarHeight()
     this._panels[name].classList.add('panel--visible')
     this._activePanel = name
     if (this._isMobile) this._drawerBackdrop.classList.add('backdrop--visible')

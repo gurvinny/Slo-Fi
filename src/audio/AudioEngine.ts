@@ -210,9 +210,13 @@ export class AudioEngine {
 
     this.context = new AudioContext({ latencyHint: 'interactive' })
     // Auto-resume if iOS suspends the context mid-foreground (e.g. phone call,
-    // Siri, AirPods reconnect) so the user doesn't perceive it as a crash.
+    // Siri, AirPods reconnect). Only do this while the app is VISIBLE — when
+    // backgrounded the OS deliberately suspends the context, and fighting it
+    // with repeated resume() calls causes the audio to stutter. Background
+    // playback is carried by the <audio> media element instead.
     this.context.addEventListener('statechange', () => {
-      if (this.context?.state === 'suspended' && this._isPlaying) {
+      if (this.context?.state === 'suspended' && this._isPlaying &&
+          document.visibilityState === 'visible') {
         this.context.resume().catch(() => {})
       }
     })

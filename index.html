@@ -365,6 +365,10 @@
          aurora layers and the compositor handles them independently. -->
     <div id="anomaly" class="anomaly-bg" aria-hidden="true" data-depth="0"></div>
 
+    <!-- Lite-visual fallback: a soft radial glow that pulses with the bass when
+         the WebGL/WebGPU orb is suspended (battery saver). Driven by --lite-bass. -->
+    <div id="liteAurora" class="lite-aurora" aria-hidden="true"></div>
+
     <div id="app" data-depth="1">
 
       <!-- Header: minimal fixed top bar -->
@@ -737,6 +741,17 @@
             </div>
 
             <div class="controls">
+              <div class="control-section-label">Performance</div>
+              <div class="control-group">
+                <label class="toggle-row">
+                  <span class="toggle-label">Lite visual <span class="toggle-sub">battery saver</span></span>
+                  <span class="toggle-wrap">
+                    <input type="checkbox" id="liteVisualToggle" class="toggle-input" aria-label="Lite visual mode (suspends 3D, saves battery)" />
+                    <span class="toggle-track"></span>
+                  </span>
+                </label>
+              </div>
+
               <div class="control-section-label">Orb</div>
               <div class="control-group">
                 <div class="control-header"><label for="orbReactivitySlider">Reactivity</label><span class="value-badge" id="orbReactivityValue">80%</span></div>
@@ -951,6 +966,14 @@
            the root context sees #app at z-index 1 and the backdrop at z-index 45,
            so the backdrop paints over the drawers and eats all touch events. -->
       <div id="drawerBackdrop" class="drawer-backdrop"></div>
+
+      <!-- Toast — bottom banner reused for the low-power Lite suggestion and the
+           PWA install prompt. Shown/positioned by the Toast helper. -->
+      <div id="toast" class="toast" role="status" aria-live="polite" aria-hidden="true">
+        <span class="toast-msg"></span>
+        <button class="toast-action" type="button"></button>
+        <button class="toast-close" aria-label="Dismiss">&times;</button>
+      </div>
 
       <!-- Playlist long-press context menu (mobile). Positioned in JS. -->
       <div id="trackMenu" class="track-menu" role="menu" aria-hidden="true">

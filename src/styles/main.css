@@ -4292,3 +4292,97 @@ html:not(.has-splash) .landing-badge {
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   Renderer performance (#83) — Lite-visual aurora fallback + toast banner
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Lite visual: a soft radial glow that pulses with the bass (--lite-bass),
+   shown when the 3D orb is suspended. Cheap — no WebGL, just a gradient. */
+.lite-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  display: none;
+  background: radial-gradient(circle at 50% 46%,
+    rgba(124, 77, 255, calc(0.24 + var(--lite-bass, 0) * 0.50)) 0%,
+    rgba(0, 201, 160,  calc(0.10 + var(--lite-bass, 0) * 0.26)) 32%,
+    transparent 64%);
+  transform: scale(calc(1 + var(--lite-bass, 0) * 0.18));
+  transition: transform 0.08s linear;
+}
+.lite-aurora--on {
+  display: block;
+  animation: lite-breathe 6s ease-in-out infinite;
+}
+@keyframes lite-breathe {
+  0%, 100% { opacity: 0.82; }
+  50%      { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lite-aurora--on { animation: none; }
+}
+
+.toggle-sub { font-size: 9px; opacity: 0.55; font-weight: 600; margin-left: 4px; letter-spacing: 0.04em; }
+
+/* Toast — low-power Lite suggestion + PWA install prompt */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(20px);
+  z-index: 130;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(8, 8, 18, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(124, 77, 255, 0.28);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.toast--visible { display: flex; opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-msg { flex: 1; font-size: 13px; line-height: 1.35; color: var(--text); }
+.toast-action {
+  flex-shrink: 0;
+  padding: 7px 13px;
+  border-radius: 8px;
+  background: rgba(124, 77, 255, 0.18);
+  border: 1px solid rgba(124, 77, 255, 0.4);
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.toast-action:hover { background: rgba(124, 77, 255, 0.28); }
+.toast-action:empty { display: none; }
+.toast-close {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* On phones the toast spans full width and sits just above the bottom nav */
+@media (max-width: 600px) {
+  .toast {
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    bottom: calc(var(--bottombar-h, 150px) + 12px);
+    transform: translateY(20px);
+  }
+  .toast--visible { transform: translateY(0); }
+}
+

@@ -10,6 +10,7 @@ import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
 import { MobileController } from './MobileController'
+import { Toast } from './Toast'
 import type { AudioParams, ReverbType } from '../types'
 
 function formatTime(seconds: number): string {
@@ -21,6 +22,13 @@ function formatTime(seconds: number): string {
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Minimal shape of the Battery Status API's BatteryManager (not in lib.dom).
+interface BatteryManagerLike {
+  level: number
+  charging: boolean
+  addEventListener(type: 'levelchange' | 'chargingchange', listener: () => void): void
 }
 
 export class App {
@@ -136,6 +144,15 @@ export class App {
   private starsValue           = document.getElementById('starsValue')!
 
   private readonly SETTINGS_KEY = 'slofi-settings'
+  private readonly LITE_KEY     = 'slofi-lite-visual'
+
+  // Lite visual mode (battery saver): suspend the 3D orb, show a CSS aurora
+  // driven by a lightweight analyser loop publishing --lite-bass.
+  private _toast = new Toast()
+  private _liteActive = false
+  private _liteRaf: number | null = null
+  private _liteData: Uint8Array | null = null
+  private _lowPowerSuggested = false
 
   constructor() {
     this.waveform = new Waveform(document.getElementById('waveform') as HTMLCanvasElement)
@@ -151,6 +168,8 @@ export class App {
     this.wirePanels()
     this.wireSheetGestures()
     this.wireTrackMenu()
+    this.wireLiteVisual()
+    this.wireBatteryMonitor()
     this.wireHelpModal()
     this.wirePlaylist()
     this.wireSliderTouch()
@@ -447,6 +466,82 @@ export class App {
       window.removeEventListener('scroll', this._trackMenuCloser, true)
       this._trackMenuCloser = null
     }
+  }
+
+  // ── Lite visual mode (battery saver) ──────────────────────────────────────
+  private wireLiteVisual(): void {
+    const toggle = document.getElementById('liteVisualToggle') as HTMLInputElement | null
+    if (!toggle) return
+    if (localStorage.getItem(this.LITE_KEY) === '1') {
+      toggle.checked = true
+      this.setLiteVisual(true)
+    }
+    toggle.addEventListener('change', () => {
+      this.setLiteVisual(toggle.checked)
+      try { localStorage.setItem(this.LITE_KEY, toggle.checked ? '1' : '0') } catch { /* quota */ }
+    })
+  }
+
+  private setLiteVisual(on: boolean): void {
+    this._liteActive = on
+    document.getElementById('liteAurora')?.classList.toggle('lite-aurora--on', on)
+    const toggle = document.getElementById('liteVisualToggle') as HTMLInputElement | null
+    if (toggle) toggle.checked = on   // keep panel toggle in sync (e.g. enabled via banner)
+    if (on) {
+      this.sphere?.suspend()
+      this.startLiteLoop()
+    } else {
+      this.stopLiteLoop()
+      this.sphere?.resume()
+      document.documentElement.style.setProperty('--lite-bass', '0')
+    }
+  }
+
+  // Cheap analyser→CSS loop driving the Lite aurora's bass pulse (no WebGL).
+  private startLiteLoop(): void {
+    if (this._liteRaf !== null) return
+    const tick = () => {
+      const analyser = this.engine.analyserNode
+      if (analyser) {
+        if (!this._liteData || this._liteData.length !== analyser.frequencyBinCount) {
+          this._liteData = new Uint8Array(analyser.frequencyBinCount)
+        }
+        analyser.getByteFrequencyData(this._liteData as Uint8Array<ArrayBuffer>)
+        const n = Math.min(16, this._liteData.length)
+        let sum = 0
+        for (let i = 0; i < n; i++) sum += this._liteData[i]
+        document.documentElement.style.setProperty('--lite-bass', (n ? (sum / n) / 255 : 0).toFixed(3))
+      }
+      this._liteRaf = requestAnimationFrame(tick)
+    }
+    this._liteRaf = requestAnimationFrame(tick)
+  }
+
+  private stopLiteLoop(): void {
+    if (this._liteRaf !== null) { cancelAnimationFrame(this._liteRaf); this._liteRaf = null }
+  }
+
+  // ── Battery API: cap fps + suggest Lite under low power ───────────────────
+  private wireBatteryMonitor(): void {
+    const nav = navigator as Navigator & { getBattery?: () => Promise<BatteryManagerLike> }
+    if (typeof nav.getBattery !== 'function') return
+    nav.getBattery().then((bat) => {
+      const check = () => {
+        const low = bat.level < 0.2 && !bat.charging
+        this.sphere?.setLowPower(low)
+        if (low && !this._liteActive && !this._lowPowerSuggested) {
+          this._lowPowerSuggested = true
+          this._toast.show({
+            message: 'Low battery — switch to Lite visual to save power?',
+            actionLabel: 'Lite',
+            onAction: () => this.setLiteVisual(true),
+          })
+        }
+      }
+      bat.addEventListener('levelchange', check)
+      bat.addEventListener('chargingchange', check)
+      check()
+    }).catch(() => { /* Battery API unavailable */ })
   }
 
   private wireHelpModal(): void {
@@ -1186,6 +1281,8 @@ export class App {
         this.sphere.setGlitch(this.glitchToggle.checked)
         this.sphere.setParticleCount(parseInt(this.particleCountSlider.value))
         this.sphere.setStarBrightness(parseInt(this.starsSlider.value) / 100)
+        // If Lite mode was already on (persisted / low-power), keep the orb suspended
+        if (this._liteActive) this.sphere.suspend()
       } catch (sphereErr) {
         console.error('3D sphere unavailable (WebGL may not be supported):', sphereErr)
       }

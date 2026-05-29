@@ -440,8 +440,21 @@
         <!-- Player HUD — shown after file loads, children use fixed positioning -->
         <div id="player" class="player" aria-hidden="true" style="display:none;opacity:0">
 
-          <!-- Help button: fixed top-right, accessible from anywhere in the player -->
+          <!-- Help button: fixed top-right, accessible from anywhere in the player.
+               On mobile it is the only persistent branding-adjacent control; on
+               desktop it also appears in the control dock. -->
           <button id="helpBtn" class="btn btn-icon btn-help" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
+
+          <!-- Mobile-only floating wordmark — replaces the hidden top header on phones -->
+          <div class="mobile-logo" aria-hidden="true">
+            <svg class="logo-icon" width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="12" y1="20" x2="12" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              <line x1="16" y1="20" x2="16" y2="12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              <line x1="20" y1="20" x2="20" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <span class="logo-text">Slo‑Fi</span>
+          </div>
 
           <!-- Top HUD: track info + preset strip -->
           <div class="player-top">
@@ -801,14 +814,67 @@
             </div><!-- /.drawer-scroll-body -->
           </div>
 
+          <!-- Export sheet — render/save processed audio. Houses the export
+               action + status (relocated here from the transport row) so Export
+               is a panel on both mobile (nav tab) and desktop (dock). -->
+          <div id="exportDrawer" class="settings-drawer export-drawer" data-depth="3">
+            <div class="controls-drawer-header">
+              <span class="controls-drawer-title">Export</span>
+              <button id="exportCloseBtn" class="controls-drawer-btn" title="Close" aria-label="Close">&times;</button>
+            </div>
+            <div class="drawer-scroll-body">
+              <div class="export-panel">
+                <p class="export-desc">Render your processed track to a WAV file. Everything stays on your device — nothing is uploaded.</p>
+                <button id="exportBtn" class="btn-export-action" aria-label="Export processed audio as WAV">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M8 2 L8 10 M5 7 L8 10 L11 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3 12 L13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  </svg>
+                  Export as WAV
+                </button>
+                <span id="exportStatus" class="export-status" aria-live="polite"></span>
+              </div>
+            </div>
+          </div>
+
           <!-- Bottom HUD: waveform + transport -->
           <div class="player-bottom" data-depth="2">
+
+            <!-- Control dock — desktop-only centered pill of panel triggers.
+                 Mobile uses the bottom nav instead; both call togglePanel(). -->
+            <div class="control-dock" role="group" aria-label="Panels">
+              <button class="dock-btn" data-panel="playlist" aria-label="Playlist" title="Playlist">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h11M4 12h11M4 18h7M18 7v9"/><circle cx="20" cy="16" r="2"/></svg>
+                <span class="dock-label">Playlist</span>
+              </button>
+              <button class="dock-btn" data-panel="sound" aria-label="Sound settings" title="Audio &amp; Effects">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M7 6v12M11 3v18M15 7v10M19 10v4"/></svg>
+                <span class="dock-label">Sound</span>
+              </button>
+              <button class="dock-btn" data-panel="visual" aria-label="Visual settings" title="Visual settings">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                <span class="dock-label">Visual</span>
+              </button>
+              <button class="dock-btn" data-panel="export" aria-label="Export" title="Export">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2 L8 10 M5 7 L8 10 L11 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 12 L13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <span class="dock-label">Export</span>
+              </button>
+              <button class="dock-btn dock-help" data-help aria-label="Help" title="Keyboard shortcuts (?)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.7"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>
+                <span class="dock-label">Help</span>
+              </button>
+            </div>
+
             <div class="waveform-wrap">
               <canvas id="waveform" class="waveform" role="slider" aria-label="Seek position" tabindex="0"></canvas>
             </div>
             <div class="transport-row">
               <span class="time-current" id="currentTime">0:00</span>
               <div class="transport">
+                <!-- prev/next are mobile-only (playlist navigation); hidden on desktop -->
+                <button id="prevBtn" class="btn btn-icon transport-skip" title="Previous track" aria-label="Previous track">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="2" height="10" rx="1"/><polygon points="13,3 6,8 13,13"/></svg>
+                </button>
                 <button id="stopBtn" class="btn btn-icon" title="Stop (s)" aria-label="Stop">
                   <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="currentColor" rx="3"/></svg>
                 </button>
@@ -823,6 +889,9 @@
                     <text x="12" y="18.5" font-size="8.5" fill="currentColor" font-family="system-ui,sans-serif" text-anchor="middle" font-weight="700">5s</text>
                   </svg>
                 </button>
+                <button id="nextBtn" class="btn btn-icon transport-skip" title="Next track" aria-label="Next track">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><polygon points="3,3 10,8 3,13"/><rect x="11" y="3" width="2" height="10" rx="1"/></svg>
+                </button>
                 <button id="loopBtn" class="btn btn-icon btn-loop" title="Toggle loop region (L)" aria-label="Enable loop" aria-pressed="false">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M3 8 Q3 3 8 3 Q13 3 13 8 Q13 11 10 12.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/>
@@ -831,16 +900,10 @@
                     <line x1="11" y1="6" x2="11" y2="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
                   </svg>
                 </button>
-                <button id="exportBtn" class="btn btn-icon btn-export" title="Export as WAV" aria-label="Export processed audio as WAV">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 2 L8 10 M5 7 L8 10 L11 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M3 12 L13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                  </svg>
-                </button>
-                <span id="exportStatus" class="export-status" aria-live="polite"></span>
               </div>
               <div class="transport-right">
                 <span class="time-total" id="duration">0:00</span>
+                <!-- Fullscreen button: desktop only; mobile toggles fullscreen by tapping the orb -->
                 <button id="fullscreenBtn" class="btn btn-icon btn-fullscreen" aria-label="Enter fullscreen" title="Fullscreen (F)">
                   <svg id="iconFullscreenEnter" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
@@ -849,15 +912,29 @@
                     <path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </button>
-                <button id="settingsShowBtn" class="btn-settings-show" aria-label="Visual settings" title="Visual settings">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                  </svg>
-                </button>
-                <button id="playlistShowBtn" class="btn-controls-show" aria-label="Show playlist">Playlist</button>
-                <button id="soundShowBtn" class="btn-controls-show" aria-label="Sound settings" title="Audio &amp; Effects">Sound</button>
               </div>
             </div>
+
+            <!-- Mobile bottom nav — four tabs; each toggles its panel as a bottom
+                 sheet. Desktop uses the control dock above instead. -->
+            <nav class="bottom-nav" aria-label="Mobile navigation">
+              <button class="nav-tab" data-panel="playlist" aria-label="Playlist">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h11M4 12h11M4 18h7M18 7v9"/><circle cx="20" cy="16" r="2"/></svg>
+                <span class="nav-label">Playlist</span>
+              </button>
+              <button class="nav-tab" data-panel="sound" aria-label="Sound">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M7 6v12M11 3v18M15 7v10M19 10v4"/></svg>
+                <span class="nav-label">Sound</span>
+              </button>
+              <button class="nav-tab" data-panel="visual" aria-label="Visual">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                <span class="nav-label">Visual</span>
+              </button>
+              <button class="nav-tab" data-panel="export" aria-label="Export">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><path d="M8 2 L8 10 M5 7 L8 10 L11 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 12 L13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <span class="nav-label">Export</span>
+              </button>
+            </nav>
           </div>
 
         </div><!-- /#player -->

@@ -4059,3 +4059,165 @@ html:not(.has-splash) .landing-badge {
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   Mobile shell overhaul (#83) — control dock (desktop) + bottom nav (mobile)
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Export sheet body */
+.export-panel {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.export-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.btn-export-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(124, 77, 255, 0.14);
+  border: 1px solid rgba(124, 77, 255, 0.35);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-export-action:hover {
+  background: rgba(124, 77, 255, 0.22);
+  border-color: rgba(124, 77, 255, 0.5);
+}
+.btn-export-action:disabled { opacity: 0.5; cursor: default; }
+
+/* Control dock — desktop floating pill above the bottom bar. Absolutely
+   positioned so it does NOT change .player-bottom height (keeps the existing
+   desktop drawer offsets valid). Hidden on mobile (which uses .bottom-nav). */
+.control-dock {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(2, 2, 8, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(124, 77, 255, 0.14);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+.dock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.dock-btn:hover {
+  background: rgba(124, 77, 255, 0.08);
+  border-color: rgba(124, 77, 255, 0.3);
+  color: var(--text);
+}
+.dock-btn.panel-trigger--active {
+  background: rgba(124, 77, 255, 0.14);
+  border-color: rgba(124, 77, 255, 0.4);
+  color: var(--accent-bright);
+}
+
+/* Hidden by default (desktop); shown only on phones */
+.bottom-nav { display: none; }
+.mobile-logo { display: none; }
+
+@media (max-width: 600px) {
+  /* Remove desktop chrome on phones */
+  .header { display: none; }
+  .control-dock { display: none; }
+  .btn-fullscreen { display: none; }          /* mobile uses tap-orb fullscreen */
+  .transport #rewindBtn { display: none; }     /* replaced by prev/next */
+
+  /* Header gone → top HUD and dropzone rise to the safe-area top */
+  .player-top { top: env(safe-area-inset-top, 0px); }
+  .dropzone   { top: 0; }
+
+  /* Floating wordmark in place of the header */
+  .mobile-logo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: fixed;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    z-index: 106;
+    color: var(--text);
+    pointer-events: none;
+    opacity: 0.92;
+  }
+  .mobile-logo .logo-text { font-size: 13px; font-weight: 800; letter-spacing: -0.2px; }
+  .mobile-logo .logo-icon { color: var(--accent-bright); }
+
+  /* Transport: single centered row — prev · play · stop · next · loop */
+  .transport-row { flex-wrap: nowrap; padding: 6px 12px 2px; gap: 8px; }
+  .transport { flex: 1; justify-content: center; gap: 10px; }
+  .transport-right { flex-basis: auto; margin-left: 0; padding-bottom: 0; gap: 6px; }
+  .transport-skip { display: inline-flex; }
+  #prevBtn      { order: 1; }
+  #playPauseBtn { order: 2; }
+  #stopBtn      { order: 3; }
+  #nextBtn      { order: 4; }
+  #loopBtn      { order: 5; }
+
+  /* Bottom nav bar — four tabs */
+  .bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    padding: 6px 6px max(6px, env(safe-area-inset-bottom, 6px));
+    border-top: 1px solid rgba(124, 77, 255, 0.10);
+  }
+  .nav-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 0;
+    background: none;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s;
+  }
+  .nav-tab .nav-label { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
+  .nav-tab.panel-trigger--active { color: var(--accent-bright); }
+  .nav-tab.panel-trigger--active svg { filter: drop-shadow(0 0 6px var(--accent)); }
+
+  /* Sheets open ABOVE the bottom nav — recompute offset to include the nav bar
+     (~58px) on top of the transport. Overrides earlier mobile drawer rules. */
+  .controls-drawer,
+  .sound-drawer,
+  .settings-drawer {
+    bottom: calc(248px + env(safe-area-inset-bottom));
+    height: calc(100dvh - 333px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 333px - env(safe-area-inset-bottom));
+  }
+}
+

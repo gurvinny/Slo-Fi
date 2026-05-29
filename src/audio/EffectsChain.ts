@@ -46,9 +46,10 @@ export class EffectsChain {
   private outputNode!: GainNode
   private ctx!: BaseAudioContext
 
-  async init(ctx: BaseAudioContext, inputNode: AudioNode): Promise<AudioNode> {
-    this.ctx = ctx
-
+  // Creates the 5-band EQ, Hz resonance, and output nodes, then wires
+  // inputNode → eqLow → … → eqHigh. Shared by the live (init) and offline
+  // (initOffline) paths so both always have the EQ/hz/output nodes available.
+  private _buildEQ(ctx: BaseAudioContext, inputNode: AudioNode): void {
     // ── EQ (5-band in series) ──────────────────────────────────────────────
     this.eqLow = ctx.createBiquadFilter()
     this.eqLow.type = 'lowshelf'
@@ -89,6 +90,12 @@ export class EffectsChain {
     this.eqLowMid.connect(this.eqMid)
     this.eqMid.connect(this.eqHighMid)
     this.eqHighMid.connect(this.eqHigh)
+  }
+
+  async init(ctx: BaseAudioContext, inputNode: AudioNode): Promise<AudioNode> {
+    this.ctx = ctx
+
+    this._buildEQ(ctx, inputNode)
 
     // ── Try AudioWorklet (requires secure context: HTTPS or localhost) ─────
     if (ctx instanceof AudioContext && ctx.audioWorklet) {
@@ -122,7 +129,8 @@ export class EffectsChain {
   // uses the traditional Web Audio graph nodes.
   initOffline(ctx: OfflineAudioContext, inputNode: AudioNode, params: AudioParams): AudioNode {
     this.ctx = ctx
-    this._initSync(ctx, inputNode)
+    this._buildEQ(ctx, inputNode)   // create + wire EQ/hz/output (was missing → export crashed)
+    this._initSync(ctx, null)       // wire chorus/sat after eqHigh
 
     // Apply all params immediately (no smooth transitions needed for offline render)
     this.eqLow.gain.value     = params.eq.low

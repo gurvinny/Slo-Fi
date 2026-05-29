@@ -4153,8 +4153,12 @@ html:not(.has-splash) .landing-badge {
   .btn-fullscreen { display: none; }          /* mobile uses tap-orb fullscreen */
   .transport #rewindBtn { display: none; }     /* replaced by prev/next */
 
-  /* Header gone → top HUD and dropzone rise to the safe-area top */
-  .player-top { top: env(safe-area-inset-top, 0px); }
+  /* Header gone → top HUD and dropzone rise to the safe-area top. Pad the top
+     so the track info clears the floating wordmark sitting over it. */
+  .player-top {
+    top: env(safe-area-inset-top, 0px);
+    padding-top: 34px;
+  }
   .dropzone   { top: 0; }
 
   /* Floating wordmark in place of the header */

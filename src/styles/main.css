@@ -4199,6 +4199,10 @@ html:not(.has-splash) .landing-badge {
   .btn-fullscreen { display: none; }          /* mobile uses tap-orb fullscreen */
   .transport #rewindBtn { display: none; }     /* replaced by prev/next */
 
+  /* The bottom nav owns the home-indicator inset; clear it on .player-bottom so
+     it isn't applied twice (which left a dead gap above the screen bottom). */
+  .player-bottom { padding-bottom: 0; }
+
   /* Header gone → top HUD and dropzone rise to the safe-area top. Pad the top
      so the track info clears the floating wordmark sitting over it. */
   .player-top {
@@ -4394,13 +4398,17 @@ html:not(.has-splash) .landing-badge {
 @media (display-mode: standalone), (display-mode: fullscreen) {
   html, body {
     height: 100dvh;
+    height: -webkit-fill-available;   /* iOS standalone reports full screen here */
     min-height: 100dvh;
+    min-height: -webkit-fill-available;
     overflow: hidden;
     overscroll-behavior: none;
   }
   #app {
     height: 100dvh;
+    height: -webkit-fill-available;
     min-height: 100dvh;
+    min-height: -webkit-fill-available;
   }
 }
 

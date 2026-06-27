@@ -154,6 +154,10 @@ export class App {
   private _liteActive = false
   private _liteRaf: number | null = null
   private _liteData: Uint8Array | null = null
+
+  // Throttle state for the desktop aurora/UI CSS-var writes (see onEnergyUpdate).
+  private _auroraVarT = 0
+  private _lastAuroraVars: Record<string, number> = {}
   private _lowPowerSuggested = false
 
   constructor() {
@@ -1260,12 +1264,27 @@ export class App {
           // iOS OOM crashes during long playback. The aurora animates via @keyframes
           // on mobile instead (see main.css .aurora-idle).
           if (!this._isMobile) {
-            const root = document.documentElement.style
-            root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
-            root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
-            root.setProperty('--aurora-treble', String(treble.toFixed(3)))
-            root.setProperty('--ui-bass',       String(uiBass.toFixed(3)))
-            root.setProperty('--ui-treble',     String(uiTreble.toFixed(3)))
+            // Each :root var write forces a style-recalc + repaint across every
+            // backdrop-filter layer (6+) and the play button's per-frame
+            // drop-shadow. At an uncapped 60–144fps that re-rasterisation is the
+            // dominant desktop cost. These glow values move slowly, so throttle
+            // writes to ~24Hz and skip values that haven't changed past the
+            // toFixed(3) quantum — visually indistinguishable, far fewer repaints.
+            const now = performance.now()
+            if (now - this._auroraVarT >= 41) {
+              this._auroraVarT = now
+              const root = document.documentElement.style
+              const set = (name: string, v: number) => {
+                if (Math.abs((this._lastAuroraVars[name] ?? -1) - v) < 0.004) return
+                this._lastAuroraVars[name] = v
+                root.setProperty(name, v.toFixed(3))
+              }
+              set('--aurora-bass',   bass)
+              set('--aurora-mid',    mid)
+              set('--aurora-treble', treble)
+              set('--ui-bass',       uiBass)
+              set('--ui-treble',     uiTreble)
+            }
           }
           this.starOverlay.setTreble(treble)
         }

@@ -3,11 +3,30 @@ function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
+// Normalize a theme hex colour to 6-digit form. getComputedStyle returns custom
+// properties as authored, and the CSS minifier shortens hexes where it can
+// (#7733dd -> #73d), so a theme var may arrive 3-digit. Callers append an alpha
+// byte, and '#73d' + '33' = '#73d33' is an invalid colour that throws in
+// addColorStop — expand to 6 digits first. Non-hex values pass through unchanged.
+function normHex(color: string): string {
+  const h = color.replace('#', '').trim()
+  if (h.length === 3) return '#' + h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
+  if (h.length >= 6)  return '#' + h.slice(0, 6)
+  return color
+}
+
+// Append an 8-bit alpha (2 hex chars) to a theme colour safely across 3/6/8-digit
+// inputs. Falls back to the opaque colour if it isn't a parseable hex.
+function withAlpha(color: string, alpha: string): string {
+  const n = normHex(color)
+  return n.length === 7 && n.startsWith('#') ? n + alpha : n
+}
+
 // Blends the theme accent at low opacity over the base dark bar colour,
 // giving unplayed bars a subtle tint that changes with the active theme.
 function unplayedColor(accent: string): string {
   // accent is a hex like #b4ff00; parse R/G/B and mix 12% over the dark base
-  const hex = accent.replace('#', '')
+  const hex = normHex(accent).replace('#', '')
   if (hex.length === 6) {
     const r = parseInt(hex.slice(0, 2), 16)
     const g = parseInt(hex.slice(2, 4), 16)
@@ -106,9 +125,9 @@ export class Waveform {
       const count = 80
       const bw = W / count
       const phGrad = ctx.createLinearGradient(0, 0, W, 0)
-      phGrad.addColorStop(0,   teal   + '33')   // 20% opacity
-      phGrad.addColorStop(0.5, accent + '44')   // 27% opacity
-      phGrad.addColorStop(1,   teal   + '33')
+      phGrad.addColorStop(0,   withAlpha(teal,   '33'))   // 20% opacity
+      phGrad.addColorStop(0.5, withAlpha(accent, '44'))   // 27% opacity
+      phGrad.addColorStop(1,   withAlpha(teal,   '33'))
       for (let i = 0; i < count; i++) {
         const h = (Math.sin(i * 0.4) * 0.3 + 0.4) * cy * 0.3
         ctx.fillStyle = phGrad
@@ -123,9 +142,9 @@ export class Waveform {
     // Hover highlight — uses theme accent
     if (hoverX >= 0) {
       const hoverGrad = ctx.createLinearGradient(0, 0, hoverX, 0)
-      hoverGrad.addColorStop(0,   teal   + '1a')   // 10%
-      hoverGrad.addColorStop(0.5, accent + '18')   // ~9%
-      hoverGrad.addColorStop(1,   teal   + '0f')   // 6%
+      hoverGrad.addColorStop(0,   withAlpha(teal,   '1a'))   // 10%
+      hoverGrad.addColorStop(0.5, withAlpha(accent, '18'))   // ~9%
+      hoverGrad.addColorStop(1,   withAlpha(teal,   '0f'))   // 6%
       ctx.fillStyle = hoverGrad
       ctx.fillRect(0, 0, hoverX, H)
     }

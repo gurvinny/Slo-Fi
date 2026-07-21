@@ -1,3 +1,7 @@
+> [!WARNING]
+> **This is Slo-Fi v1 — deprecated and no longer maintained.**
+> Please use the latest release instead: **[v2.1.0 — Anomaly →](https://github.com/gurvinny/Slo-Fi/releases/tag/v2.1.0)**
+
 <br/>
 
 <div align="center">
@@ -17,6 +21,7 @@
 <br/>
 
 [![Version](https://img.shields.io/badge/Version-1.0.0-A855F7.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases/tag/v1.0.0)
+[![Status](https://img.shields.io/badge/Status-Deprecated-9CA3AF.svg?style=flat-square&logo=archiveofourown&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases/tag/v2.1.0)
 [![License](https://img.shields.io/badge/License-MIT-A855F7.svg?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.x-646CFF.svg?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)

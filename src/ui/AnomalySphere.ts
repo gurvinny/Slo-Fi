@@ -908,10 +908,16 @@ export class AnomalySphere {
     this.loop()
     requestAnimationFrame(() => this.resize())
 
-    // Fire-and-forget: attempt to upgrade from WebGLRenderer to WebGPURenderer.
-    // The sphere keeps rendering on WebGL2 immediately; if WebGPU is available
-    // the renderer swaps in the background before the first user interaction.
-    this._tryWebGPUUpgrade()
+    // WebGPU upgrade is gated OFF. _tryWebGPUUpgrade() swaps in a WebGPURenderer
+    // but only the sphere material is ported to TSL — the particle cloud, star
+    // field, and post-processing passes remain raw GLSL (RawShaderMaterial/
+    // ShaderMaterial), which the WebGPU node pipeline cannot render
+    // ("THREE.NodeMaterial: Material ... is not compatible"). On any WebGPU-
+    // capable browser (e.g. desktop Chrome) that makes the whole orb render
+    // blank. Stay on the working WebGLRenderer until every material and pass is
+    // ported to TSL, then flip this flag back to true.
+    const ENABLE_WEBGPU_UPGRADE = false
+    if (ENABLE_WEBGPU_UPGRADE) this._tryWebGPUUpgrade()
   }
 
   // Attempts a progressive upgrade to WebGPURenderer.

@@ -39,7 +39,7 @@
 
 ## ✦ What It Does
 
-Slo-Fi is a **fully client-side audio processing app** that runs entirely in the browser — no server, no uploads, no account. Drop any audio file and it gives you a real-time studio: slow the track down, shape the reverb, tune pitch and EQ, and watch a 3D WebGL orb react to every beat.
+Slo-Fi is a **fully client-side audio processing app** that runs entirely in the browser no server, no uploads, no account. Drop any audio file and it gives you a real-time studio: slow the track down, shape the reverb, tune pitch and EQ, and watch a 3D WebGL orb react to every beat.
 
 Built as a demonstration of what the Web Audio API and WebGL can do together at production quality. Everything processes on-device. Nothing touches a server.
 

@@ -951,7 +951,15 @@ export class App {
 
     if (!this.sphere && this.engine.analyserNode) {
       try {
-        const { AnomalySphere } = await import('./AnomalySphere')
+        let mod: typeof import('./AnomalySphere')
+        try {
+          mod = await import('./AnomalySphere')
+        } catch {
+          // One retry: covers a mid-session service-worker cache swap or a
+          // transient network blip fetching the code-split orb chunk.
+          mod = await import('./AnomalySphere')
+        }
+        const { AnomalySphere } = mod
         this.sphere = new AnomalySphere(
           document.getElementById('anomaly') as HTMLElement,
           this.engine.analyserNode,
@@ -987,7 +995,18 @@ export class App {
         this.sphere.setParticleCount(parseInt(this.particleCountSlider.value))
         this.sphere.setStarBrightness(parseInt(this.starsSlider.value) / 100)
       } catch (sphereErr) {
-        console.error('3D sphere unavailable (WebGL may not be supported):', sphereErr)
+        // Distinguish a failed chunk load (stale cache / network) from genuine
+        // WebGL-unsupported so the cause is diagnosable rather than ambiguous.
+        const message = String((sphereErr as Error)?.message ?? sphereErr)
+        const isChunkLoadFailure =
+          sphereErr instanceof TypeError &&
+          /dynamically imported module|Failed to fetch|error loading dynamically|importing a module script failed/i.test(message)
+        console.error(
+          isChunkLoadFailure
+            ? '3D sphere chunk failed to load (stale cache or network issue) — a reload may resolve this:'
+            : '3D sphere unavailable (WebGL may not be supported):',
+          sphereErr,
+        )
       }
     }
   }

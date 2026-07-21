@@ -87,7 +87,7 @@ At the center of Slo-Fi is a **3D audio-reactive sphere** built with Three.js an
 
 **Audio never leaves the device.**
 
-Slo-Fi processes everything inside the browser using the Web Audio API. There is no backend receiving files, no analytics, no third-party scripts, no telemetry of any kind.
+Slo-Fi processes everything inside the browser using the Web Audio API. There is no backend receiving files, no analytics, no third-party scripts and no telemetry of any kind.
 
 | | |
 |:---|:---:|

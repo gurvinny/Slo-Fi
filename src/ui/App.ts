@@ -10,6 +10,8 @@ import { PresetController } from './PresetController'
 import { EffectsController } from './EffectsController'
 import { ExportController } from './ExportController'
 import { MobileController } from './MobileController'
+import { Toast } from './Toast'
+import { InstallController } from './InstallController'
 import type { AudioParams, ReverbType } from '../types'
 
 function formatTime(seconds: number): string {
@@ -21,6 +23,13 @@ function formatTime(seconds: number): string {
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Minimal shape of the Battery Status API's BatteryManager (not in lib.dom).
+interface BatteryManagerLike {
+  level: number
+  charging: boolean
+  addEventListener(type: 'levelchange' | 'chargingchange', listener: () => void): void
 }
 
 export class App {
@@ -52,6 +61,8 @@ export class App {
   private playPauseBtn = document.getElementById('playPauseBtn')!
   private stopBtn = document.getElementById('stopBtn')!
   private rewindBtn = document.getElementById('rewindBtn')!
+  private prevBtn   = document.getElementById('prevBtn')!
+  private nextBtn   = document.getElementById('nextBtn')!
   private loopBtn   = document.getElementById('loopBtn')!
   private speedSlider = document.getElementById('speedSlider') as HTMLInputElement
   private speedValue = document.getElementById('speedValue')!
@@ -73,16 +84,24 @@ export class App {
 
   // Sound drawer refs (merged Audio + Effects)
   private soundDrawer   = document.getElementById('soundDrawer')!
-  private soundShowBtn  = document.getElementById('soundShowBtn')!
   private soundCloseBtn = document.getElementById('soundCloseBtn')!
 
   // Mobile backdrop — shown behind open drawers on phones; tap to close
   private _drawerBackdrop = document.getElementById('drawerBackdrop')!
 
-  // Settings drawer refs
+  // Settings (Visual) drawer refs
   private settingsDrawer   = document.getElementById('settingsDrawer')!
   private settingsCloseBtn = document.getElementById('settingsCloseBtn')!
-  private settingsShowBtn  = document.getElementById('settingsShowBtn')!
+
+  // Export sheet refs (export action button + status live inside it)
+  private exportDrawer   = document.getElementById('exportDrawer')!
+  private exportCloseBtn = document.getElementById('exportCloseBtn')!
+
+  // Unified panel system — one open at a time on both mobile (bottom nav +
+  // bottom sheets) and desktop (control dock + side drawers).
+  private _panels!: Record<'playlist' | 'sound' | 'visual' | 'export', HTMLElement>
+  private _activePanel: 'playlist' | 'sound' | 'visual' | 'export' | null = null
+  private _playerBottom = document.querySelector('.player-bottom') as HTMLElement
 
   // Help modal refs
   private helpModal    = document.getElementById('help-modal') as HTMLDialogElement
@@ -96,10 +115,14 @@ export class App {
   private _trackMeta              = new Map<number, { duration: number; key: string; bpm: number }>()
   private playlistDrawer          = document.getElementById('playlistDrawer')!
   private playlistCloseBtn        = document.getElementById('playlistCloseBtn')!
-  private playlistShowBtn         = document.getElementById('playlistShowBtn')!
   private playlistAddBtn          = document.getElementById('playlistAddBtn')!
   private playlistList            = document.getElementById('playlistList')!
   private playlistCount           = document.getElementById('playlistCount')!
+
+  // Playlist long-press context menu
+  private _trackMenu       = document.getElementById('trackMenu')!
+  private _trackMenuIndex  = -1
+  private _trackMenuCloser: ((e: Event) => void) | null = null
 
   // Visual settings controls
   private particleCountSlider  = document.getElementById('particleCountSlider') as HTMLInputElement
@@ -122,6 +145,20 @@ export class App {
   private starsValue           = document.getElementById('starsValue')!
 
   private readonly SETTINGS_KEY = 'slofi-settings'
+  private readonly LITE_KEY     = 'slofi-lite-visual'
+
+  // Lite visual mode (battery saver): suspend the 3D orb, show a CSS aurora
+  // driven by a lightweight analyser loop publishing --lite-bass.
+  private _toast = new Toast()
+  private _install = new InstallController(this._toast)
+  private _liteActive = false
+  private _liteRaf: number | null = null
+  private _liteData: Uint8Array | null = null
+
+  // Throttle state for the desktop aurora/UI CSS-var writes (see onEnergyUpdate).
+  private _auroraVarT = 0
+  private _lastAuroraVars: Record<string, number> = {}
+  private _lowPowerSuggested = false
 
   constructor() {
     this.waveform = new Waveform(document.getElementById('waveform') as HTMLCanvasElement)
@@ -134,11 +171,13 @@ export class App {
     this.wireUI()
     this.wireKeyboard()
     this.wireCrossController()
-    this.wireSoundPanel()
-    this.wireSettingsPanel()
+    this.wirePanels()
+    this.wireSheetGestures()
+    this.wireTrackMenu()
+    this.wireLiteVisual()
+    this.wireBatteryMonitor()
     this.wireHelpModal()
-    this.wirePlaylistPanel()
-    this._drawerBackdrop.addEventListener('click', () => this.closeAllPanels())
+    this.wirePlaylist()
     this.wireSliderTouch()
     this.applyDefaults()
     this.loadSettings()
@@ -160,21 +199,30 @@ export class App {
     }
     const fsBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement | null
     if (fsBtn) this._mobile.bindFullscreenBtn(fsBtn)
+    this.wireOrbTapFullscreen(fsBtn)
   }
 
-  private wirePlaylistPanel(): void {
-    this.playlistCloseBtn.addEventListener('click', () => {
-      this.playlistDrawer.classList.remove('panel--visible')
-      this._drawerBackdrop.classList.remove('backdrop--visible')
+  // Mobile: tapping the bare visualiser area toggles fullscreen. The orb canvas
+  // (#anomaly) has pointer-events:none, so taps on the empty central region land
+  // on #app — we treat those as orb taps and reuse the fullscreen button's logic.
+  // Taps on any control, panel, or HUD are ignored.
+  private wireOrbTapFullscreen(fsBtn: HTMLButtonElement | null): void {
+    if (!fsBtn) return
+    const appEl = document.getElementById('app')
+    appEl?.addEventListener('click', (e) => {
+      if (!this._isMobile) return
+      if (!this.player.classList.contains('visible')) return
+      const t = e.target as HTMLElement
+      if (t.closest('button, a, input, label, dialog, .controls-drawer, .sound-drawer, ' +
+        '.settings-drawer, .export-drawer, .bottom-nav, .control-dock, .player-top, ' +
+        '.player-bottom, .drawer-backdrop, .preset-card, .mobile-logo')) return
+      fsBtn.click()
     })
-    this.playlistShowBtn.addEventListener('click', () => {
-      const isOpen = this.playlistDrawer.classList.contains('panel--visible')
-      this.closeAllPanels()
-      if (!isOpen) {
-        this.playlistDrawer.classList.add('panel--visible')
-        this.showBackdrop()
-      }
-    })
+  }
+
+  // Non-toggle playlist controls (add / clear / search). Opening & closing the
+  // playlist panel is handled by the unified panel system in wirePanels().
+  private wirePlaylist(): void {
     this.playlistAddBtn.addEventListener('click', () => this.fileInput.click())
 
     const clearBtn = document.getElementById('playlistClearBtn')
@@ -317,10 +365,34 @@ export class App {
       rmBtn.textContent = '×'
       rmBtn.addEventListener('click', (e) => { e.stopPropagation(); this.removeTrack(i) })
 
-      li.addEventListener('click', () => void this.switchTrack(i, true))
+      // Long-press (mobile) opens the context menu; a normal tap plays the track.
+      let lpTimer: number | null = null
+      let lpFired = false
+      const cancelLp = () => { if (lpTimer !== null) { clearTimeout(lpTimer); lpTimer = null } }
+      li.addEventListener('touchstart', () => {
+        lpFired = false
+        lpTimer = window.setTimeout(() => {
+          lpFired = true
+          this._mobile?.hapticSeek()
+          this.openTrackMenu(i, li)
+        }, 450)
+      }, { passive: true })
+      li.addEventListener('touchmove', cancelLp, { passive: true })
+      li.addEventListener('touchend', cancelLp)
+      li.addEventListener('touchcancel', cancelLp)
+
+      li.addEventListener('click', (e) => {
+        if (lpFired) { e.preventDefault(); e.stopPropagation(); lpFired = false; return }
+        void this.switchTrack(i, true)
+      })
       li.append(handle, info, rmBtn)
       this.playlistList.appendChild(li)
     })
+
+    // Sync mobile prev/next track buttons with playlist bounds
+    ;(this.prevBtn as HTMLButtonElement).disabled = this.currentTrackIndex <= 0
+    ;(this.nextBtn as HTMLButtonElement).disabled =
+      this.currentTrackIndex < 0 || this.currentTrackIndex >= this.playlist.length - 1
   }
 
   private reorderTrack(from: number, to: number): void {
@@ -344,8 +416,145 @@ export class App {
     this.renderPlaylist()
   }
 
+  // ── Playlist long-press context menu ──────────────────────────────────────
+  private wireTrackMenu(): void {
+    this._trackMenu.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = this._trackMenuIndex
+        this.closeTrackMenu()
+        if (i < 0 || i >= this.playlist.length) return
+        switch (btn.dataset.action) {
+          case 'play-now':  void this.switchTrack(i, true); break
+          case 'play-next': {
+            const base = this.currentTrackIndex < 0 ? 0 : this.currentTrackIndex
+            this.reorderTrack(i, Math.min(this.playlist.length - 1, base + 1))
+            break
+          }
+          case 'move-top':  this.reorderTrack(i, 0); break
+          case 'remove':    this.removeTrack(i); break
+        }
+      })
+    })
+  }
+
+  private openTrackMenu(index: number, li: HTMLElement): void {
+    this._trackMenuIndex = index
+    const menu = this._trackMenu
+    menu.classList.add('track-menu--visible')
+    menu.setAttribute('aria-hidden', 'false')
+
+    // Anchor to the item, then clamp inside the viewport
+    const r = li.getBoundingClientRect()
+    const mw = menu.offsetWidth
+    const mh = menu.offsetHeight
+    let top = r.bottom + 6
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6)
+    let left = r.left + 12
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8
+    menu.style.top = `${top}px`
+    menu.style.left = `${Math.max(8, left)}px`
+
+    // Close on the next outside interaction (deferred so the opening tap doesn't close it)
+    window.setTimeout(() => {
+      const close = (ev: Event) => { if (!menu.contains(ev.target as Node)) this.closeTrackMenu() }
+      this._trackMenuCloser = close
+      document.addEventListener('pointerdown', close, true)
+      window.addEventListener('scroll', close, true)
+    }, 0)
+  }
+
+  private closeTrackMenu(): void {
+    this._trackMenu.classList.remove('track-menu--visible')
+    this._trackMenu.setAttribute('aria-hidden', 'true')
+    this._trackMenuIndex = -1
+    if (this._trackMenuCloser) {
+      document.removeEventListener('pointerdown', this._trackMenuCloser, true)
+      window.removeEventListener('scroll', this._trackMenuCloser, true)
+      this._trackMenuCloser = null
+    }
+  }
+
+  // ── Lite visual mode (battery saver) ──────────────────────────────────────
+  private wireLiteVisual(): void {
+    const toggle = document.getElementById('liteVisualToggle') as HTMLInputElement | null
+    if (!toggle) return
+    if (localStorage.getItem(this.LITE_KEY) === '1') {
+      toggle.checked = true
+      this.setLiteVisual(true)
+    }
+    toggle.addEventListener('change', () => {
+      this.setLiteVisual(toggle.checked)
+      try { localStorage.setItem(this.LITE_KEY, toggle.checked ? '1' : '0') } catch { /* quota */ }
+    })
+  }
+
+  private setLiteVisual(on: boolean): void {
+    this._liteActive = on
+    document.getElementById('liteAurora')?.classList.toggle('lite-aurora--on', on)
+    const toggle = document.getElementById('liteVisualToggle') as HTMLInputElement | null
+    if (toggle) toggle.checked = on   // keep panel toggle in sync (e.g. enabled via banner)
+    if (on) {
+      this.sphere?.suspend()
+      this.startLiteLoop()
+    } else {
+      this.stopLiteLoop()
+      this.sphere?.resume()
+      document.documentElement.style.setProperty('--lite-bass', '0')
+    }
+  }
+
+  // Cheap analyser→CSS loop driving the Lite aurora's bass pulse (no WebGL).
+  private startLiteLoop(): void {
+    if (this._liteRaf !== null) return
+    const tick = () => {
+      const analyser = this.engine.analyserNode
+      if (analyser) {
+        if (!this._liteData || this._liteData.length !== analyser.frequencyBinCount) {
+          this._liteData = new Uint8Array(analyser.frequencyBinCount)
+        }
+        analyser.getByteFrequencyData(this._liteData as Uint8Array<ArrayBuffer>)
+        const n = Math.min(16, this._liteData.length)
+        let sum = 0
+        for (let i = 0; i < n; i++) sum += this._liteData[i]
+        document.documentElement.style.setProperty('--lite-bass', (n ? (sum / n) / 255 : 0).toFixed(3))
+      }
+      this._liteRaf = requestAnimationFrame(tick)
+    }
+    this._liteRaf = requestAnimationFrame(tick)
+  }
+
+  private stopLiteLoop(): void {
+    if (this._liteRaf !== null) { cancelAnimationFrame(this._liteRaf); this._liteRaf = null }
+  }
+
+  // ── Battery API: cap fps + suggest Lite under low power ───────────────────
+  private wireBatteryMonitor(): void {
+    const nav = navigator as Navigator & { getBattery?: () => Promise<BatteryManagerLike> }
+    if (typeof nav.getBattery !== 'function') return
+    nav.getBattery().then((bat) => {
+      const check = () => {
+        const low = bat.level < 0.2 && !bat.charging
+        this.sphere?.setLowPower(low)
+        if (low && !this._liteActive && !this._lowPowerSuggested) {
+          this._lowPowerSuggested = true
+          this._toast.show({
+            message: 'Low battery — switch to Lite visual to save power?',
+            actionLabel: 'Lite',
+            onAction: () => this.setLiteVisual(true),
+          })
+        }
+      }
+      bat.addEventListener('levelchange', check)
+      bat.addEventListener('chargingchange', check)
+      check()
+    }).catch(() => { /* Battery API unavailable */ })
+  }
+
   private wireHelpModal(): void {
     this.helpBtn.addEventListener('click', () => this.helpModal.showModal())
+    // Desktop control-dock help trigger opens the same modal
+    document.querySelectorAll<HTMLElement>('[data-help]').forEach((btn) =>
+      btn.addEventListener('click', () => this.helpModal.showModal()))
     this.helpCloseBtn.addEventListener('click', () => this.helpModal.close())
     this.helpModal.addEventListener('click', (e) => {
       if (e.target === this.helpModal) this.helpModal.close()
@@ -367,17 +576,145 @@ export class App {
     })
   }
 
-  private closeAllPanels(): void {
-    this.playlistDrawer.classList.remove('panel--visible')
-    this.soundDrawer.classList.remove('panel--visible')
-    this.settingsDrawer.classList.remove('panel--visible')
-    this.soundShowBtn.classList.remove('btn-controls-show--active')
-    this.settingsShowBtn.classList.remove('btn-settings-show--active')
-    this._drawerBackdrop.classList.remove('backdrop--visible')
+  // ── Unified panel system ────────────────────────────────────────────────
+  // Single source of truth for opening/closing the Playlist, Sound, Visual and
+  // Export panels. Triggered identically by the desktop control dock and the
+  // mobile bottom nav (both use [data-panel="…"]). One panel open at a time.
+  private wirePanels(): void {
+    this._panels = {
+      playlist: this.playlistDrawer,
+      sound:    this.soundDrawer,
+      visual:   this.settingsDrawer,
+      export:   this.exportDrawer,
+    }
+
+    // Triggers: every dock/nav button carrying a data-panel attribute
+    document.querySelectorAll<HTMLElement>('[data-panel]').forEach((btn) => {
+      const name = btn.dataset.panel as 'playlist' | 'sound' | 'visual' | 'export'
+      btn.addEventListener('click', () => this.togglePanel(name))
+    })
+
+    // Close (×) buttons inside each panel
+    this.playlistCloseBtn.addEventListener('click', () => this.closePanel())
+    this.soundCloseBtn.addEventListener('click', () => this.closePanel())
+    this.settingsCloseBtn.addEventListener('click', () => this.closePanel())
+    this.exportCloseBtn.addEventListener('click', () => this.closePanel())
+
+    // Tap the dimmed backdrop to dismiss whatever is open
+    this._drawerBackdrop.addEventListener('click', () => this.closePanel())
+
+    // Keep the mobile bottom-sheet offset matched to the actual bottom bar
+    // height (waveform + transport + nav + safe-area), so sheets sit flush on
+    // top of it with no gap. Recompute on resize / orientation change.
+    window.addEventListener('resize', () => this.updateBottomBarHeight())
+    this.updateBottomBarHeight()
+
+    // Sound panel sub-tabs (Audio / Effects)
+    this.soundDrawer.querySelectorAll<HTMLButtonElement>('.sound-tab').forEach((tab) => {
+      tab.addEventListener('click', () =>
+        this.switchSoundTab(tab.dataset.tab as 'audio' | 'effects'))
+    })
+
+    // Visual panel theme chips
+    this.settingsDrawer.querySelectorAll<HTMLButtonElement>('.theme-chip').forEach((chip) => {
+      chip.addEventListener('click', () => this.applyTheme(chip.dataset.theme ?? 'prism'))
+    })
   }
 
-  private showBackdrop(): void {
+  // Publishes the live bottom-bar height as --bottombar-h for the mobile sheet
+  // CSS to anchor against (avoids a hard-coded magic offset that left a gap).
+  private updateBottomBarHeight(): void {
+    const h = this._playerBottom?.getBoundingClientRect().height ?? 0
+    if (h > 0) document.documentElement.style.setProperty('--bottombar-h', `${Math.round(h)}px`)
+  }
+
+  private openPanel(name: 'playlist' | 'sound' | 'visual' | 'export'): void {
+    if (this._activePanel && this._activePanel !== name) this.closePanel()
+    this.updateBottomBarHeight()
+    this._panels[name].classList.add('panel--visible')
+    this._activePanel = name
     if (this._isMobile) this._drawerBackdrop.classList.add('backdrop--visible')
+    this.syncPanelTriggers(name)
+  }
+
+  private closePanel(): void {
+    if (this._activePanel) this._panels[this._activePanel].classList.remove('panel--visible')
+    this._activePanel = null
+    this._drawerBackdrop.classList.remove('backdrop--visible')
+    this.syncPanelTriggers(null)
+  }
+
+  private togglePanel(name: 'playlist' | 'sound' | 'visual' | 'export'): void {
+    if (this._activePanel === name) this.closePanel()
+    else this.openPanel(name)
+  }
+
+  // Drag-to-dismiss for mobile bottom sheets. The header (with its drag handle)
+  // is the grab zone — the scrollable body keeps its own pan-y scrolling, so the
+  // two never fight. Velocity-aware: a fast flick or a drag past threshold
+  // animates the sheet out; otherwise it springs back.
+  private wireSheetGestures(): void {
+    const sheets: HTMLElement[] = [
+      this.playlistDrawer, this.soundDrawer, this.settingsDrawer, this.exportDrawer,
+    ]
+    for (const sheet of sheets) {
+      const header = sheet.querySelector<HTMLElement>('.controls-drawer-header, .sound-drawer-header')
+      if (!header) continue
+
+      let startY = 0, startT = 0, dy = 0, dragging = false
+
+      header.addEventListener('touchstart', (e) => {
+        if (!this._isMobile) return
+        dragging = true
+        startY = e.touches[0].clientY
+        startT = performance.now()
+        dy = 0
+        sheet.style.transition = 'none'   // 1:1 finger tracking while dragging
+      }, { passive: true })
+
+      header.addEventListener('touchmove', (e) => {
+        if (!dragging) return
+        dy = Math.max(0, e.touches[0].clientY - startY)   // downward only
+        sheet.style.transform = `translateY(${dy}px)`
+        if (dy > 2) e.preventDefault()
+      }, { passive: false })
+
+      const end = () => {
+        if (!dragging) return
+        dragging = false
+        const velocity = dy / Math.max(performance.now() - startT, 1)   // px/ms
+        if (dy > 60 || velocity > 0.25) {
+          // Flick/drag past threshold → slide the rest of the way out (opacity
+          // stays up so it doesn't flicker), then tear down without a reverse jump.
+          sheet.style.transition = 'transform 0.2s cubic-bezier(0.4, 0, 1, 1)'
+          sheet.style.transform = 'translateY(110%)'
+          let done = false
+          const finish = () => {
+            if (done) return
+            done = true
+            sheet.style.transition = 'none'   // no reverse animation on cleanup
+            this.closePanel()
+            sheet.style.transform = ''
+            requestAnimationFrame(() => { sheet.style.transition = '' })
+          }
+          sheet.addEventListener('transitionend', finish, { once: true })
+          window.setTimeout(finish, 280)       // fallback if transitionend is missed
+        } else {
+          // Snap back to the open position using the CSS spring
+          sheet.style.transition = ''
+          sheet.style.transform = ''
+        }
+      }
+      header.addEventListener('touchend', end)
+      header.addEventListener('touchcancel', end)
+    }
+  }
+
+  // Highlight the active dock/nav trigger(s) for the open panel.
+  private syncPanelTriggers(active: 'playlist' | 'sound' | 'visual' | 'export' | null): void {
+    document.querySelectorAll<HTMLElement>('[data-panel]').forEach((btn) => {
+      btn.classList.toggle('panel-trigger--active', btn.dataset.panel === active)
+    })
   }
 
   // iOS Safari does not fire input events from touch on range inputs that have
@@ -415,27 +752,6 @@ export class App {
     })
   }
 
-  private wireSoundPanel(): void {
-    this.soundShowBtn.addEventListener('click', () => {
-      const isOpen = this.soundDrawer.classList.contains('panel--visible')
-      this.closeAllPanels()
-      if (!isOpen) {
-        this.soundDrawer.classList.add('panel--visible')
-        this.soundShowBtn.classList.add('btn-controls-show--active')
-        this.showBackdrop()
-      }
-    })
-    this.soundCloseBtn.addEventListener('click', () => {
-      this.soundDrawer.classList.remove('panel--visible')
-      this.soundShowBtn.classList.remove('btn-controls-show--active')
-      this._drawerBackdrop.classList.remove('backdrop--visible')
-    })
-    this.soundDrawer.querySelectorAll<HTMLButtonElement>('.sound-tab').forEach((tab) => {
-      tab.addEventListener('click', () =>
-        this.switchSoundTab(tab.dataset.tab as 'audio' | 'effects'))
-    })
-  }
-
   private switchSoundTab(tab: 'audio' | 'effects'): void {
     this.soundDrawer.querySelectorAll<HTMLElement>('.sound-tab').forEach((t) => {
       const isActive = t.dataset.tab === tab
@@ -444,30 +760,6 @@ export class App {
     })
     this.soundDrawer.querySelectorAll<HTMLElement>('.sound-tab-panel').forEach((p) => {
       p.classList.toggle('sound-tab-panel--hidden', p.id !== `soundTab-${tab}`)
-    })
-  }
-
-  private wireSettingsPanel(): void {
-    this.settingsCloseBtn.addEventListener('click', () => {
-      this.settingsDrawer.classList.remove('panel--visible')
-      this.settingsShowBtn.classList.remove('btn-settings-show--active')
-      this._drawerBackdrop.classList.remove('backdrop--visible')
-    })
-    this.settingsShowBtn.addEventListener('click', () => {
-      const isOpen = this.settingsDrawer.classList.contains('panel--visible')
-      if (isOpen) {
-        this.settingsDrawer.classList.remove('panel--visible')
-        this.settingsShowBtn.classList.remove('btn-settings-show--active')
-      } else {
-        this.settingsDrawer.classList.add('panel--visible')
-        this.settingsShowBtn.classList.add('btn-settings-show--active')
-        this.showBackdrop()
-      }
-    })
-    this.settingsDrawer.querySelectorAll<HTMLButtonElement>('.theme-chip').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        this.applyTheme(chip.dataset.theme ?? 'prism')
-      })
     })
   }
 
@@ -583,6 +875,15 @@ export class App {
     })
     this.rewindBtn.addEventListener('click', () => {
       this.engine.seek(Math.max(0, this.engine.currentTime - 5))
+    })
+
+    // Previous / next track (mobile transport — playlist navigation)
+    this.prevBtn.addEventListener('click', () => {
+      if (this.currentTrackIndex > 0) void this.switchTrack(this.currentTrackIndex - 1, true)
+    })
+    this.nextBtn.addEventListener('click', () => {
+      if (this.currentTrackIndex < this.playlist.length - 1)
+        void this.switchTrack(this.currentTrackIndex + 1, true)
     })
 
     // Waveform seek
@@ -971,12 +1272,27 @@ export class App {
           // iOS OOM crashes during long playback. The aurora animates via @keyframes
           // on mobile instead (see main.css .aurora-idle).
           if (!this._isMobile) {
-            const root = document.documentElement.style
-            root.setProperty('--aurora-bass',   String(bass.toFixed(3)))
-            root.setProperty('--aurora-mid',    String(mid.toFixed(3)))
-            root.setProperty('--aurora-treble', String(treble.toFixed(3)))
-            root.setProperty('--ui-bass',       String(uiBass.toFixed(3)))
-            root.setProperty('--ui-treble',     String(uiTreble.toFixed(3)))
+            // Each :root var write forces a style-recalc + repaint across every
+            // backdrop-filter layer (6+) and the play button's per-frame
+            // drop-shadow. At an uncapped 60–144fps that re-rasterisation is the
+            // dominant desktop cost. These glow values move slowly, so throttle
+            // writes to ~24Hz and skip values that haven't changed past the
+            // toFixed(3) quantum — visually indistinguishable, far fewer repaints.
+            const now = performance.now()
+            if (now - this._auroraVarT >= 41) {
+              this._auroraVarT = now
+              const root = document.documentElement.style
+              const set = (name: string, v: number) => {
+                if (Math.abs((this._lastAuroraVars[name] ?? -1) - v) < 0.004) return
+                this._lastAuroraVars[name] = v
+                root.setProperty(name, v.toFixed(3))
+              }
+              set('--aurora-bass',   bass)
+              set('--aurora-mid',    mid)
+              set('--aurora-treble', treble)
+              set('--ui-bass',       uiBass)
+              set('--ui-treble',     uiTreble)
+            }
           }
           this.starOverlay.setTreble(treble)
         }
@@ -994,6 +1310,8 @@ export class App {
         this.sphere.setGlitch(this.glitchToggle.checked)
         this.sphere.setParticleCount(parseInt(this.particleCountSlider.value))
         this.sphere.setStarBrightness(parseInt(this.starsSlider.value) / 100)
+        // If Lite mode was already on (persisted / low-power), keep the orb suspended
+        if (this._liteActive) this.sphere.suspend()
       } catch (sphereErr) {
         // Distinguish a failed chunk load (stale cache / network) from genuine
         // WebGL-unsupported so the cause is diagnosable rather than ambiguous.
@@ -1352,6 +1670,8 @@ export class App {
     window.setTimeout(() => {
       this.player.style.opacity = ''
       this.player.classList.add('visible')
+      // First track is loaded and the player is up — offer to install (once/session)
+      this._install.maybePrompt()
     }, 420)
   }
 

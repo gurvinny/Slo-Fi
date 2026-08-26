@@ -742,6 +742,13 @@ export class AnomalySphere {
   private container: HTMLElement  // stored so resize() doesn't need parentElement
   private _isMobile: boolean
   private rafId:   number | null = null
+
+  // Frame-rate cap (#83): 0 = uncapped (desktop). On mobile we cap at 60, and
+  // drop to 30 under low power. Set after _isMobile is known in the constructor.
+  private _targetFps = 0
+  private _lastFrameT = 0
+  // Lite mode suspends the render loop entirely (WebGL idle) — see suspend().
+  private _suspended = false
   private playing  = false
   private _reducedMotion: boolean
   private _motionMQ: MediaQueryList
@@ -769,6 +776,7 @@ export class AnomalySphere {
     // On mobile (DPR ≥ 3) cap at 2 to reduce WebGL framebuffer memory pressure.
     // Capping 3→2 cuts FBO size by ~44% — critical for avoiding iOS OOM page reloads.
     this._isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    this._targetFps = this._isMobile ? 60 : 0   // cap mobile at 60; desktop uncapped
     // Fewer particles on mobile to reduce JS heap pressure alongside the large
     // decoded AudioBuffer that can exceed 100 MB for long tracks.
     if (this._isMobile) this.particleCount = 150
@@ -899,7 +907,7 @@ export class AnomalySphere {
     // Restart the RAF loop when the tab becomes visible again after being
     // hidden (the loop cancels itself on visibilityState === 'hidden').
     this._onVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && this.rafId === null) {
+      if (document.visibilityState === 'visible' && this.rafId === null && !this._suspended) {
         this.loop()
       }
     }
@@ -1221,8 +1229,8 @@ export class AnomalySphere {
   // Called from App.ts whenever the speed slider changes (0.25-1.0)
   setSpeed(v: number): void { this.speed = v }
 
-  private loop(): void {
-    this.rafId = requestAnimationFrame(() => this.loop())
+  private loop(now: number = performance.now()): void {
+    this.rafId = requestAnimationFrame((t) => this.loop(t))
 
     // Fully pause the RAF loop when the tab is hidden — cancel the pending
     // frame so the loop stops firing entirely (not just skips rendering).
@@ -1232,6 +1240,14 @@ export class AnomalySphere {
       cancelAnimationFrame(this.rafId)
       this.rafId = null
       return
+    }
+
+    // Frame-rate cap (mobile): keep the RAF chain alive but skip rendering until
+    // the target interval has elapsed. Halves GPU/battery load at 30fps and
+    // tames 120Hz displays at 60fps. Desktop (_targetFps 0) renders every frame.
+    if (this._targetFps > 0) {
+      if (now - this._lastFrameT < 1000 / this._targetFps - 2) return
+      this._lastFrameT = now
     }
 
     const elapsed = this.clock.getElapsedTime()
@@ -1721,6 +1737,28 @@ export class AnomalySphere {
         this.lightningArcs.splice(i, 1)
       }
     }
+  }
+
+  // Low-power: drop the mobile cap to 30fps (no-op on desktop, which is uncapped).
+  setLowPower(on: boolean): void {
+    this._targetFps = this._isMobile ? (on ? 30 : 60) : 0
+  }
+
+  // Lite mode: stop the render loop and hide the canvas so WebGL goes idle. The
+  // CSS aurora fallback (driven separately by App) takes over the visuals.
+  suspend(): void {
+    if (this._suspended) return
+    this._suspended = true
+    if (this.rafId !== null) { cancelAnimationFrame(this.rafId); this.rafId = null }
+    this.renderer.domElement.style.display = 'none'
+  }
+
+  resume(): void {
+    if (!this._suspended) return
+    this._suspended = false
+    this.renderer.domElement.style.display = ''
+    this.resize()
+    if (this.rafId === null) this.loop()
   }
 
   destroy(): void {

@@ -9,11 +9,11 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      # Routine churn arrives as one PR; majors stay separate so a breaking
-      # bump is always reviewed on its own.
-      minor-patch:
+      # Patch only. A grouped PR does not expose per-dependency versions to
+      # fetch-metadata, so the 0.x rule cannot be applied inside a group --
+      # minors therefore arrive individually where they can be judged.
+      patch:
         update-types:
-          - minor
           - patch
 
   - package-ecosystem: docker

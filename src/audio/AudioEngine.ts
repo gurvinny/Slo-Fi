@@ -108,6 +108,7 @@ export class AudioEngine {
 
   // 8D binaural panner — sits after analyser, before destination
   private _panner8D: PannerNode | null = null
+  private _convolverBypassed = false
   private _8DEnabled = false
   private _8DSpeed   = 0.5   // Hz, rotation rate
   private _8DRafId:  number | null = null
@@ -210,9 +211,13 @@ export class AudioEngine {
 
     this.context = new AudioContext({ latencyHint: 'interactive' })
     // Auto-resume if iOS suspends the context mid-foreground (e.g. phone call,
-    // Siri, AirPods reconnect) so the user doesn't perceive it as a crash.
+    // Siri, AirPods reconnect). Only do this while the app is VISIBLE — when
+    // backgrounded the OS deliberately suspends the context, and fighting it
+    // with repeated resume() calls causes the audio to stutter. Background
+    // playback is carried by the <audio> media element instead.
     this.context.addEventListener('statechange', () => {
-      if (this.context?.state === 'suspended' && this._isPlaying) {
+      if (this.context?.state === 'suspended' && this._isPlaying &&
+          document.visibilityState === 'visible') {
         this.context.resume().catch(() => {})
       }
     })
@@ -282,22 +287,22 @@ export class AudioEngine {
     this._panner8D.positionY.value =  0
     this._panner8D.positionZ.value = -1
     this._analyserNode.connect(this._panner8D)
-    this._panner8D.connect(this.context.destination)
 
-    // Create a silent MediaStream tap from the audio graph and wire it to a
-    // hidden <audio> element. Playing a MediaStream source keeps the iOS audio
-    // session alive in the background. Because a MediaStream has no file
-    // duration, iOS cannot display a looping 0-1 s counter in Control Center,
-    // so our navigator.mediaSession.setPositionState calls take full effect.
-    const keepaliveDest = this.context.createMediaStreamDestination()
-    const keepaliveGain = this.context.createGain()
-    keepaliveGain.gain.value = 0
-    keepaliveGain.connect(keepaliveDest)
+    // Background playback (iOS PWA): route the FULL processed mix through a
+    // MediaStreamAudioDestinationNode into a hidden <audio> element, and make
+    // that element the sole audio output (we do NOT connect to ctx.destination).
+    // iOS suspends raw Web Audio when the app is backgrounded, but keeps a
+    // playing HTMLMediaElement — and the AudioContext feeding it — alive, so the
+    // song continues with the screen off / app backgrounded. A silent tap on
+    // preEQ already keeps ctx.destination referenced for the analyser path.
+    const mediaDest = this.context.createMediaStreamDestination()
+    this._panner8D.connect(mediaDest)
 
     const el = document.createElement('audio')
-    el.srcObject = keepaliveDest.stream
+    el.srcObject = mediaDest.stream
     el.setAttribute('playsinline', '')
     el.setAttribute('aria-hidden', 'true')
+    el.preload = 'auto'
     this._keepaliveEl = el
   }
 
@@ -730,14 +735,46 @@ export class AudioEngine {
     this.masterGainNode.gain.linearRampToValueAtTime(0, t + 0.03)
   }
 
-  // Resumes the AudioContext after a background suspension and fades gain
-  // back up so the return from background sounds clean rather than popping in.
+  // Background DSP reduction (iOS throttles the audio thread when hidden). Bypass
+  // the heaviest nodes so the graph keeps real time and stops stuttering:
+  //  - convolution reverb: go fully dry + disconnect the convolver (saves the most)
+  //  - HRTF spatial: downgrade to cheap equalpower panning
+  //  - saturation: drop 4× oversampling (via EffectsChain)
+  // All restored on return to foreground.
+  setBackgroundMode(hidden: boolean): void {
+    if (!this.context) return
+    const t = this.context.currentTime
+
+    if (hidden && !this._convolverBypassed) {
+      if (this.dryGainNode && this.wetGainNode && this._loopXfadeGain && this.convolverNode) {
+        this.dryGainNode.gain.setTargetAtTime(1, t, 0.05)
+        this.wetGainNode.gain.setTargetAtTime(0, t, 0.05)
+        try { this._loopXfadeGain.disconnect(this.convolverNode) } catch { /* already disconnected */ }
+      }
+      this._convolverBypassed = true
+    } else if (!hidden && this._convolverBypassed) {
+      if (this.dryGainNode && this.wetGainNode && this._loopXfadeGain && this.convolverNode) {
+        try { this._loopXfadeGain.connect(this.convolverNode) } catch { /* already connected */ }
+        this.dryGainNode.gain.setTargetAtTime(1 - this._reverbMix, t, 0.05)
+        this.wetGainNode.gain.setTargetAtTime(this._reverbMix, t, 0.05)
+      }
+      this._convolverBypassed = false
+    }
+
+    if (this._panner8D) {
+      this._panner8D.panningModel = hidden ? 'equalpower' : (this._8DEnabled ? 'HRTF' : 'equalpower')
+    }
+    this._effectsChain?.setBackgroundMode(hidden)
+  }
+
+  // Resumes the AudioContext on return to foreground. Audio plays through the
+  // <audio> element so it isn't muted while backgrounded; we just make sure the
+  // context is running and the gain is at the user's volume (no 0→up dip).
   resumeFromBackground(): void {
     if (!this.context || !this.masterGainNode) return
     this.context.resume().catch(() => {})
     const t = this.context.currentTime
     this.masterGainNode.gain.cancelScheduledValues(t)
-    this.masterGainNode.gain.setValueAtTime(0, t)
-    this.masterGainNode.gain.linearRampToValueAtTime(this._volume, t + 0.05)
+    this.masterGainNode.gain.setTargetAtTime(this._volume, t, 0.02)
   }
 }

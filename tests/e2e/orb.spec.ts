@@ -15,7 +15,14 @@ import {
   readContextLost,
   isMeaningfulError,
   measureCanvas,
+  webglCanvasIndex,
 } from "./helpers";
+
+// The orb renderer appends its canvas into #anomaly, a direct child of body.
+// Two other canvases -- #eqCurveCanvas and #waveform -- appear earlier in the
+// DOM, and the EQ one sits in a collapsed panel, so a first-match selector
+// finds a hidden canvas that is not the orb.
+const ORB = "#anomaly canvas";
 
 test("home page loads with no console errors or uncaught exceptions", async ({ page }) => {
   const faults = watchForFaults(page);
@@ -34,17 +41,12 @@ test("the orb canvas mounts and draws a non-blank frame", async ({ page }) => {
   const faults = watchForFaults(page);
   await page.goto("/", { waitUntil: "networkidle" });
 
-  const canvas = page.locator("canvas").first();
-  await expect(canvas, "a canvas element should mount").toBeVisible();
+  const canvas = page.locator(ORB);
+  await expect(canvas, "the orb canvas should mount into #anomaly").toBeVisible();
 
-  // WebGL is a real WebGL context, not a stub.
-  const glOk = await page.evaluate(() => {
-    const c = document.querySelector("canvas");
-    if (!c) return false;
-    const gl = c.getContext("webgl2") || c.getContext("webgl");
-    return Boolean(gl);
-  });
-  expect(glOk, "canvas should have a WebGL context").toBe(true);
+  // A real WebGL context somewhere on the page, not a stub.
+  const idx = await webglCanvasIndex(page);
+  expect(idx, "a canvas with a WebGL context should exist").toBeGreaterThanOrEqual(0);
 
   // Software WebGL needs a moment to produce a first frame.
   await page.waitForTimeout(4000);
@@ -64,7 +66,7 @@ test("the orb canvas mounts and draws a non-blank frame", async ({ page }) => {
 test("the renderer survives a resize without losing its context", async ({ page }) => {
   const faults = watchForFaults(page);
   await page.goto("/", { waitUntil: "networkidle" });
-  await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.locator(ORB)).toBeVisible();
 
   // Mobile sizing has broken here before (100vh vs 100svh/100dvh).
   await page.setViewportSize({ width: 390, height: 844 });

@@ -11,7 +11,7 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.33.0",
+    "@cloudflare/vite-plugin": "^1.54.6",
     "@types/three": "^0.183.1",
     "sharp": "^0.34.5",
     "typescript": "^5.9.3",

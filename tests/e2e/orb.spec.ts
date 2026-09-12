@@ -17,12 +17,24 @@ import {
   measureCanvas,
   webglCanvasIndex,
 } from "./helpers";
+import { makeWavFile } from "./fixtures";
 
 // The orb renderer appends its canvas into #anomaly, a direct child of body.
 // Two other canvases -- #eqCurveCanvas and #waveform -- appear earlier in the
 // DOM, and the EQ one sits in a collapsed panel, so a first-match selector
 // finds a hidden canvas that is not the orb.
 const ORB = "#anomaly canvas";
+
+/**
+ * Load a track. The orb does not exist on a cold page: AnomalySphere is
+ * imported only after a file decodes and an analyser node exists, which is
+ * correct -- there is no reason to start WebGL before there is audio.
+ */
+async function loadTrack(page: import("@playwright/test").Page) {
+  await page.setInputFiles("#fileInput", makeWavFile());
+  // Decode plus BPM/key detection, then the code-split orb chunk.
+  await expect(page.locator(ORB)).toBeVisible({ timeout: 30_000 });
+}
 
 test("home page loads with no console errors or uncaught exceptions", async ({ page }) => {
   const faults = watchForFaults(page);
@@ -41,8 +53,8 @@ test("the orb canvas mounts and draws a non-blank frame", async ({ page }) => {
   const faults = watchForFaults(page);
   await page.goto("/", { waitUntil: "networkidle" });
 
+  await loadTrack(page);
   const canvas = page.locator(ORB);
-  await expect(canvas, "the orb canvas should mount into #anomaly").toBeVisible();
 
   // A real WebGL context somewhere on the page, not a stub.
   const idx = await webglCanvasIndex(page);
@@ -66,7 +78,7 @@ test("the orb canvas mounts and draws a non-blank frame", async ({ page }) => {
 test("the renderer survives a resize without losing its context", async ({ page }) => {
   const faults = watchForFaults(page);
   await page.goto("/", { waitUntil: "networkidle" });
-  await expect(page.locator(ORB)).toBeVisible();
+  await loadTrack(page);
 
   // Mobile sizing has broken here before (100vh vs 100svh/100dvh).
   await page.setViewportSize({ width: 390, height: 844 });

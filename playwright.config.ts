@@ -31,6 +31,8 @@ export default defineConfig({
         "--use-angle=swiftshader",
         "--enable-unsafe-swiftshader",
         "--disable-dev-shm-usage",
+        // decodeAudioData and the analyser must work without a user gesture.
+        "--autoplay-policy=no-user-gesture-required",
       ],
     },
   },

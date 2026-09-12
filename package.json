@@ -11,17 +11,17 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.33.0",
-    "@types/three": "^0.183.1",
-    "sharp": "^0.34.5",
+    "@cloudflare/vite-plugin": "^1.54.6",
+    "@types/three": "^0.185.4",
+    "sharp": "^0.35.4",
     "typescript": "^5.9.3",
-    "vite": "^8.0.1",
+    "vite": "^8.2.2",
     "wrangler": "^4.84.0"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.2.2",
+    "@tailwindcss/vite": "^4.3.3",
     "ogl": "^1.0.11",
     "tailwindcss": "^4.2.2",
-    "three": "^0.183.2"
+    "three": "^0.186.0"
   }
 }

@@ -56,9 +56,13 @@ export function detectBpm(buffer: AudioBuffer): number {
   let bestLag = lagMin
   let bestCorr = -Infinity
   for (let lag = lagMin; lag <= lagMax; lag++) {
-    let corr = 0
     const limit = numFrames - lag
+    let corr = 0
     for (let f = 0; f < limit; f++) corr += onset[f] * onset[f + lag]
+
+    // Normalize by the number of overlapping frames. Without this, shorter
+    // lags accumulate more products and are biased toward higher BPM values.
+    corr /= limit
     if (corr > bestCorr) { bestCorr = corr; bestLag = lag }
   }
 

@@ -14,5 +14,8 @@ jobs:
       - uses: treosh/lighthouse-ci-action@v11
         with:
           configPath: ./lighthouserc.json
+          # Run 3 times and assert on the median (see lighthouserc.json) so a
+          # single noisy run near the 0.90 budget can't fail PRs at random.
+          runs: 3
           uploadArtifacts: true
           temporaryPublicStorage: true

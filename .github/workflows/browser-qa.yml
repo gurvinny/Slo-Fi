@@ -1,0 +1,62 @@
+# Browser QA
+# Author: gurvinny
+#
+# Typecheck and build cannot tell whether anything actually renders. The orb
+# has failed in production twice while CI was green -- once from a renderer
+# swap that could not draw the scene's materials, once from a stale service
+# worker serving an index.html with dead chunk hashes. This drives a real
+# browser against the built output instead.
+#
+# Advisory for now: reports on every PR but is not a required status check.
+# Promote it into the ruleset once it has proven stable.
+name: Browser QA
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Browser QA
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Browser binary and its system libraries. Pinned by the lockfile via
+      # @playwright/test, so this cannot drift from the installed client.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Run browser QA
+        run: npm run test:e2e
+
+      - name: Upload report and failure screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-qa-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

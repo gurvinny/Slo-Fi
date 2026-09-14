@@ -25,6 +25,15 @@ export class StarOverlay {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
 
+  // Pre-rendered radial-gradient star sprite. Drawing 220 stars per frame each
+  // built its own createRadialGradient + addColorStop chain + rgba template
+  // strings — ~13k gradient allocations/sec plus heavy GC churn. We bake the
+  // gradient into one offscreen canvas once and blit it per star with
+  // globalAlpha + scale, which is a GPU-accelerated copy with zero per-frame
+  // allocation. Visually identical (same colour stops / falloff).
+  private starSprite!: HTMLCanvasElement
+  private static readonly SPRITE_R = 32   // sprite half-size in px (gradient radius)
+
   private stars: Star[]       = []
   private shots: ShootingStar[] = []
 
@@ -58,6 +67,7 @@ export class StarOverlay {
     document.body.appendChild(this.canvas)
 
     this.ctx = this.canvas.getContext('2d')!
+    this.buildStarSprite()
 
     window.addEventListener('resize', () => this.resize())
     this.resize()
@@ -117,6 +127,23 @@ export class StarOverlay {
     }))
   }
 
+  // Bake the star's radial gradient (core → soft halo) into an offscreen canvas
+  // once. The relative colour-stop opacities are preserved; per-star brightness
+  // is applied later via ctx.globalAlpha, and per-star size via drawImage scale.
+  private buildStarSprite(): void {
+    const R = StarOverlay.SPRITE_R
+    const c = document.createElement('canvas')
+    c.width = c.height = R * 2
+    const g = c.getContext('2d')!
+    const grad = g.createRadialGradient(R, R, 0, R, R, R)
+    grad.addColorStop(0,   'rgba(225,235,255,1)')
+    grad.addColorStop(0.3, 'rgba(210,222,255,0.55)')
+    grad.addColorStop(1,   'rgba(190,210,255,0)')
+    g.fillStyle = grad
+    g.fillRect(0, 0, R * 2, R * 2)
+    this.starSprite = c
+  }
+
   private spawnShot(): void {
     const angleRad = (28 + Math.random() * 28) * (Math.PI / 180)  // 28-56° below horizontal
     const spd      = (440 + Math.random() * 360) / 1000            // px/ms
@@ -161,15 +188,12 @@ export class StarOverlay {
       const alpha    = this._reducedMotion ? 0.45 : (0.20 + twinkle * (0.80 + this.treble * 0.20))
       const r        = s.size * (0.8 + twinkle * 0.5)
 
-      // Core + soft halo via radial gradient
-      const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 2)
-      grad.addColorStop(0,   `rgba(225,235,255,${alpha})`)
-      grad.addColorStop(0.3, `rgba(210,222,255,${(alpha * 0.55).toFixed(3)})`)
-      grad.addColorStop(1,   'rgba(190,210,255,0)')
-      ctx.beginPath()
-      ctx.fillStyle = grad
-      ctx.arc(s.x, s.y, r * 2, 0, Math.PI * 2)
-      ctx.fill()
+      // Core + soft halo: blit the cached gradient sprite scaled to the star's
+      // visible diameter (2 * r * 2) with brightness applied via globalAlpha.
+      const d = r * 4   // sprite covers a disc of radius r*2 → draw at 2*(r*2) px
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha))
+      ctx.drawImage(this.starSprite, s.x - d / 2, s.y - d / 2, d, d)
+      ctx.globalAlpha = 1
 
       // Four-pointed diffraction cross — only at peak brightness
       if (twinkle > 0.78) {

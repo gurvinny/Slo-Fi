@@ -4059,3 +4059,356 @@ html:not(.has-splash) .landing-badge {
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   Mobile shell overhaul (#83) — control dock (desktop) + bottom nav (mobile)
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Export sheet body */
+.export-panel {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.export-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.btn-export-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(124, 77, 255, 0.14);
+  border: 1px solid rgba(124, 77, 255, 0.35);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-export-action:hover {
+  background: rgba(124, 77, 255, 0.22);
+  border-color: rgba(124, 77, 255, 0.5);
+}
+.btn-export-action:disabled { opacity: 0.5; cursor: default; }
+
+/* Control dock — desktop floating pill above the bottom bar. Absolutely
+   positioned so it does NOT change .player-bottom height (keeps the existing
+   desktop drawer offsets valid). Hidden on mobile (which uses .bottom-nav). */
+.control-dock {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(2, 2, 8, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(124, 77, 255, 0.14);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+.dock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.dock-btn:hover {
+  background: rgba(124, 77, 255, 0.08);
+  border-color: rgba(124, 77, 255, 0.3);
+  color: var(--text);
+}
+.dock-btn.panel-trigger--active {
+  background: rgba(124, 77, 255, 0.14);
+  border-color: rgba(124, 77, 255, 0.4);
+  color: var(--accent-bright);
+}
+
+/* Hidden by default (desktop); shown only on phones */
+.bottom-nav { display: none; }
+.mobile-logo { display: none; }
+.sheet-handle { display: none; }
+
+/* Playlist long-press context menu */
+.track-menu {
+  position: fixed;
+  z-index: 120;
+  display: none;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(8, 8, 18, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(124, 77, 255, 0.22);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+.track-menu--visible {
+  display: block;
+  animation: track-menu-in 0.14s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes track-menu-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+.track-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.track-menu-item:hover,
+.track-menu-item:active { background: rgba(124, 77, 255, 0.16); }
+.track-menu-item--danger { color: #ff6b8a; }
+.track-menu-item--danger:hover,
+.track-menu-item--danger:active { background: rgba(255, 107, 138, 0.14); }
+@media (prefers-reduced-motion: reduce) {
+  .track-menu--visible { animation: none; }
+}
+
+@media (max-width: 600px) {
+  /* Remove desktop chrome on phones */
+  .header { display: none; }
+  .control-dock { display: none; }
+  .btn-fullscreen { display: none; }          /* mobile uses tap-orb fullscreen */
+  .transport #rewindBtn { display: none; }     /* replaced by prev/next */
+
+  /* The bottom nav owns the home-indicator inset; clear it on .player-bottom so
+     it isn't applied twice (which left a dead gap above the screen bottom). */
+  .player-bottom { padding-bottom: 0; }
+
+  /* Header gone → top HUD and dropzone rise to the safe-area top. Pad the top
+     so the track info clears the floating wordmark sitting over it. */
+  .player-top {
+    top: env(safe-area-inset-top, 0px);
+    padding-top: 34px;
+  }
+  .dropzone   { top: 0; }
+
+  /* Floating wordmark in place of the header */
+  .mobile-logo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: fixed;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    z-index: 106;
+    color: var(--text);
+    pointer-events: none;
+    opacity: 0.92;
+  }
+  .mobile-logo .logo-text { font-size: 13px; font-weight: 800; letter-spacing: -0.2px; }
+  .mobile-logo .logo-icon { color: var(--accent-bright); }
+
+  /* Transport: single centered row — prev · play · stop · next · loop */
+  .transport-row { flex-wrap: nowrap; padding: 6px 12px 2px; gap: 8px; }
+  .transport { flex: 1; justify-content: center; gap: 10px; }
+  .transport-right { flex-basis: auto; margin-left: 0; padding-bottom: 0; gap: 6px; }
+  .transport-skip { display: inline-flex; }
+  #prevBtn      { order: 1; }
+  #playPauseBtn { order: 2; }
+  #stopBtn      { order: 3; }
+  #nextBtn      { order: 4; }
+  #loopBtn      { order: 5; }
+
+  /* Bottom nav bar — four tabs */
+  .bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    padding: 6px 6px max(6px, env(safe-area-inset-bottom, 6px));
+    border-top: 1px solid rgba(124, 77, 255, 0.10);
+  }
+  .nav-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 0;
+    background: none;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s;
+  }
+  .nav-tab .nav-label { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
+  .nav-tab.panel-trigger--active { color: var(--accent-bright); }
+  .nav-tab.panel-trigger--active svg { filter: drop-shadow(0 0 6px var(--accent)); }
+
+  /* Drag-handle pill — the sheet header is the drag-to-dismiss zone */
+  .controls-drawer-header,
+  .sound-drawer-header {
+    position: relative;
+    padding-top: 18px;
+    touch-action: none;
+  }
+  .sheet-handle {
+    display: block;
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  /* Sheets sit flush on top of the bottom bar (waveform + transport + nav).
+     --bottombar-h is measured live in JS (updateBottomBarHeight) and already
+     includes the safe-area inset, so no gap regardless of waveform height or
+     notch. Falls back to a sane estimate before the first measurement. */
+  .controls-drawer,
+  .sound-drawer,
+  .settings-drawer {
+    bottom: var(--bottombar-h, 210px);
+    height: calc(100dvh - var(--bottombar-h, 210px) - 84px);
+    max-height: calc(100dvh - var(--bottombar-h, 210px) - 84px);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Renderer performance (#83) — Lite-visual aurora fallback + toast banner
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Lite visual: a soft radial glow that pulses with the bass (--lite-bass),
+   shown when the 3D orb is suspended. Cheap — no WebGL, just a gradient. */
+.lite-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  display: none;
+  background: radial-gradient(circle at 50% 46%,
+    rgba(124, 77, 255, calc(0.24 + var(--lite-bass, 0) * 0.50)) 0%,
+    rgba(0, 201, 160,  calc(0.10 + var(--lite-bass, 0) * 0.26)) 32%,
+    transparent 64%);
+  transform: scale(calc(1 + var(--lite-bass, 0) * 0.18));
+  transition: transform 0.08s linear;
+}
+.lite-aurora--on {
+  display: block;
+  animation: lite-breathe 6s ease-in-out infinite;
+}
+@keyframes lite-breathe {
+  0%, 100% { opacity: 0.82; }
+  50%      { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lite-aurora--on { animation: none; }
+}
+
+.toggle-sub { font-size: 9px; opacity: 0.55; font-weight: 600; margin-left: 4px; letter-spacing: 0.04em; }
+
+/* Toast — low-power Lite suggestion + PWA install prompt */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(20px);
+  z-index: 130;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(8, 8, 18, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(124, 77, 255, 0.28);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.toast--visible { display: flex; opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-msg { flex: 1; font-size: 13px; line-height: 1.35; color: var(--text); }
+.toast-action {
+  flex-shrink: 0;
+  padding: 7px 13px;
+  border-radius: 8px;
+  background: rgba(124, 77, 255, 0.18);
+  border: 1px solid rgba(124, 77, 255, 0.4);
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.toast-action:hover { background: rgba(124, 77, 255, 0.28); }
+.toast-action:empty { display: none; }
+.toast-close {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* On phones the toast spans full width and sits just above the bottom nav */
+@media (max-width: 600px) {
+  .toast {
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    bottom: calc(var(--bottombar-h, 150px) + 12px);
+    transform: translateY(20px);
+  }
+  .toast--visible { transform: translateY(0); }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Installed PWA (standalone) — fill the true device screen, no scroll/chrome.
+   With the browser UI gone there's more height available; lock the app to the
+   full dynamic viewport so the orb and HUD use every pixel (insets respected).
+   ════════════════════════════════════════════════════════════════════════ */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  html, body {
+    height: 100dvh;
+    height: -webkit-fill-available;   /* iOS standalone reports full screen here */
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  #app {
+    height: 100dvh;
+    height: -webkit-fill-available;
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+  }
+}
+

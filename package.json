@@ -3,6 +3,9 @@
   "version": "3.0.0-beta.1",
   "description": "Professional-grade browser audio slow-down tool with convolution reverb",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "node scripts/generate-icons.mjs && tsc && vite build && node scripts/precache-sw.mjs",

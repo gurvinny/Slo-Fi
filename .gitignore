@@ -21,3 +21,6 @@ public/icon-512.png
 
 # graphify tool output (local analysis, not part of the project)
 /graphify-out/
+
+# Lighthouse CI local run output
+/.lighthouseci/

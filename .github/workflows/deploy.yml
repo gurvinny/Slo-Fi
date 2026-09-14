@@ -1,0 +1,128 @@
+# Deploy to Cloudflare Workers
+# Author: gurvinny
+#
+# Production used to be promoted by hand with `wrangler deploy`, which meant it
+# drifted: the git-connected Workers Build uploads a *version* on every push but
+# never promotes it, so the versions list looked busy while production sat seven
+# weeks behind main. A healthy version feed is exactly what a stalled deploy
+# looks like.
+#
+# This makes the deploy automatic and conditional instead. The gate is the point:
+# `deploy` runs only after typecheck, build and a real-browser render check have
+# all passed on the same commit, so nothing reaches slofi.live that CI would have
+# rejected. Lighthouse is deliberately NOT a gate -- a performance regression
+# should be visible, not block a correctness fix from shipping.
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  # Manual re-run, for when a deploy needs repeating without a new commit.
+  workflow_dispatch:
+
+# Least privilege: the deploy talks to Cloudflare, not to the repository.
+permissions:
+  contents: read
+
+# Never let two deploys race. Unlike CI, in-progress runs are NOT cancelled:
+# cancelling a half-finished upload is worse than letting it land.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run lint
+      - name: Build
+        run: npm run build
+
+  render:
+    name: Render check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build
+        run: npm run build
+      - name: Browser QA
+        run: npm run test:e2e
+      - name: Upload report on failure
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-render-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: [verify, render]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+
+      # Fail loudly and early rather than letting wrangler emit an opaque auth
+      # error halfway through an upload.
+      - name: Check credentials are present
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=
+          [ -n "$CLOUDFLARE_API_TOKEN" ]  || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$missing" ]; then
+              echo "::error::missing repository secret(s):$missing"
+              echo "The token needs the Workers Scripts:Edit permission." >&2
+              exit 1
+          fi
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run deploy
+
+      # A deploy that uploaded a version without promoting it is the exact
+      # failure this workflow exists to prevent, so confirm the live asset
+      # really is the one just built rather than trusting wrangler's exit code.
+      - name: Confirm the deployed build is live
+        run: |
+          built=$(ls dist/assets/index-*.js | head -1 | xargs basename)
+          echo "built asset: $built"
+          for i in $(seq 1 10); do
+              live=$(curl -sf --max-time 20 https://slofi.live/ \
+                     | grep -oE 'assets/index-[^"]*\.js' | head -1 | xargs basename) || true
+              echo "attempt $i, live asset: ${live:-<none>}"
+              [ "$live" = "$built" ] && { echo "live build matches the deployed build"; exit 0; }
+              sleep 15
+          done
+          echo "::error::slofi.live is not serving the build this run produced ($built)"
+          exit 1

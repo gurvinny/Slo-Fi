@@ -1,0 +1,57 @@
+# CodeQL static analysis
+# Author: gurvinny
+#
+# Replaces GitHub's default setup with a committed workflow, for two reasons.
+#
+# Default setup skips analysis when no analysable code changed -- which is every
+# lockfile-only dependency PR -- so its context cannot be relied on as a
+# required status check. And it runs the `default` query suite; this repo
+# decodes untrusted audio files and builds DOM from their metadata, which is
+# what `security-extended` is for.
+#
+# `actions` is in the matrix deliberately. Default setup was scanning workflow
+# files, and dropping it here would have quietly traded one class of coverage
+# for another.
+name: CodeQL
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Weekly, so advisories landing against unchanged code still surface.
+    - cron: "33 4 * * 3"
+
+# Least privilege: elevated only where the SARIF upload needs it.
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ javascript-typescript, actions ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

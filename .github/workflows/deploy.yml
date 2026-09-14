@@ -110,19 +110,53 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npm run deploy
 
-      # A deploy that uploaded a version without promoting it is the exact
-      # failure this workflow exists to prevent, so confirm the live asset
-      # really is the one just built rather than trusting wrangler's exit code.
-      - name: Confirm the deployed build is live
+      # The failure this workflow exists to prevent is an upload that never
+      # gets promoted, so wrangler's exit code is not taken as proof.
+      #
+      # This asks Cloudflare which version is actually SERVING rather than
+      # polling slofi.live: the public URL goes through the edge cache, which
+      # served stale HTML for minutes after the first real deploy and failed
+      # this step while the deploy had in fact succeeded. The deployments
+      # endpoint has no such lag, and it distinguishes a promotion from a
+      # version upload -- which the HTML never could.
+      - name: Confirm the build was promoted, not just uploaded
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          built=$(ls dist/assets/index-*.js | head -1 | xargs basename)
-          echo "built asset: $built"
-          for i in $(seq 1 10); do
-              live=$(curl -sf --max-time 20 https://slofi.live/ \
-                     | grep -oE 'assets/index-[^"]*\.js' | head -1 | xargs basename) || true
-              echo "attempt $i, live asset: ${live:-<none>}"
-              [ "$live" = "$built" ] && { echo "live build matches the deployed build"; exit 0; }
-              sleep 15
-          done
-          echo "::error::slofi.live is not serving the build this run produced ($built)"
-          exit 1
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/slo-fi/deployments"
+          resp=$(curl -sS --max-time 30 "$api" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
+
+          if [ "$(jq -r '.success' <<<"$resp")" != "true" ]; then
+              echo "::error::could not read deployments: $(jq -c '.errors' <<<"$resp")"
+              echo "the token needs Workers Scripts read access as well as edit" >&2
+              exit 1
+          fi
+
+          latest=$(jq -r '.result.deployments | sort_by(.created_on) | last | .created_on' <<<"$resp")
+          echo "most recent promotion: $latest"
+
+          # A promotion older than this run means wrangler uploaded a version
+          # and stopped -- the exact silent failure being guarded against.
+          age=$(( $(date -u +%s) - $(date -u -d "$latest" +%s) ))
+          echo "promoted $age seconds ago"
+          if [ "$age" -gt 900 ]; then
+              echo "::error::no promotion from this run; newest deployment is ${age}s old"
+              exit 1
+          fi
+          echo "a new deployment was promoted by this run"
+
+      # Informational only. The edge cache can lag a promotion by minutes, so
+      # a mismatch here is not grounds to fail a deploy that Cloudflare has
+      # already confirmed.
+      - name: Report what the edge is serving
+        continue-on-error: true
+        run: |
+          built=$(basename "$(ls dist/assets/index-*.js | head -1)")
+          live=$(curl -s --max-time 20 "https://slofi.live/?_cb=$(date +%s)" \
+                 | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1) || true
+          echo "built: $built"
+          echo "edge:  ${live:-<not matched>}"
+          [ "$(basename "${live:-x}")" = "$built" ] \
+              && echo "edge is already serving this build" \
+              || echo "edge has not caught up yet, which is normal immediately after a deploy"

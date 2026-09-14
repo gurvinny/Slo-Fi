@@ -15,7 +15,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci && npm run build
-      - uses: treosh/lighthouse-ci-action@v11
+      - uses: treosh/lighthouse-ci-action@v12
         with:
           configPath: ./lighthouserc.json
           # Run 3 times and assert on the median (see lighthouserc.json) so a

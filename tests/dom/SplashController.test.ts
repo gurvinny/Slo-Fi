@@ -164,3 +164,49 @@ describe('SplashController', () => {
     expect(splash()!.style.getPropertyValue('--clip-cy')).toBe('0.0%')
   })
 })
+
+describe('splash accessibility', () => {
+  afterEach(() => { resetDom() })
+
+  // #splash carried aria-hidden="true" while wrapping #splashCta, the only way
+  // a desktop visitor dismisses it. aria-hidden on an ancestor of an operable
+  // control is a WCAG violation with a nasty shape: a screen reader announces
+  // nothing, while a keyboard user can still tab to a button assistive tech
+  // insists does not exist, so the app opens behind an invisible wall.
+  //
+  // Walking up from the button rather than asserting on #splash directly means
+  // this still fails if the attribute reappears on any wrapper in between.
+  it('leaves no aria-hidden ancestor above the dismiss button', () => {
+    mountFixture('#splash')
+
+    const hidden: string[] = []
+    for (let el = cta().parentElement; el; el = el.parentElement) {
+      if (el.getAttribute('aria-hidden') === 'true') {
+        hidden.push(el.id ? `#${el.id}` : el.className || el.tagName)
+      }
+    }
+
+    expect(hidden, `aria-hidden ancestors of #splashCta: ${hidden.join(', ')}`)
+      .toEqual([])
+  })
+
+  // The decorative children should keep theirs -- the fix is to remove it from
+  // the operable branch, not to strip it everywhere. Without this, deleting
+  // every aria-hidden in the file would satisfy the test above.
+  it('keeps aria-hidden on the purely decorative elements', () => {
+    const root = mountFixture('#splash')
+
+    for (const sel of ['.splash-bracket', '.splash-scanline', '.splash-eq', '.splash-version']) {
+      const el = root.querySelector(sel)
+      expect(el, `${sel} should exist in index.html`).not.toBeNull()
+      expect(el!.getAttribute('aria-hidden'), `${sel} should stay hidden`).toBe('true')
+    }
+  })
+
+  it('gives the dismiss button an accessible name', () => {
+    mountFixture('#splash')
+    const name = cta().getAttribute('aria-label') ?? cta().textContent?.trim() ?? ''
+    expect(name.length, 'the CTA needs a name assistive tech can announce')
+      .toBeGreaterThan(0)
+  })
+})

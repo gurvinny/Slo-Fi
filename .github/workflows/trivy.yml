@@ -4,6 +4,25 @@
 # Covers the gap CodeQL leaves: CodeQL analyses source, not container base
 # images or Dockerfile configuration. Findings upload to the Security tab
 # alongside the CodeQL ones.
+#
+# On failing vs reporting -- the two jobs here deliberately differ.
+#
+# `Trivy repository scan` GATES: `ignore-unfixed: true` with `exit-code: 1`.
+# The original reasoning for never failing still holds -- a CVE with no patch
+# available must not block a merge, because there is nothing the merge could do
+# about it. `ignore-unfixed` encodes exactly that exemption and nothing more,
+# leaving the actionable set: findings with a fix already published, in code
+# and dependencies this repo controls. Those should block. Measured clean at
+# the time this gate was armed (0 vulns, 0 misconfigs).
+#
+# `Trivy base images (report)` does NOT gate, and its name says so. It scans
+# upstream images this project does not author, where the only available fix is
+# bumping a tag -- which is Dependabot's job, not a merge gate's. Both bases
+# currently carry fixed CRITICAL/HIGH CVEs (node-tar in node:20-alpine,
+# util-linux in nginx:alpine), so gating here would mean a check that is red on
+# every PR regardless of its contents. A permanently red check trains you to
+# ignore red, which fails the same way a green check that cannot fail does.
+# Read this job's output; do not read its status.
 name: Trivy
 
 on:
@@ -19,6 +38,31 @@ permissions:
   security-events: write
 
 jobs:
+  # The base images are read out of the Dockerfile rather than listed here.
+  # Hardcoding them meant a node bump could merge while Trivy kept scanning the
+  # old base forever -- a green check about an image the project no longer
+  # ships, which is worse than no check.
+  prepare:
+    name: Resolve base images
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.parse.outputs.images }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Parse FROM lines
+        id: parse
+        run: |
+          images=$(grep -iE '^[[:space:]]*FROM[[:space:]]' Dockerfile \
+            | awk '{print $2}' \
+            | sort -u \
+            | jq -R . | jq -sc .)
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+          echo "resolved from Dockerfile: $images"
+          # An empty matrix would silently scan nothing and still report green.
+          [ "$images" != "[]" ] \
+            || { echo "::error::no FROM lines found in Dockerfile"; exit 1; }
+
   repo:
     name: Trivy repository scan
     runs-on: ubuntu-latest
@@ -27,7 +71,12 @@ jobs:
 
       # Dependency vulnerabilities, Dockerfile misconfiguration and any
       # committed credential shapes, in one pass over the tree.
-      - name: Scan filesystem
+      #
+      # Run twice on purpose: the SARIF pass always succeeds so the Security tab
+      # is populated even on a failing run, then the gate pass decides the
+      # result. A single step cannot do both -- a non-zero exit skips the
+      # upload, and the findings would be lost exactly when they matter most.
+      - name: Scan filesystem (report)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
@@ -36,26 +85,38 @@ jobs:
           severity: CRITICAL,HIGH
           format: sarif
           output: trivy-fs.sarif
-          # Report rather than fail: the Security tab is the signal, and a
-          # base-image CVE with no patch available should not block a merge.
           exit-code: "0"
 
       - name: Upload results
+        if: ${{ !cancelled() }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
 
+      - name: Scan filesystem (gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          format: table
+          ignore-unfixed: true
+          exit-code: "1"
+
   images:
-    name: Trivy base image scan
+    name: Trivy base images (report)
     runs-on: ubuntu-latest
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
-        # The base image the Dockerfile pins, scanned directly so a CVE in
-        # the base is visible without building the image.
-        image: [ "node:20-alpine", "nginx:alpine" ]
+        image: ${{ fromJSON(needs.prepare.outputs.images) }}
     steps:
+      # Informational by design -- see the note at the top of this file. The
+      # findings are the output, not the status. `ignore-unfixed` is still set
+      # so the table shows only what a tag bump could actually resolve.
       - name: Scan ${{ matrix.image }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -63,4 +124,5 @@ jobs:
           image-ref: ${{ matrix.image }}
           severity: CRITICAL,HIGH
           format: table
+          ignore-unfixed: true
           exit-code: "0"

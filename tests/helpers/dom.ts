@@ -131,3 +131,124 @@ export function recordCanvas2D(): Ctx2DCall[] {
 export function drawSequence(calls: Ctx2DCall[]): string[] {
   return calls.map((c) => c.method)
 }
+
+// ── Mobile browser APIs ──────────────────────────────────────────────────────
+// jsdom implements none of the following. Each one is reached through an
+// `in navigator` / optional-call guard in the source, so leaving them absent
+// tests only the unsupported-browser path -- which is a real branch, but not
+// the one the mobile behaviour lives in.
+
+export type MediaSessionStub = {
+  handlers: Map<string, ((details: { seekTime?: number; seekOffset?: number }) => void) | null>
+  metadata: unknown
+  playbackState: string
+  positionStates: unknown[]
+  invoke(action: string, details?: { seekTime?: number; seekOffset?: number }): void
+}
+
+/** Install a recording navigator.mediaSession plus the MediaMetadata ctor. */
+export function stubMediaSession(opts: { positionStateThrows?: boolean } = {}): MediaSessionStub {
+  const handlers = new Map<string, ((d: never) => void) | null>()
+  const positionStates: unknown[] = []
+
+  const ms = {
+    metadata: null as unknown,
+    playbackState: 'none',
+    setActionHandler: (action: string, fn: ((d: never) => void) | null) => {
+      handlers.set(action, fn)
+    },
+    setPositionState: (state: unknown) => {
+      if (opts.positionStateThrows) throw new Error('position > duration')
+      positionStates.push(state)
+    },
+  }
+
+  Object.defineProperty(window.navigator, 'mediaSession', {
+    configurable: true, writable: true, value: ms,
+  })
+  ;(window as unknown as Record<string, unknown>).MediaMetadata =
+    class { constructor(init: unknown) { Object.assign(this, init) } }
+
+  return {
+    handlers: handlers as MediaSessionStub['handlers'],
+    positionStates,
+    get metadata() { return ms.metadata },
+    get playbackState() { return ms.playbackState },
+    invoke(action, details) {
+      const fn = handlers.get(action)
+      if (!fn) throw new Error(`no mediaSession handler registered for "${action}"`)
+      fn((details ?? {}) as never)
+    },
+  }
+}
+
+/** Remove navigator.mediaSession so the `in navigator` guards take the else path. */
+export function removeMediaSession(): void {
+  // `delete` does not work on jsdom's navigator, so the property is redefined
+  // as absent instead -- `in` still reports true for an own property set to
+  // undefined, hence configurable redefinition rather than assignment.
+  Reflect.deleteProperty(window.navigator, 'mediaSession')
+}
+
+export function stubVibration(): number[][] {
+  const patterns: number[][] = []
+  Object.defineProperty(window.navigator, 'vibrate', {
+    configurable: true, writable: true,
+    value: (p: number[]) => { patterns.push(p); return true },
+  })
+  return patterns
+}
+
+export type WakeLockStub = { requests: number; releases: number; deny: boolean }
+
+export function stubWakeLock(deny = false): WakeLockStub {
+  const state: WakeLockStub = { requests: 0, releases: 0, deny }
+  Object.defineProperty(window.navigator, 'wakeLock', {
+    configurable: true, writable: true,
+    value: {
+      request: async () => {
+        state.requests++
+        if (state.deny) throw new Error('wake lock denied')
+        return { release: async () => { state.releases++ } }
+      },
+    },
+  })
+  return state
+}
+
+/** document.visibilityState is a getter, so it cannot simply be assigned. */
+export function setVisibility(value: 'visible' | 'hidden'): void {
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true, get: () => value,
+  })
+  document.dispatchEvent(new Event('visibilitychange'))
+}
+
+export type FullscreenStub = { requests: number; exits: number; element: Element | null }
+
+export function stubFullscreen(opts: { denyRequest?: boolean } = {}): FullscreenStub {
+  const state: FullscreenStub = { requests: 0, exits: 0, element: null }
+  Object.defineProperty(document, 'fullscreenElement', {
+    configurable: true, get: () => state.element,
+  })
+  // The prefixed property is not a jsdom member, so a test that defines it
+  // leaves every later fullscreen check reading "already fullscreen" from a
+  // stale getter. Reset it here rather than trusting each test to undo it.
+  Object.defineProperty(document, 'webkitFullscreenElement', {
+    configurable: true, get: () => null,
+  })
+  Object.defineProperty(document.documentElement, 'requestFullscreen', {
+    configurable: true, writable: true,
+    value: () => {
+      state.requests++
+      if (opts.denyRequest) return Promise.reject(new Error('denied'))
+      state.element = document.documentElement
+      return Promise.resolve()
+    },
+  })
+  Object.defineProperty(document, 'exitFullscreen', {
+    configurable: true, writable: true,
+    value: () => { state.exits++; state.element = null; return Promise.resolve() },
+  })
+  return state
+}

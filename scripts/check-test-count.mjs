@@ -14,7 +14,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 
-const ROOTS = ['tests/unit', 'tests/browser']
+const ROOTS = ['tests/unit', 'tests/browser', 'tests/dom']
 
 function collect(dir) {
   return readdirSync(dir).flatMap((entry) => {
@@ -28,11 +28,16 @@ const onDisk = ROOTS.flatMap(collect).sort()
 
 // --reporter=json writes to a file, not stdout -- reading stdout gets an empty
 // string and a confusing JSON parse error.
-const out = join(tmpdir(), `slofi-vitest-${process.pid}.json`)
-// Both suites are counted: the browser tests live in a second config, and a
-// guard that only knows about one of them would miss the other disappearing.
-function runSuite(configArgs) {
-  const file = join(tmpdir(), `slofi-vitest-${process.pid}-${configArgs.length}.json`)
+//
+// Every suite is counted: the browser and DOM tests live in their own configs,
+// and a guard that only knows about one of them would miss the others
+// disappearing.
+//
+// The temp file is keyed by a caller-supplied label, not by the shape of
+// configArgs -- the browser and DOM invocations are the same length, so
+// deriving the name from the arguments hands them the same path.
+function runSuite(label, configArgs) {
+  const file = join(tmpdir(), `slofi-vitest-${process.pid}-${label}.json`)
   execFileSync('npx', ['vitest', 'run', ...configArgs, '--reporter=json', `--outputFile=${file}`], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
@@ -43,7 +48,11 @@ function runSuite(configArgs) {
   return parsed
 }
 
-const reports = [runSuite([]), runSuite(['--config', 'vitest.browser.config.ts'])]
+const reports = [
+  runSuite('unit', []),
+  runSuite('browser', ['--config', 'vitest.browser.config.ts']),
+  runSuite('dom', ['--config', 'vitest.dom.config.ts']),
+]
 const report = {
   testResults: reports.flatMap((r) => r.testResults),
   numTotalTests: reports.reduce((n, r) => n + r.numTotalTests, 0),

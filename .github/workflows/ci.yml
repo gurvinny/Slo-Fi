@@ -67,7 +67,8 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      # Runs both suites AND asserts every test file on disk was collected.
+      # Runs all three suites (unit, browser, jsdom) AND asserts every test file
+      # on disk was collected.
       - name: Run tests
         run: npm run test:verify
 

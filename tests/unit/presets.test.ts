@@ -2,13 +2,16 @@
 import { describe, it, expect } from 'vitest'
 import { PRESETS } from '../../src/presets'
 import { DEFAULTS } from '../../src/config/defaults'
-import type { ReverbType } from '../../src/types'
+import type { AudioParams, ReverbType } from '../../src/types'
 
 // These bounds are the ones presets.ts documents in its own header comment.
 // The point of pinning them here is that the comment and the data can drift
 // apart silently -- a preset nudged out of range still compiles, still loads,
 // and just sounds wrong or pins a slider to its end stop.
-const RANGE: Record<string, [number, number]> = {
+// `satisfies` rather than a plain annotation: it checks every key against
+// AudioParams at compile time, so renaming a field in src/types.ts fails the
+// typecheck here instead of silently indexing undefined and testing nothing.
+const RANGE = {
   playbackRate: [0.5, 1.7],
   reverbMix: [0, 1],
   reverbDecay: [0.2, 10],
@@ -17,7 +20,7 @@ const RANGE: Record<string, [number, number]> = {
   volume: [0, 1],
   saturationDrive: [0, 1],
   pitchSemitones: [-12, 12],
-}
+} satisfies Partial<Record<keyof AudioParams, [number, number]>>
 const EQ_BANDS = ['low', 'lowMid', 'mid', 'highMid', 'high'] as const
 const REVERB_TYPES: ReverbType[] = ['room', 'hall', 'plate', 'church', 'chamber', 'spring']
 const HZ_ALLOWED = [432, 528, 639, 741, 852, 963]
@@ -40,7 +43,7 @@ describe('PRESETS', () => {
 
   describe.each(PRESETS.map((p) => [p.id, p] as const))('%s', (_id, preset) => {
     it.each(Object.entries(RANGE))('keeps %s within its documented range', (key, [lo, hi]) => {
-      const value = (preset.params as Record<string, unknown>)[key]
+      const value = preset.params[key as keyof AudioParams]
       expect(typeof value).toBe('number')
       expect(value as number).toBeGreaterThanOrEqual(lo)
       expect(value as number).toBeLessThanOrEqual(hi)

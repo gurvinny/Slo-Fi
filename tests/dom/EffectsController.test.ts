@@ -317,7 +317,7 @@ describe('EffectsController', () => {
     }
 
     it('ignores a press that misses every node', () => {
-      const c = build()
+      build()
       // Bottom-left corner: far from any node at 0 dB on the centre line.
       pointer('pointerdown', 2, H - 2)
       expect(canvas().classList.contains('eq-dragging')).toBe(false)

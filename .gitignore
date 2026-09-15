@@ -30,3 +30,6 @@ public/icon-512.png
 
 # Vitest cache
 /.vitest/
+
+# Vitest blob reports, merged by test:coverage into one report across configs
+.vitest-reports/

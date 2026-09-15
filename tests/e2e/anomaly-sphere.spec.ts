@@ -15,8 +15,6 @@ import {
   readContextLost,
   isMeaningfulError,
   measureCanvas,
-  measureTint,
-  warmth,
   watchForFailedRequests,
   skipSplash,
   frameAdvance,

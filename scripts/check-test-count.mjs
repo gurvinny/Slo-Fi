@@ -16,6 +16,27 @@ import { execFileSync } from 'node:child_process'
 
 const ROOTS = ['tests/unit', 'tests/browser', 'tests/dom']
 
+// Per-suite assertion floors.
+//
+// Proving every file on disk ran does not prove the files still contain
+// anything. A suite that collapsed from 196 assertions to 3 -- a bad merge, a
+// describe block accidentally emptied, a helper throwing in beforeEach so every
+// test is skipped -- would satisfy the collection check and report green.
+//
+// The floors are per suite rather than one total on purpose: a global floor
+// lets a collapse in one layer hide behind another layer's volume. 348 total
+// stays 348 whether the DOM suite has 196 assertions or 0 and the unit suite
+// grew to compensate.
+//
+// Set to the counts measured when each floor was armed. A floor is a minimum,
+// so adding tests never trips it; only a net removal does, and that should be
+// a deliberate act -- lower the number in the same commit that removes them.
+const FLOORS = {
+  unit: 121,
+  browser: 31,
+  dom: 196,
+}
+
 function collect(dir) {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry)
@@ -48,11 +69,12 @@ function runSuite(label, configArgs) {
   return parsed
 }
 
-const reports = [
-  runSuite('unit', []),
-  runSuite('browser', ['--config', 'vitest.browser.config.ts']),
-  runSuite('dom', ['--config', 'vitest.dom.config.ts']),
-]
+const suites = {
+  unit: runSuite('unit', []),
+  browser: runSuite('browser', ['--config', 'vitest.browser.config.ts']),
+  dom: runSuite('dom', ['--config', 'vitest.dom.config.ts']),
+}
+const reports = Object.values(suites)
 const report = {
   testResults: reports.flatMap((r) => r.testResults),
   numTotalTests: reports.reduce((n, r) => n + r.numTotalTests, 0),
@@ -67,14 +89,25 @@ const missing = onDisk.filter((f) => !executed.includes(f))
 console.log(`test files on disk: ${onDisk.length}`)
 console.log(`test files executed: ${executed.length}`)
 console.log(`assertions run:      ${report.numTotalTests}`)
+for (const [suite, floor] of Object.entries(FLOORS)) {
+  console.log(`  ${suite.padEnd(8)} ${String(suites[suite].numTotalTests).padStart(4)}  (floor ${floor})`)
+}
 
 if (missing.length > 0) {
   console.error('\nthese test files exist but were never executed:')
   for (const f of missing) console.error(`  ${f}`)
   process.exit(1)
 }
-if (report.numTotalTests === 0) {
-  console.error('\nno assertions ran at all')
+const below = Object.entries(FLOORS)
+  .map(([suite, floor]) => ({ suite, floor, actual: suites[suite].numTotalTests }))
+  .filter(({ actual, floor }) => actual < floor)
+
+if (below.length > 0) {
+  console.error('\nsuites ran fewer assertions than their floor:')
+  for (const { suite, floor, actual } of below) {
+    console.error(`  ${suite}: ${actual} < ${floor}`)
+  }
+  console.error('\nIf tests were removed on purpose, lower the floor in the same commit.')
   process.exit(1)
 }
-console.log('\nevery test file on disk was executed')
+console.log('\nevery test file on disk was executed, and every suite met its floor')

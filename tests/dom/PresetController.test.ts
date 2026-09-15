@@ -1,5 +1,5 @@
 // Author: gurvinny
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { PresetController } from '../../src/ui/PresetController'
 import { PRESETS } from '../../src/presets'
 import { mountFixture, resetDom } from '../helpers/dom'

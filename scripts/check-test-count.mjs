@@ -14,7 +14,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 
-const ROOT = 'tests/unit'
+const ROOTS = ['tests/unit', 'tests/browser']
 
 function collect(dir) {
   return readdirSync(dir).flatMap((entry) => {
@@ -24,18 +24,30 @@ function collect(dir) {
   })
 }
 
-const onDisk = collect(ROOT).sort()
+const onDisk = ROOTS.flatMap(collect).sort()
 
 // --reporter=json writes to a file, not stdout -- reading stdout gets an empty
 // string and a confusing JSON parse error.
 const out = join(tmpdir(), `slofi-vitest-${process.pid}.json`)
-execFileSync('npx', ['vitest', 'run', '--reporter=json', `--outputFile=${out}`], {
-  encoding: 'utf8',
-  maxBuffer: 64 * 1024 * 1024,
-  stdio: ['ignore', 'ignore', 'inherit'],
-})
-const report = JSON.parse(readFileSync(out, 'utf8'))
-rmSync(out, { force: true })
+// Both suites are counted: the browser tests live in a second config, and a
+// guard that only knows about one of them would miss the other disappearing.
+function runSuite(configArgs) {
+  const file = join(tmpdir(), `slofi-vitest-${process.pid}-${configArgs.length}.json`)
+  execFileSync('npx', ['vitest', 'run', ...configArgs, '--reporter=json', `--outputFile=${file}`], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'ignore', 'inherit'],
+  })
+  const parsed = JSON.parse(readFileSync(file, 'utf8'))
+  rmSync(file, { force: true })
+  return parsed
+}
+
+const reports = [runSuite([]), runSuite(['--config', 'vitest.browser.config.ts'])]
+const report = {
+  testResults: reports.flatMap((r) => r.testResults),
+  numTotalTests: reports.reduce((n, r) => n + r.numTotalTests, 0),
+}
 
 const executed = [...new Set(report.testResults.map((r) => r.name))]
   .map((p) => p.replace(`${process.cwd()}/`, ''))

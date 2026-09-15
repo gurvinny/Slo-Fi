@@ -2,22 +2,29 @@ import type { AudioEngine } from './AudioEngine'
 import { buildIR } from './AudioEngine'
 import { EffectsChain } from './EffectsChain'
 import { encodeWav } from './WavEncoder'
+import type { AudioParams } from '../types'
 
 // Max source duration we'll attempt to export (security: prevent browser OOM on huge files)
 const MAX_EXPORT_DURATION_SECONDS = 30 * 60 // 30 minutes
 
-// Renders the current track with all effects applied and triggers a WAV download.
-export async function exportAudio(engine: AudioEngine, trackName: string): Promise<void> {
-  const srcBuffer = engine.getBuffer()
-  if (!srcBuffer) throw new Error('No audio loaded')
-
-  const params = engine.getParams()
-
-  if (srcBuffer.duration > MAX_EXPORT_DURATION_SECONDS) {
-    throw new Error('Track is too long to export (max 30 minutes)')
-  }
-
-  // Output duration is longer than the source because we're slowing it down
+// Renders a source buffer through the full offline signal graph.
+//
+// Split out from exportAudio so it can be tested directly. Keeping the graph
+// in a second copy inside a test is how an export path drifts away from the
+// thing it is supposed to mirror -- the missing detune below survived exactly
+// because nothing exercised this code.
+//
+// The graph:
+//   source -> dry ------------------> master -> EffectsChain -> destination
+//          \-> convolver -> wet ----/
+//
+// Sample rate and channel count are inherited from the source buffer, and the
+// output is sized from the *slowed* duration, not the source duration.
+export async function renderExport(
+  srcBuffer: AudioBuffer,
+  params: AudioParams,
+): Promise<AudioBuffer> {
+  // Output is longer than the source whenever the track is slowed down.
   const outputDuration = srcBuffer.duration / params.playbackRate
   const outputSamples = Math.ceil(outputDuration * srcBuffer.sampleRate)
 
@@ -27,10 +34,13 @@ export async function exportAudio(engine: AudioEngine, trackName: string): Promi
     srcBuffer.sampleRate,
   )
 
-  // Rebuild the full signal graph offline with the same parameters
   const source = offline.createBufferSource()
   source.buffer = srcBuffer
   source.playbackRate.value = params.playbackRate
+  // Live playback pitches with detune (AudioEngine.ensureContext). Without the
+  // same line here the exported file comes back at the original pitch, so it
+  // disagrees with what the user just heard.
+  source.detune.value = params.pitchSemitones * 100
 
   const convolver = offline.createConvolver()
   convolver.buffer = buildIR(offline, params.reverbType, params.reverbDecay, params.reverbPreDelay, params.reverbDamping)
@@ -44,24 +54,34 @@ export async function exportAudio(engine: AudioEngine, trackName: string): Promi
   const masterGain = offline.createGain()
   masterGain.gain.value = params.volume
 
-  // source -> dry/wet reverb -> masterGain
   source.connect(dryGain)
   source.connect(convolver)
   convolver.connect(wetGain)
   dryGain.connect(masterGain)
   wetGain.connect(masterGain)
 
-  // effects chain -> offline destination
   const chain = new EffectsChain()
   const chainOut = chain.initOffline(offline, masterGain, params)
   chainOut.connect(offline.destination)
 
   source.start(0)
 
-  const rendered = await offline.startRendering()
-  const blob = encodeWav(rendered)
+  return offline.startRendering()
+}
 
-  triggerDownload(blob, sanitizeFilename(trackName))
+// Renders the current track with all effects applied and triggers a WAV download.
+export async function exportAudio(engine: AudioEngine, trackName: string): Promise<void> {
+  const srcBuffer = engine.getBuffer()
+  if (!srcBuffer) throw new Error('No audio loaded')
+
+  const params = engine.getParams()
+
+  if (srcBuffer.duration > MAX_EXPORT_DURATION_SECONDS) {
+    throw new Error('Track is too long to export (max 30 minutes)')
+  }
+
+  const rendered = await renderExport(srcBuffer, params)
+  triggerDownload(encodeWav(rendered), sanitizeFilename(trackName))
 }
 
 // Strips unsafe characters from a filename

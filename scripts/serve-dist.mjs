@@ -13,7 +13,7 @@
  * module and the dynamic import throws. A missing asset must stay a 404.
  */
 import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 
 const ROOT = resolve(process.argv[2] ?? "dist");
@@ -36,9 +36,12 @@ const TYPES = {
 };
 
 async function readIfFile(path) {
+  // One syscall, not stat-then-read. The two-step version was a TOCTOU race
+  // (CodeQL js/file-system-race) and was redundant anyway: readFile throws
+  // EISDIR on a directory and ENOENT on a missing path, which is exactly the
+  // distinction the stat call was making.
   try {
-    const s = await stat(path);
-    return s.isFile() ? await readFile(path) : null;
+    return await readFile(path);
   } catch {
     return null;
   }

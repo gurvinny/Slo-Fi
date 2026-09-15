@@ -252,3 +252,50 @@ export function stubFullscreen(opts: { denyRequest?: boolean } = {}): Fullscreen
   })
   return state
 }
+
+export type ResizeObserverStub = { instances: number; trigger(): void }
+
+/**
+ * jsdom has no ResizeObserver, and EffectsController constructs one while
+ * building its EQ DOM -- so without this the constructor throws before any of
+ * its wiring runs.
+ *
+ * The stub never observes anything on its own; `trigger()` fires every
+ * registered callback, which is how the drawer-opens-at-zero-width path gets
+ * exercised deliberately rather than by accident.
+ */
+export function stubResizeObserver(): ResizeObserverStub {
+  const callbacks: (() => void)[] = []
+  const state: ResizeObserverStub = {
+    instances: 0,
+    trigger: () => { for (const cb of callbacks) cb() },
+  }
+  ;(window as unknown as Record<string, unknown>).ResizeObserver =
+    class {
+      constructor(cb: () => void) { state.instances++; callbacks.push(cb) }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  ;(globalThis as unknown as Record<string, unknown>).ResizeObserver =
+    (window as unknown as Record<string, unknown>).ResizeObserver
+  return state
+}
+
+/**
+ * Give an element a real-looking box. jsdom reports an all-zero rect, and any
+ * code that divides by width or bails on `!W` reads that as "not laid out yet"
+ * -- so a canvas test without this silently exercises the early return.
+ */
+export function stubBoundingRect(
+  el: Element,
+  box: { width: number; height: number; left?: number; top?: number },
+): void {
+  const { width, height, left = 0, top = 0 } = box
+  el.getBoundingClientRect = () => ({
+    width, height, left, top,
+    right: left + width, bottom: top + height,
+    x: left, y: top,
+    toJSON: () => ({}),
+  }) as DOMRect
+}

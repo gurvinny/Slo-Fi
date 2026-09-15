@@ -978,11 +978,13 @@ export class AnomalySphere {
       newRenderer.toneMapping        = ACESFilmicToneMapping
       newRenderer.toneMappingExposure = 0.50
 
-      // Rebuild the EffectComposer with the new renderer
-      const { EffectComposer } = await import('three/examples/jsm/postprocessing/EffectComposer.js')
-      const { RenderPass }     = await import('three/examples/jsm/postprocessing/RenderPass.js')
-      const { UnrealBloomPass }= await import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
-      const { OutputPass }     = await import('three/examples/jsm/postprocessing/OutputPass.js')
+      // Rebuild the EffectComposer with the new renderer.
+      //
+      // These four passes are imported statically at the top of the file and
+      // used to build the WebGL composer in the constructor, so re-importing
+      // them dynamically here split nothing out -- it just made Rollup warn
+      // INEFFECTIVE_DYNAMIC_IMPORT on every build while awaiting modules that
+      // were already in memory.
 
       this.composer = new EffectComposer(newRenderer as unknown as WebGLRenderer)
       this.composer.addPass(new RenderPass(this.scene, this.camera))

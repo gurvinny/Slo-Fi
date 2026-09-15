@@ -92,6 +92,12 @@ export type Ctx2DCall = { method: string; args: unknown[] }
  * call sequence is the only honest option: it proves the draw code ran and in
  * what order, and says nothing about what it looked like. Pixel truth is the
  * browser suite's job.
+ *
+ * Property assignments (fillStyle, strokeStyle, globalAlpha, ...) are recorded
+ * as `set:<prop>` and gradient stops as `addColorStop`, because the colour
+ * strings are computed -- a theme hex that arrives 3-digit and gets an alpha
+ * byte appended produces an invalid colour, and the recorded value is the only
+ * place that is visible outside a real canvas.
  */
 export function recordCanvas2D(): Ctx2DCall[] {
   const calls: Ctx2DCall[] = []
@@ -100,23 +106,35 @@ export function recordCanvas2D(): Ctx2DCall[] {
     'moveTo', 'lineTo', 'arc', 'ellipse', 'rect', 'save', 'restore', 'translate',
     'scale', 'rotate', 'setTransform', 'drawImage', 'fillText', 'strokeText',
     'createLinearGradient', 'createRadialGradient', 'setLineDash', 'quadraticCurveTo',
-    'bezierCurveTo', 'putImageData', 'getImageData', 'measureText',
+    'bezierCurveTo', 'putImageData', 'getImageData', 'measureText', 'clip',
   ]
 
-  const ctx: Record<string, unknown> = {}
+  const target: Record<string, unknown> = {}
   for (const m of methods) {
-    ctx[m] = (...args: unknown[]) => {
+    target[m] = (...args: unknown[]) => {
       calls.push({ method: m, args })
       // The gradient builders and measureText are used for their return value,
       // not their effect -- handing back undefined makes the caller throw.
       if (m === 'createLinearGradient' || m === 'createRadialGradient') {
-        return { addColorStop: () => {} }
+        return {
+          addColorStop: (offset: number, color: string) => {
+            calls.push({ method: 'addColorStop', args: [offset, color] })
+          },
+        }
       }
       if (m === 'measureText') return { width: 0 }
       if (m === 'getImageData') return { data: new Uint8ClampedArray(4), width: 1, height: 1 }
       return undefined
     }
   }
+
+  const ctx = new Proxy(target, {
+    set(obj, prop, value) {
+      calls.push({ method: `set:${String(prop)}`, args: [value] })
+      obj[String(prop)] = value
+      return true
+    },
+  })
 
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     configurable: true,
@@ -125,6 +143,13 @@ export function recordCanvas2D(): Ctx2DCall[] {
   })
 
   return calls
+}
+
+/** Every colour string the draw pass produced, from styles and gradient stops. */
+export function drawColors(calls: Ctx2DCall[]): string[] {
+  return calls
+    .filter((c) => c.method === 'addColorStop' || /^set:(fill|stroke|shadowColor)/.test(c.method))
+    .map((c) => String(c.args[c.method === 'addColorStop' ? 1 : 0]))
 }
 
 /** Names of the recorded calls, for asserting a draw sequence. */

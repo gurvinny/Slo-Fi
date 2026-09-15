@@ -1,0 +1,136 @@
+# Slo-Fi container verification
+# Author: gurvinny
+#
+# Until this workflow existed, nothing in CI built the image. The consequence
+# was not weak evidence about the container -- it was no evidence at all, and
+# it is why a base-image bump could go green while nothing had built or run the
+# thing it changed.
+#
+# Every step below asserts something no other job can see:
+#
+#   build      -- npm ci and npm run build succeed INSIDE node:20-alpine, not
+#                 merely on the runner's Node 22.
+#   healthy    -- the HEALTHCHECK actually passes. It spent a long time unable
+#                 to: /etc/hosts maps localhost to ::1 as well, busybox wget
+#                 tries IPv6 first and does not fall back, and nginx listens on
+#                 IPv4 only. The 127.0.0.1 fix had never been verified by CI.
+#   serves     -- nginx returns the built index.html, not a default page.
+#   asset      -- a hashed chunk REFERENCED BY index.html resolves. A dead
+#                 chunk hash has reached production in this repo before.
+#   fallback   -- the SPA deep-link rewrite works, so a refresh on a nested
+#                 route is not a 404.
+#   unprivileged -- the runtime user is uid 101, not root.
+name: Docker
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: slofi:ci
+  NAME: slofi-ci
+  # Host port. The container listens on 5173 (see nginx.conf); mapping to a
+  # different host port keeps this from colliding with anything else on the
+  # runner.
+  PORT: 15173
+
+jobs:
+  image:
+    name: Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Builds BOTH stages. This is the only place the project is compiled
+      # inside its pinned base image rather than on the runner's toolchain.
+      - name: Build image
+        run: docker build -t "$IMAGE" .
+
+      - name: Start container
+        run: docker run -d --name "$NAME" -p "$PORT:5173" "$IMAGE"
+
+      # Poll, never sleep. A fixed sleep either flakes or wastes time, and the
+      # status transition itself is the assertion: 'starting' -> 'healthy'.
+      # 'unhealthy' fails immediately rather than burning the full timeout.
+      - name: Wait for HEALTHCHECK to report healthy
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' "$NAME")
+            echo "t+$((i * 5))s: $status"
+            case "$status" in
+              healthy)
+                exit 0
+                ;;
+              unhealthy)
+                echo "::error::container reported unhealthy"
+                docker inspect --format '{{json .State.Health}}' "$NAME"
+                exit 1
+                ;;
+            esac
+            sleep 5
+          done
+          echo "::error::container never became healthy within 150s"
+          docker inspect --format '{{json .State.Health}}' "$NAME"
+          exit 1
+
+      - name: Serves the built index.html
+        run: |
+          out=$(curl -sS -o index.html -w '%{http_code} %{content_type}' \
+            "http://127.0.0.1:$PORT/")
+          echo "GET / -> $out"
+          case "$out" in
+            "200 text/html"*) ;;
+            *) echo "::error::expected 200 text/html, got: $out"; exit 1 ;;
+          esac
+          # A default nginx welcome page is also 200 text/html, so prove it is
+          # OUR build that is being served.
+          grep -q 'id="app"' index.html \
+            || { echo "::error::served page is not the Slo-Fi build"; exit 1; }
+
+      # The hash is parsed out of the served markup rather than hardcoded, so
+      # this follows the build instead of drifting from it.
+      - name: A hashed asset referenced by index.html resolves
+        run: |
+          asset=$(grep -oE '/assets/[A-Za-z0-9._-]+\.(js|css)' index.html | head -1)
+          [ -n "$asset" ] \
+            || { echo "::error::index.html references no hashed asset"; exit 1; }
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT$asset")
+          echo "GET $asset -> $code"
+          [ "$code" = "200" ] \
+            || { echo "::error::$asset returned $code"; exit 1; }
+
+      # Verified by inversion: with try_files' /index.html fallback replaced by
+      # =404 this step returns 404 while / stays 200, so it fails for the right
+      # reason and not merely because the server is down.
+      - name: SPA deep links fall back to index.html
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            "http://127.0.0.1:$PORT/some/deep/route")
+          echo "GET /some/deep/route -> $code"
+          [ "$code" = "200" ] \
+            || { echo "::error::deep link returned $code, SPA fallback is broken"; exit 1; }
+
+      - name: Runs unprivileged
+        run: |
+          uid=$(docker exec "$NAME" id -u)
+          echo "runtime uid: $uid"
+          [ "$uid" = "101" ] \
+            || { echo "::error::expected uid 101, got $uid"; exit 1; }
+
+      - name: Container logs
+        if: ${{ !cancelled() }}
+        run: docker logs "$NAME"
+
+      - name: Stop container
+        if: ${{ always() }}
+        run: docker rm -f "$NAME" || true

@@ -10,10 +10,34 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 4173;
 
+// Software GL. Without these Chromium reports no WebGL at all on a GPU-less
+// host and the orb never mounts.
+const SOFTWARE_GL = [
+  "--use-gl=angle",
+  "--use-angle=swiftshader",
+  "--enable-unsafe-swiftshader",
+];
+
+// Ask for real hardware GL. Specs that care read the renderer back and skip when
+// this silently falls back -- Chromium does not error, it just uses SwiftShader,
+// and a project that claimed hardware coverage while running software would be
+// exactly the kind of green check that proves nothing.
+const HARDWARE_GL = [
+  "--use-gl=angle",
+  "--use-angle=gl",
+  "--ignore-gpu-blocklist",
+  "--enable-gpu-rasterization",
+];
+
+const SHARED = ["--disable-dev-shm-usage", "--autoplay-policy=no-user-gesture-required"];
+
 export default defineConfig({
   testDir: "./tests/e2e",
-  // WebGL under SwiftShader is slow to reach a first frame.
-  timeout: 60_000,
+  // WebGL under SwiftShader is slow to reach a first frame, and several specs do
+  // two full decode + detect + render cycles. 60s left no margin on a loaded
+  // host: two tests timed out at 60s having already done most of their work,
+  // then passed comfortably in 45-56s when given room.
+  timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
@@ -23,20 +47,39 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${PORT}`,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
-    launchOptions: {
-      args: [
-        // Force a working software GL stack on a GPU-less runner. Without
-        // these Chromium reports no WebGL at all and the orb never mounts.
-        "--use-gl=angle",
-        "--use-angle=swiftshader",
-        "--enable-unsafe-swiftshader",
-        "--disable-dev-shm-usage",
-        // decodeAudioData and the analyser must work without a user gesture.
-        "--autoplay-policy=no-user-gesture-required",
-      ],
-    },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+
+  // The orb is a different scene per environment, not one scene at different
+  // sizes. AnomalySphere branches on a mobile UA regex (AnomalySphere.ts:778)
+  // and that branch changes the geometry (icosahedron detail 4 vs 6), the
+  // particle count, antialiasing, powerPreference, the pixel-ratio cap, the
+  // bloom resolution, and drops the grain and glitch passes entirely. A
+  // mobile-only shader or geometry failure is invisible to a desktop-only run.
+  projects: [
+    {
+      name: "desktop-software-gl",
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: { args: [...SOFTWARE_GL, ...SHARED] },
+      },
+    },
+    {
+      name: "mobile-software-gl",
+      use: {
+        // Pixel 5 supplies the mobile UA the renderer actually branches on, so
+        // the mobile path is entered for real rather than stubbed.
+        ...devices["Pixel 5"],
+        launchOptions: { args: [...SOFTWARE_GL, ...SHARED] },
+      },
+    },
+    {
+      name: "desktop-hardware-gl",
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: { args: [...HARDWARE_GL, ...SHARED] },
+      },
+    },
+  ],
   webServer: {
     command: `node scripts/serve-dist.mjs dist`,
     env: { PORT: String(PORT) },

@@ -11,6 +11,10 @@
     "build": "node scripts/generate-icons.mjs && tsc && vite build && node scripts/precache-sw.mjs",
     "preview": "npm run build && wrangler dev",
     "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:verify": "node scripts/check-test-count.mjs",
     "deploy": "npm run build && wrangler deploy",
     "test:e2e": "playwright test"
   },
@@ -19,10 +23,12 @@
     "@playwright/test": "^1.63.0",
     "@types/pngjs": "^6.0.5",
     "@types/three": "^0.183.1",
+    "@vitest/coverage-v8": "^5.0.0",
     "pngjs": "^7.0.0",
     "sharp": "^0.35.4",
     "typescript": "^5.9.3",
     "vite": "^8.0.1",
+    "vitest": "^5.0.0",
     "wrangler": "^4.84.0"
   },
   "dependencies": {

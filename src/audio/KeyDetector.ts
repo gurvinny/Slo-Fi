@@ -59,7 +59,14 @@ export function detectKey(buffer: AudioBuffer): DetectedKey | null {
     ? Float32Array.from({ length: ch0.length }, (_, i) => (ch0[i] + ch1[i]) * 0.5)
     : ch0
 
-  const fftSize = 4096
+  // 16384, not 4096. The scan starts at C2 (~65 Hz), but a semitone there is
+  // only 3.9 Hz apart while a 4096-point FFT at 44.1 kHz has 10.8 Hz bins --
+  // so the bottom two octaves of the detector's own stated range were being
+  // smeared across neighbouring pitch classes, which is where bass energy
+  // lives. Measured on synthetic triads: 4096 identified 6/12 major roots at
+  // 44.1 kHz and 8/12 at 48 kHz; 16384 identifies 12/12 at both. Accuracy
+  // varying with sample rate was the tell.
+  const fftSize = 16384
   const chroma = new Float64Array(12)
 
   // Sample up to 20 frames evenly spaced through the track

@@ -311,7 +311,12 @@
   </style>
   </head>
   <body>
-    <div id="splash" aria-hidden="true">
+    <!-- No aria-hidden here: this element wraps #splashCta, the only way a
+         desktop visitor dismisses the splash. Hiding an operable control's
+         ancestor from assistive tech while leaving it in the tab order is a
+         WCAG violation. The decorative children below carry aria-hidden
+         individually, which is where it belongs. -->
+    <div id="splash">
       <!-- Corner brackets — appear after mark traces in -->
       <span class="splash-bracket splash-bracket--tl" aria-hidden="true"></span>
       <span class="splash-bracket splash-bracket--tr" aria-hidden="true"></span>

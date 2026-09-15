@@ -16,6 +16,8 @@ import {
   isMeaningfulError,
   measureCanvas,
   webglCanvasIndex,
+  frameAdvance,
+  skipSplash,
 } from "./helpers";
 import { makeWavFile } from "./fixtures";
 
@@ -51,6 +53,7 @@ test("home page loads with no console errors or uncaught exceptions", async ({ p
 
 test("the orb canvas mounts and draws a non-blank frame", async ({ page }) => {
   const faults = watchForFaults(page);
+  await skipSplash(page);
   await page.goto("/", { waitUntil: "networkidle" });
 
   await loadTrack(page);
@@ -70,6 +73,32 @@ test("the orb canvas mounts and draws a non-blank frame", async ({ page }) => {
     .toBeGreaterThan(12);
   expect(stats.nonBlankRatio, `share of lit pixels (${JSON.stringify(stats)})`)
     .toBeGreaterThan(0.01);
+
+  // Neither assertion above can fail on a dead renderer, so on their own they
+  // do not test what this test is named. Measured by deleting the main-loop
+  // `composer.render()` call: the orb never draws a single frame, and both
+  // still passed -- the canvas keeps whatever pixels it last painted.
+  // Only a two-capture comparison separates a live orb from a frozen one.
+  //
+  // Measured on desktop-software-gl:
+  //   live orb      0.0871
+  //   dead renderer 0.0045
+  //   floor         0.005
+  //
+  // The 0.0045 on a dead renderer is not the orb -- it is the page showing
+  // through a transparent canvas. That leaves the failing side a thin margin
+  // (0.0045 against 0.005) while the passing side has plenty, so the floor is
+  // kept in step with render-matrix.spec.ts rather than raised on one
+  // renderer's numbers: an absolute threshold tuned on desktop has already
+  // failed a healthy build on the mobile project once.
+  //
+  // This measurement only works with the splash skipped. Without it the splash
+  // animates over the canvas and its own decay is what gets measured -- the
+  // same clean build read 0.0122 in one run and under 0.005 in the next,
+  // straddling the threshold from either side.
+  const motion = await frameAdvance(page, canvas);
+  expect(motion, `share of pixels changing between frames: ${motion}`)
+    .toBeGreaterThan(0.005);
 
   expect(await readContextLost(page), "WebGL context was lost").toBe(false);
   expect(faults.pageErrors, "uncaught exceptions").toEqual([]);

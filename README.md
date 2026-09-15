@@ -16,7 +16,10 @@
 
 <br/>
 
-[![Version](https://img.shields.io/badge/Version-3.0.0-A855F7.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/gurvinny/Slo-Fi/ci.yml?branch=main&style=flat-square&label=CI&color=10B981)](../../actions/workflows/ci.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/gurvinny/Slo-Fi/codeql.yml?branch=main&style=flat-square&label=CodeQL&color=10B981)](../../actions/workflows/codeql.yml)
+[![Browser QA](https://img.shields.io/github/actions/workflow/status/gurvinny/Slo-Fi/browser-qa.yml?branch=main&style=flat-square&label=Browser%20QA&color=10B981)](../../actions/workflows/browser-qa.yml)
+[![Version](https://img.shields.io/badge/Version-3.0.0--beta.1-A855F7.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/releases)
 [![License](https://img.shields.io/badge/License-MIT-A855F7.svg?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r183-black.svg?style=flat-square&logo=threedotjs&logoColor=white)](https://threejs.org/)
@@ -147,8 +150,6 @@ MIT — see [LICENSE](LICENSE).
 
 <div align="center">
 
-[![GitHub Stars](https://img.shields.io/github/stars/gurvinny/Slo-Fi?style=flat-square&color=A855F7&label=Stars)](https://github.com/gurvinny/Slo-Fi/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/gurvinny/Slo-Fi?style=flat-square&color=06B6D4&label=Forks)](https://github.com/gurvinny/Slo-Fi/network/members)
 [![GitHub Issues](https://img.shields.io/github/issues/gurvinny/Slo-Fi?style=flat-square&color=A855F7&label=Issues)](https://github.com/gurvinny/Slo-Fi/issues)
 
 </div>

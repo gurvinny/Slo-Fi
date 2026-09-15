@@ -24,3 +24,9 @@ public/icon-512.png
 
 # Lighthouse CI local run output
 /.lighthouseci/
+
+# Vitest coverage output
+/coverage/
+
+# Vitest cache
+/.vitest/

@@ -62,7 +62,7 @@ export const PRESETS: PresetDefinition[] = [
       reverbDamping:   0.50,
       volume:          0.80,
       eq:              { low: 3, lowMid: 1.5, mid: -1, highMid: -2, high: -5 },
-      chorus:          { rate: 0, depth: 0 },
+      chorus:          { rate: 0.1, depth: 0 },
       saturationDrive: 0,
       abyss:           { depth: 0, resonance: 0 },
       hzFrequency:     null,

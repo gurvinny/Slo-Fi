@@ -1,9 +1,13 @@
 # Slo-Fi CI
 # Author: gurvinny
 #
-# The merge gate. There is no test suite in this repo yet, so this verifies
-# the two things a dependency bump can break: that the project still
-# typechecks, and that it still builds.
+# The merge gate. `Build & Typecheck` verifies the two things a dependency bump
+# can break -- that the project still typechecks and still builds -- and
+# `Tests` runs the unit suite over the DSP and data layers.
+#
+# The two are separate jobs so a failure names itself: a red `Tests` is a
+# behaviour regression, a red `Build & Typecheck` is a compile or bundling
+# problem, and they are rarely fixed the same way.
 name: CI
 
 on:
@@ -39,3 +43,37 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Runs the suite AND asserts every test file on disk was collected.
+      # A test file that is silently never executed is the one failure a test
+      # suite cannot catch by testing harder -- SPECTRE's runner once executed
+      # 4 of 28 files and reported success.
+      - name: Run unit tests
+        run: npm run test:verify
+
+      - name: Coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore

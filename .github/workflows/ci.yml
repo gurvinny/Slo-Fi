@@ -59,11 +59,16 @@ jobs:
       - name: Install
         run: npm ci
 
-      # Runs the suite AND asserts every test file on disk was collected.
       # A test file that is silently never executed is the one failure a test
       # suite cannot catch by testing harder -- SPECTRE's runner once executed
       # 4 of 28 files and reported success.
-      - name: Run unit tests
+      # Chromium is needed because test:verify also counts the browser suite,
+      # which runs the real Web Audio render path.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Runs both suites AND asserts every test file on disk was collected.
+      - name: Run tests
         run: npm run test:verify
 
       - name: Coverage

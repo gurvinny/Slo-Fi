@@ -34,7 +34,7 @@ const ROOTS = ['tests/unit', 'tests/browser', 'tests/dom']
 const FLOORS = {
   unit: 121,
   browser: 31,
-  dom: 196,
+  dom: 277,
 }
 
 function collect(dir) {

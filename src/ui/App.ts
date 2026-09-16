@@ -1388,7 +1388,7 @@ export class App {
   private applyDefaults(): void {
     const d = DEFAULTS
 
-    this.applyTheme(d.colorTheme)
+    this.applyTheme(d.colorTheme, false)
 
     this.speedSlider.value       = String(Math.round(d.speed * 100))
     this.speedValue.textContent  = `${d.speed.toFixed(2)}x`
@@ -1584,7 +1584,11 @@ export class App {
     }
   }
 
-  private applyTheme(theme: string): void {
+  // `persist` is false for exactly one caller: applyDefaults(), which runs
+  // before loadSettings(). Saving there wrote the defaults over the stored
+  // settings blob before it had been read, so every saved setting was lost on
+  // the next load and the app always came back at its defaults.
+  private applyTheme(theme: string, persist = true): void {
     this.settingsDrawer.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('theme-chip--active'))
     const chip = this.settingsDrawer.querySelector<HTMLButtonElement>(`.theme-chip[data-theme="${theme}"]`)
     chip?.classList.add('theme-chip--active')
@@ -1594,7 +1598,7 @@ export class App {
       document.documentElement.dataset.theme = theme
     }
     this.sphere?.setColorTheme(theme)
-    this.saveSettings()
+    if (persist) this.saveSettings()
     // rAF ensures the browser has recalculated the CSS cascade before we read
     // the new --accent / --teal vars from getComputedStyle inside waveform.draw().
     requestAnimationFrame(() => this.waveform.redraw())

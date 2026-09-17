@@ -12,19 +12,41 @@ export const CONFIG = 'vitest.config.ts'
 
 export const MUTATIONS = [
   ['the ripple term is computed and then not summed (layer 2 invisible)',
-   '+ idle + swell + shimmer + ripple',
-   '+ idle + swell + shimmer',
+   'clamp(shimmer + ripple, -0.16, 0.16)',
+   'clamp(shimmer, -0.16, 0.16)',
    'sums all three ANOMALY III terms into the displacement it outputs'],
 
   ['the radius swell is computed and then not summed (layer 1 invisible)',
-   '+ idle + swell + shimmer + ripple',
-   '+ idle + shimmer + ripple',
+   '+ d4 + idle + swell,',
+   '+ d4 + idle,',
    'sums all three ANOMALY III terms into the displacement it outputs'],
 
   ['the shimmer term is computed and then not summed (layer 3 invisible)',
-   '+ idle + swell + shimmer + ripple',
-   '+ idle + swell + ripple',
+   'clamp(shimmer + ripple, -0.16, 0.16)',
+   'clamp(ripple, -0.16, 0.16)',
    'sums all three ANOMALY III terms into the displacement it outputs'],
+
+  ['the transient budget is dropped from the output, discarding layers 2 and 3',
+   'float disp = (mass + transient)',
+   'float disp = (mass)',
+   'sums all three ANOMALY III terms into the displacement it outputs'],
+
+  // The regression that actually shipped: one clamp over every term, so the
+  // sustained ones eat the whole budget and the transients render as nothing.
+  ['the two budgets collapse back into one, starving the transients',
+   'float mass      = clamp(dSub + d1 + d2 + d3 + d4 + idle + swell, -0.36, 0.36);\n  float transient = clamp(shimmer + ripple, -0.16, 0.16);',
+   'float mass      = clamp(dSub + d1 + d2 + d3 + d4 + idle + swell + shimmer + ripple, -0.52, 0.52);\n  float transient = 0.0;',
+   'reserves the transients a budget the sustained terms cannot eat'],
+
+  ['the transient budget is shaved below one ripple\'s amplitude',
+   'clamp(shimmer + ripple, -0.16, 0.16)',
+   'clamp(shimmer + ripple, -0.05, 0.05)',
+   'reserves the transients a budget the sustained terms cannot eat'],
+
+  ['the total displacement bound creeps upward, changing the silhouette',
+   'clamp(dSub + d1 + d2 + d3 + d4 + idle + swell, -0.36, 0.36)',
+   'clamp(dSub + d1 + d2 + d3 + d4 + idle + swell, -0.52, 0.52)',
+   'keeps the total displacement bound the orb was designed around'],
 
   ['the ripple loop stops short of the bank capacity, dropping the newest ripples',
    'for (int i = 0; i < 4; i++) {',

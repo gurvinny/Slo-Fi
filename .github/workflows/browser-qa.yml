@@ -68,10 +68,35 @@ jobs:
       - name: Install
         run: npm ci
 
-      # Browser binary and its system libraries. Pinned by the lockfile via
-      # @playwright/test, so this cannot drift from the installed client.
+      # Cache the browser binary across shards. Eight runners each downloading
+      # ~180MB of Chromium is the single largest fixed cost left in this job --
+      # measured at roughly 30-45s of a ~46s setup.
+      #
+      # Keyed on the resolved @playwright/test version rather than on a lockfile
+      # hash: the binary revision is pinned by that package, so an unrelated
+      # dependency bump must not evict a still-valid browser, and a Playwright
+      # bump must evict it. Deriving the key from package-lock.json directly
+      # would get both of those backwards.
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Chromium
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      # The cache holds the browser, never the apt packages it links against, so
+      # install-deps still runs on a hit. It is the cheap half.
       - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Install Chromium system deps
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: Build
         run: npm run build

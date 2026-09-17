@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "rm -rf .vitest-reports && vitest run --coverage --reporter=blob --outputFile=.vitest-reports/unit.json && vitest run --config vitest.dom.config.ts --coverage --reporter=blob --outputFile=.vitest-reports/dom.json && vitest --mergeReports=.vitest-reports --coverage",
+    "test:mutate": "node scripts/mutate.mjs",
     "test:verify": "node scripts/check-test-count.mjs",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:dom": "vitest run --config vitest.dom.config.ts",

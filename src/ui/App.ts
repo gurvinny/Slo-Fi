@@ -1264,6 +1264,12 @@ export class App {
         this.sphere = new AnomalySphere(
           document.getElementById('anomaly') as HTMLElement,
           this.engine.analyserNode,
+          // The orb's own two analysers, off the same post-effects tap. Kept
+          // separate from the node above because that one is also read by the
+          // EQ spectrum ghosts and the lite-bass loop, and the orb needs
+          // smoothingTimeConstant 0 on its own.
+          this.engine.orbAnalyserFast,
+          this.engine.orbAnalyserFine,
         )
         this.sphere.onEnergyUpdate = (bass, mid, treble, uiBass, uiTreble) => {
           // On mobile, skip CSS var updates entirely — setProperty() on aurora vars

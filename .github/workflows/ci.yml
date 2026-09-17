@@ -44,6 +44,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      # The service worker precaches with cache.addAll, which is atomic and
+      # unconditional -- every URL in that list is fetched by every visitor
+      # before the worker activates. It once carried ~197 KB gzip of WebGPU
+      # code the runtime cannot reach. tests/unit/precache.test.ts covers the
+      # selection; this reads the built dist/sw.js, which is the only thing
+      # that proves the build wired it in.
+      - name: Verify the shipped precache list
+        run: node scripts/check-precache.mjs
+
   test:
     name: Tests
     runs-on: ubuntu-latest

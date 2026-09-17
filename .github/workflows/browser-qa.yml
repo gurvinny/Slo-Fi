@@ -7,8 +7,16 @@
 # worker serving an index.html with dead chunk hashes. This drives a real
 # browser against the built output instead.
 #
-# Advisory for now: reports on every PR but is not a required status check.
-# Promote it into the ruleset once it has proven stable.
+# Sharded across runners, not across workers. SwiftShader is CPU-bound and the
+# suite's 120s timeouts were tuned after tests timed out at 60s on a loaded
+# host, so raising `workers` would buy parallelism by making every test slower
+# and reintroduce exactly that failure. Each shard keeps workers: 1 and gets a
+# runner to itself.
+#
+# NOTE: the aggregate job below is named "Browser QA" because that is the
+# required status check. Matrix jobs report as "... (1)", "... (2)" and so on,
+# so promoting the matrix itself would leave the required context permanently
+# pending and deadlock every PR. Keep the name in sync with the ruleset.
 name: Browser QA
 
 on:
@@ -25,9 +33,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e:
-    name: Browser QA
+  shard:
+    name: shard ${{ matrix.shard }} of 4
     runs-on: ubuntu-latest
+    strategy:
+      # Report every shard's result. Cancelling siblings on the first failure
+      # hides whether a break is one spec or the whole renderer, which is the
+      # first thing worth knowing.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
 
@@ -48,15 +63,67 @@ jobs:
         run: npm run build
 
       - name: Run browser QA
-        run: npm run test:e2e
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4 --reporter=blob
 
-      - name: Upload report and failure screenshots
+      - name: Upload blob report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: browser-qa-report
-          path: |
-            playwright-report/
-            test-results/
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Upload failure screenshots
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-qa-failures-${{ matrix.shard }}
+          path: test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  e2e:
+    name: Browser QA
+    runs-on: ubuntu-latest
+    needs: shard
+    # Runs even when a shard fails, so the merged report covers the failure
+    # rather than only ever describing green runs.
+    if: ${{ !cancelled() }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Download shard reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge into one report
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-qa-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # The merge step above succeeds on a report full of failures, so the
+      # shard results are what this check actually reports. Without this the
+      # required check would go green whenever the reporting worked.
+      - name: Report shard results
+        if: ${{ needs.shard.result != 'success' }}
+        run: |
+          echo "::error::at least one Browser QA shard failed (${{ needs.shard.result }})"
+          exit 1

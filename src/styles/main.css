@@ -20,8 +20,8 @@
   --color-border-2:     #202033;
 
   --color-text:         #d6d6ee;
-  --color-text-dim:     #74748e;
-  --color-text-muted:   #36364a;
+  --color-text-dim:     #808098;
+  --color-text-muted:   #66667e;
 
   --color-accent:       #7c4dff;
   --color-accent-bright:#a37bff;
@@ -2941,7 +2941,7 @@ body.is-paused .site-footer {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: 0.8rem;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
@@ -4124,7 +4124,7 @@ html:not(.has-splash) .landing-badge {
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;

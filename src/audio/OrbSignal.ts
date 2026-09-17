@@ -8,8 +8,9 @@
 // both came from the same spectral-flux signal, so damping one damped the
 // other and the orb could be smooth or on-beat but not both.
 import { alpha, tauFromLerp, AsymEnvelope } from './envelope'
-import { bandEnergy, freqToBin, lowCentroidHz } from './spectrum'
-import { RippleBank, type Ripple } from './RippleBank'
+import { bandEnergy, freqToBin, lowCentroidHz, positiveFlux } from './spectrum'
+import { RippleBank, RIPPLE_CAPACITY, RIPPLE_STRIDE, type Ripple } from './RippleBank'
+import { OnsetDetector } from './OnsetDetector'
 
 export interface OrbSignalOptions {
   sampleRate: number
@@ -73,10 +74,32 @@ const MIN_RANGE = 0.12
 // saturate harmlessly, but anything integrating dt would jump visibly.
 const MAX_DT = 0.1
 
+// Onsets are measured over the whole low range, not over layer 1's narrow
+// follow band. The two want different things: layer 1 compares mean energy
+// ACROSS tracks, so its band has to be a fixed width or a wide band dilutes a
+// narrow note (the band-drift bug). Flux is only ever compared to its own
+// recent history by an adaptive threshold, so cross-track scale is irrelevant
+// -- and a kick's attack is broadband, often well above the sustained bass
+// note it sits under, so a 7-bin window around the centroid would miss it.
+const FLUX_MIN_HZ = LOW_MIN_HZ
+const FLUX_MAX_HZ = LOW_MAX_HZ
+
+// The buffer packRipples writes: RIPPLE_CAPACITY ripples of RIPPLE_STRIDE
+// floats, which the shader declares as vec4 uRipples[8].
+const PACK_LENGTH = RIPPLE_CAPACITY * RIPPLE_STRIDE
+
 export class OrbSignal {
   private readonly opts: OrbSignalOptions
   private readonly bank = new RippleBank()
+  private readonly onsets = new OnsetDetector()
   private readonly radiusEnv = new AsymEnvelope(RADIUS_ATTACK_TAU, RADIUS_RELEASE_TAU)
+
+  // Previous frame's fast spectrum, for the flux difference. Seeded from the
+  // first real frame rather than left at zeros: a zeroed previous frame makes
+  // the first flux reading the entire spectrum, which poisons the detector's
+  // baseline and deviation upward before it has seen any music. The same class
+  // of startup transient already fired phantom beats at the top of every track.
+  private prevFast: Uint8Array | null = null
 
   private centroidHz = (LOW_MIN_HZ + LOW_MAX_HZ) / 2
   private shimmer = 0
@@ -128,8 +151,27 @@ export class OrbSignal {
       : 0
     this.shimmer += (highs - this.shimmer) * alpha(SHIMMER_TAU, dt)
 
-    // --- layer 2: ripples age on their own clock ---
+    // --- layer 2: transients ---
+    // Age first, then spawn, so a ripple born this frame is not immediately
+    // advanced by this frame's dt -- otherwise its wavefront starts part way
+    // out and the beat reads early.
     this.bank.step(dt)
+
+    const fluxLo = freqToBin(FLUX_MIN_HZ, fastBins, sampleRate)
+    const fluxHi = freqToBin(FLUX_MAX_HZ, fastBins, sampleRate)
+    let flux = 0
+    if (this.prevFast === null || this.prevFast.length !== fast.length) {
+      this.prevFast = new Uint8Array(fast)
+    } else {
+      flux = positiveFlux(fast, this.prevFast, fluxLo, fluxHi)
+      this.prevFast.set(fast)
+    }
+
+    // The detector's clock still advances while paused, so its baseline decays
+    // toward the silence it is actually being shown rather than holding the
+    // last playing level and firing on the first frame after a resume.
+    const strength = this.onsets.push(playing ? flux : 0, dt)
+    if (playing && strength > 0) this.bank.spawn(strength)
 
     return {
       radius,
@@ -137,5 +179,19 @@ export class OrbSignal {
       centroidHz: this.centroidHz,
       ripples: this.bank.active,
     }
+  }
+
+  /**
+   * Write the live ripples into the shader's uniform buffer.
+   *
+   * The caller owns the buffer so the hot path allocates nothing. Returns how
+   * many slots were filled; the rest are zeroed, which the shader reads as no
+   * displacement.
+   */
+  packRipples(out: Float32Array): number {
+    if (out.length !== PACK_LENGTH) {
+      throw new Error(`packRipples needs a Float32Array of ${PACK_LENGTH}, got ${out.length}`)
+    }
+    return this.bank.pack(out)
   }
 }

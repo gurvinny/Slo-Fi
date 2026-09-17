@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { OrbSignal } from '../../src/audio/OrbSignal'
 import { bandEnergy, freqToBin } from '../../src/audio/spectrum'
+import { RIPPLE_CAPACITY, RIPPLE_STRIDE } from '../../src/audio/RippleBank'
 
 const SAMPLE_RATE = 48000
 const FAST_BINS = 1024   // fftSize 2048 -- 43ms window, for onsets
@@ -161,5 +162,121 @@ describe('OrbSignal auto-gain', () => {
       min = Math.min(min, r); max = Math.max(max, r)
     }
     expect(max - min).toBeGreaterThan(0.1)
+  })
+})
+
+// ── Layer 2: the ripples ─────────────────────────────────────────────────────
+// The file header has always described layer 2 as the channel that carries the
+// transients, but nothing ever spawned one: OrbSignal computed no flux, built no
+// OnsetDetector, and kept its RippleBank private with no way to reach pack().
+// So `drivers.ripples` was permanently empty and positiveFlux had no callers.
+describe('OrbSignal ripples', () => {
+  const dt = 1 / 60
+  const fine = bump(60, FINE_BINS)
+
+  /** Run `seconds` of steady tone so the onset baseline is past its warm-up. */
+  function settle(signal: ReturnType<typeof make>, seconds = 1): void {
+    for (let t = 0; t < seconds; t += dt) signal.update(bump(60, FAST_BINS), fine, dt, true)
+  }
+
+  it('fires on a transient and not on a steady tone', () => {
+    const signal = make()
+    settle(signal)
+    // A steady tone has no rising edges, so positiveFlux is ~0 and nothing
+    // should fire. This is the assertion that fails if flux is computed against
+    // a zeroed previous frame every time.
+    expect(signal.update(bump(60, FAST_BINS), fine, dt, true).ripples).toHaveLength(0)
+
+    const hit = signal.update(bump(60, FAST_BINS, 255), fine, dt, true)
+    expect(hit.ripples).toHaveLength(1)
+  })
+
+  it('stays quiet while paused, however hard the spectrum jumps', () => {
+    const signal = make()
+    settle(signal)
+    for (let i = 0; i < 10; i++) {
+      signal.update(bump(60, FAST_BINS, i % 2 ? 255 : 40), fine, dt, false)
+    }
+    expect(signal.update(bump(60, FAST_BINS, 255), fine, dt, false).ripples).toHaveLength(0)
+  })
+
+  it('starts a fresh ripple at age zero', () => {
+    // step() runs before spawn, so a ripple born this frame must not already
+    // have been aged by this frame's dt -- otherwise the wavefront starts part
+    // way out and the beat looks early.
+    const signal = make()
+    settle(signal)
+    signal.update(bump(60, FAST_BINS, 255), fine, dt, true)
+
+    const out = new Float32Array(RIPPLE_CAPACITY * RIPPLE_STRIDE)
+    expect(signal.packRipples(out)).toBe(1)
+    expect(out[3]).toBe(0)
+  })
+
+  it('packs origin, normalised age and strength where the shader reads them', () => {
+    const signal = make()
+    settle(signal)
+    signal.update(bump(60, FAST_BINS, 255), fine, dt, true)
+
+    const out = new Float32Array(RIPPLE_CAPACITY * RIPPLE_STRIDE)
+    signal.packRipples(out)
+
+    // The origin is a point on the unit sphere -- the shader treats it as a
+    // direction and never normalises it.
+    const len = Math.hypot(out[0]!, out[1]!, out[2]!)
+    expect(len).toBeCloseTo(1, 5)
+    expect(out[4]).toBeGreaterThan(0)
+    // Unused slots must read as zero strength, or dead ripples keep displacing.
+    expect(out[RIPPLE_STRIDE + 4]).toBe(0)
+  })
+
+  it('ages a ripple out and frees its slot', () => {
+    const signal = make()
+    settle(signal)
+    signal.update(bump(60, FAST_BINS, 255), fine, dt, true)
+    expect(signal.packRipples(new Float32Array(RIPPLE_CAPACITY * RIPPLE_STRIDE))).toBe(1)
+
+    // Past the 1.1s lifetime, on a steady tone so nothing new fires.
+    for (let t = 0; t < 1.5; t += dt) signal.update(bump(60, FAST_BINS), fine, dt, true)
+
+    const out = new Float32Array(RIPPLE_CAPACITY * RIPPLE_STRIDE)
+    expect(signal.packRipples(out)).toBe(0)
+    expect([...out].every((v) => v === 0)).toBe(true)
+  })
+
+  it('does not swallow the first beats of a track', () => {
+    // The startup transient, from the other side. positiveFlux needs a previous
+    // frame; leaving it zeroed makes the FIRST reading the whole spectrum, which
+    // seeds the detector's baseline far above anything the music will produce
+    // and it then has to decay back down before a real beat can clear it.
+    //
+    // Measured on this fixture (hits every 0.5s over a sustained bass): seeding
+    // the previous frame from the first real frame fires at 0.500s, a zeroed
+    // previous frame fires at 1.500s. A full second of every intro, silently.
+    const signal = make()
+    const hits: number[] = []
+    for (let i = 0; i < 180; i++) {
+      const t = i * dt
+      // An attack riding a sustain, which is what a kick under a bass note is.
+      const peak = (t % 0.5) < 2 * dt ? 255 : 140
+      const { ripples } = signal.update(bump(60, FAST_BINS, peak), fine, dt, true)
+      // A spawn is an age-0 ripple, not a longer array: the bank caps at 4 and
+      // evicts, so at capacity a spawn leaves the length unchanged.
+      if (ripples.some((r) => r.age === 0)) hits.push(+t.toFixed(3))
+    }
+
+    expect(hits[0], `first onset at ${hits[0]}s`).toBeLessThan(0.7)
+    // Bounded both ways: "fires on every frame" would satisfy the line above
+    // while being a worse failure than firing late.
+    expect(hits.length).toBeGreaterThanOrEqual(4)
+    expect(hits.length).toBeLessThanOrEqual(10)
+  })
+
+  it('refuses a pack buffer the shader could not read', () => {
+    // A short buffer would silently pack fewer ripples than the uniform array
+    // declares, leaving stale values in the tail. Cheap to assert, and the
+    // stride is the kind of constant that gets changed in one place only.
+    const signal = make()
+    expect(() => signal.packRipples(new Float32Array(8))).toThrow(/32/)
   })
 })

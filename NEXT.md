@@ -1,7 +1,16 @@
 # NEXT — Slo-Fi · ANOMALY III
 
 Handoff written **2026-09-17**, replacing the version from earlier the same day. **The orb is wired
-and the reported jitter is fixed.**
+and the reported jitter is fixed. The ripples are not yet legible at default glow — see item 0.**
+
+> ### PR #142 IS GREEN AND DELIBERATELY NOT MERGED
+>
+> 22 checks pass, `MERGEABLE / CLEAN`, `Browser QA` green across all 8 shards. **The user chose to
+> hold the merge** rather than land it, because green is not the same as the feature being worth
+> shipping: the layers ANOMALY III exists to add are present in the vertex data and verified, but
+> still cannot be told apart from surface noise at the shipped default settings on desktop.
+>
+> **Do not merge #142 without asking.** Resolving item 0 is the precondition.
 
 **Read first:** `~/.claude/plans/i-want-to-work-fancy-unicorn.md` — the approved plan, with every
 settled decision and two addenda. Memory: `project-slofi-anomaly-iii`.
@@ -13,11 +22,11 @@ settled decision and two addenda. Memory: `project-slofi-anomaly-iii`.
 | | |
 |---|---|
 | `main` | `88e26ab` — carries **both defect fixes**, D1 (#143) and D2 (#144), merged by fast-forward |
-| Branch | `feat/anomaly-iii` — 15 commits ahead of `main`, rebased onto it |
-| PR | **#142** |
-| Suite | **511 assertions**, floors **unit 193 / browser 37 / dom 281** |
-| Mutations | **54 caught / 0 survived**, 2 documented ALLOWED |
-| e2e | **36 passed / 3 skipped** across all three render projects |
+| Branch | `feat/anomaly-iii` at `e1e1602` — **18 commits** ahead of `main`, rebased onto it, clean tree |
+| PR | **#142** — 22 checks pass, `MERGEABLE / CLEAN`, **held unmerged on purpose** |
+| Suite | **513 assertions**, floors **unit 195 / browser 37 / dom 281** |
+| Mutations | **58 caught / 0 survived**, 2 documented ALLOWED |
+| e2e | **19 passed / 2 skipped** (orb + render-matrix) after the last fix; **36 / 3** on the full sweep before it |
 
 No longer an isolated island: `App` constructs `AnomalySphere` with the two orb analysers, and
 `AnomalySphere` drives `uRadius`, `uRipples` and `uShimmer` from `OrbSignal`.
@@ -35,6 +44,41 @@ No longer an isolated island: `App` constructs `AnomalySphere` with the two orb 
 `src/audio/envelope.ts` · `spectrum.ts` · `RippleBank.ts` · `OrbSignal.ts` · `OnsetDetector.ts`
 `src/ui/cssColor.ts` · `scripts/precache-lib.mjs` · `scripts/check-precache.mjs`
 `tests/unit/orb-shader.test.ts` · `scripts/mutate.mjs` + `tests/mutations/*.mutations.mjs`
+
+### The 18 commits, oldest first
+
+| | |
+|---|---|
+| `4bb8ef2` | test(mutation): add the curated mutation runner and its first catalogue |
+| `51ad875` | feat(audio): add frame-rate-independent smoothing primitives |
+| `673fd7d` | feat(audio): extract the spectrum helpers and add centroid band tracking |
+| `c567911` | fix(ui): raise control legibility above the WCAG contrast floors |
+| `966fe3a` | feat(audio): add the ripple bank that carries the orb's transients |
+| `c1ed68b` | ci(browser-qa): shard the e2e suite across four runners |
+| `438b714` | feat(audio): add the layered orb signal pipeline |
+| `8fe43dc` | ci(browser-qa): raise the shard count to the measured floor |
+| `05fce1e` | feat(audio): add the onset detector that fires the ripples |
+| `9d186ce` | ci(browser-qa): cache the browser binary and split the heaviest spec |
+| `0866fd9` | feat(audio): spawn ripples from onsets and expose the uniform pack |
+| `ec358fa` | feat(audio): give the orb its own two analysers on the post-effects tap |
+| `2e7623f` | refactor(orb): make every envelope frame-rate independent |
+| `98660f6` | test(mutation): catalogue the theme-repaint defects |
+| `a0acc22` | feat(orb): drive the sphere from OrbSignal and kill the jitter |
+| `2d29c1a` | docs: rewrite the handoff for the wired orb |
+| `c3e87fa` | fix(orb): stop the sustained layers starving the transient ones |
+| `e1e1602` | docs: record the unresolved ripple-legibility blocker and the disproved cause |
+
+The last four are the ones a reviewer should read first: the wiring, the defect it shipped with, and
+the two documentation commits recording what is still unresolved.
+
+### Two decisions waiting on the user
+
+Both were surfaced at the end of the last session and neither should be taken unilaterally.
+
+1. **Merge #142 now, or after ripple legibility is demonstrated?** The branch is green. The
+   feature's headline improvement is not yet visible at defaults.
+2. **Reduce `d1`?** It is the prime suspect for "the ripple is indistinguishable from the general
+   craggy surface noise", and it is a visible change to how the orb looks. Deliberately not made.
 
 ---
 
@@ -163,6 +207,28 @@ the name the dynamic import uses (`App.ts`) and the Rollup chunk name that `prec
 - **Merge by fast-forward when the branch is a clean ancestor.** A GitHub merge commit is authored
   with the *profile display name*, which leaks a real name onto a public repo.
 - Full list in `project-slofi-test-suite` and `reference-browser-qa`.
+
+---
+
+## Reproducing the legibility problem yourself
+
+```bash
+npm run build
+node scripts/serve-dist.mjs            # :4173 — NOT vite preview
+```
+
+The orb is constructed **lazily on file load** and only reacts while playing, so nothing is visible
+until a track is in. Seed `localStorage.sf_visited` on a throwaway navigation *before* the real one
+(`skipSplash` in `tests/e2e/helpers.ts` — an `evaluate` after navigation is too late), then inject a
+WAV via `fetch → File → DataTransfer → input.files` against `input#fileInput`. `makeWavFile()` in
+`tests/e2e/fixtures.ts` writes an amplitude-modulated fixture; a **sparse one kick per 3 s** file is
+the right tool, because it separates one ripple's whole 1.1 s life from the next beat. The orb canvas
+is `#anomaly canvas` — never a first-match `canvas`, two others precede it in the DOM.
+
+Delegate this to the **`browser-qa`** agent (it owns Playwright and keeps screenshots out of the main
+context) — but **re-derive any causal claim yourself.** Across two passes it gave correct
+observations and an incorrect cause both times, because MCP round-trips take seconds and it cannot
+time frames well enough to support a claim like "still bright N seconds later".
 
 ---
 

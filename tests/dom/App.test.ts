@@ -344,6 +344,33 @@ describe('App — saved settings', () => {
     flushFrames()
     expect(draws.some((c) => c.method === 'clearRect' && c.args[2] === 600)).toBe(true)
   })
+
+  it('repaints the equalizer a frame after the theme changes', () => {
+    // The reported bug: applyTheme redrew only the waveform, so the EQ canvas
+    // kept the previous theme's pixels until an unrelated event repainted it.
+    // Invisible while playing -- EffectsController's spectrum loop repaints
+    // every frame and hides it -- and permanent once paused.
+    build()
+    // A width of its own: _drawEQCurve clears at its own measured box while the
+    // waveform clears at 600 in the same flush, and distinct widths are the
+    // only way to tell which canvas painted. jsdom's zero rect would otherwise
+    // send the draw down its `if (!W || !H) return` guard and the assertion
+    // would be asserting nothing.
+    stubBoundingRect(el<HTMLCanvasElement>('eqCurveCanvas'), { width: 480, height: 200 })
+    // Spend the frame EffectsController queued in its own constructor first.
+    // Left pending it is flushed by the assertion below and paints at 480 on
+    // its own, so the test passed with applyTheme's call deleted -- caught by
+    // inverting it, which is the only reason this line exists.
+    flushFrames()
+    draws.length = 0
+
+    const before = frames.size
+    click(q('.theme-chip[data-theme="neon"]'))
+    expect(frames.size).toBe(before + 1)
+
+    flushFrames()
+    expect(draws.some((c) => c.method === 'clearRect' && c.args[2] === 480)).toBe(true)
+  })
 })
 
 // ────────────────────────────────────────────────────────────────────────────

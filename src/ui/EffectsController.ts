@@ -1,5 +1,6 @@
 import type { AudioEngine } from '../audio/AudioEngine'
 import type { AudioParams, EQNodeState } from '../types'
+import { cssVar, normHex } from './cssColor'
 
 // Owns the effects chain control section (EQ, chorus, saturation sliders).
 export class EffectsController {
@@ -551,6 +552,18 @@ export class EffectsController {
 
   // ── Curve drawing ─────────────────────────────────────────────────────────
 
+  /**
+   * Repaint the EQ curve now, in the colours the cascade currently resolves.
+   *
+   * Synchronous, and deliberately not _scheduleCurveDraw(): the only caller is
+   * App.applyTheme(), which already defers a frame so the browser has
+   * recalculated the cascade before --accent is read. Queueing a second frame
+   * from inside that one would delay the repaint again for no gain.
+   */
+  redrawCurve(): void {
+    this._drawEQCurve()
+  }
+
   // Schedules a curve redraw on the next animation frame (debounced).
   private _scheduleCurveDraw(): void {
     if (this._curveRafId !== null) return
@@ -857,7 +870,7 @@ export class EffectsController {
 
   // Returns 180°-hue-rotated, slightly desaturated version of the accent colour.
   private _getComplementaryRGB(): string {
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+    const accent = normHex(cssVar('--accent'))
     if (accent.startsWith('#')) {
       const hex = accent.slice(1)
       if (hex.length === 6) {
@@ -900,8 +913,9 @@ export class EffectsController {
 
   // Reads the current --accent CSS variable to use the active theme colour.
   private _getAccentRGB(): string {
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
-    // Parse hex (#rrggbb or #rgb) or fall back to theme-neutral cyan
+    // normHex expands a minified 3-digit theme hex; without it the positional
+    // slices below read #b4f as no colour and every theme painted the fallback.
+    const accent = normHex(cssVar('--accent'))
     if (accent.startsWith('#')) {
       const hex = accent.slice(1)
       if (hex.length === 6) {

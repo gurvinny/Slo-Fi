@@ -1600,8 +1600,15 @@ export class App {
     this.sphere?.setColorTheme(theme)
     if (persist) this.saveSettings()
     // rAF ensures the browser has recalculated the CSS cascade before we read
-    // the new --accent / --teal vars from getComputedStyle inside waveform.draw().
-    requestAnimationFrame(() => this.waveform.redraw())
+    // the new --accent / --teal vars from getComputedStyle inside the draw paths.
+    // Both canvases read those vars inside their own draw path, and neither
+    // repaints on its own while paused -- the waveform never loops, and the EQ's
+    // spectrum loop stops once the ghosts fade. Miss either call and that
+    // component keeps the previous theme's pixels indefinitely.
+    requestAnimationFrame(() => {
+      this.waveform.redraw()
+      this.effects.redrawCurve()
+    })
   }
 
   private updateBpmDisplay(): void {

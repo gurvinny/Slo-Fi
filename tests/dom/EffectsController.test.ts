@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { EffectsController } from '../../src/ui/EffectsController'
 import {
   mountFixture, resetDom, recordCanvas2D, stubResizeObserver, stubBoundingRect,
-  drawSequence, type Ctx2DCall,
+  drawSequence, drawColors, type Ctx2DCall,
 } from '../helpers/dom'
 
 // Every engine method the controller reaches for, recording rather than acting.
@@ -33,6 +33,36 @@ function fakeEngine() {
     set8DEnabled: rec('set8DEnabled'),
     set8DSpeed: rec('set8DSpeed'),
   }
+}
+
+// A five-band chain whose filters report a flat unity response. Real
+// BiquadFilterNodes belong to the browser suite; what matters here is that
+// getEQNodes() returns five of them, because anything fewer sends _drawEQCurve
+// down its flat-curve fallback -- and that path paints no theme colour at all,
+// so a theme test against the default fakeEngine would assert nothing.
+function fakeEQChain() {
+  const filter = {
+    getFrequencyResponse(_f: Float32Array, mag: Float32Array, _p: Float32Array) {
+      mag.fill(1)
+    },
+  }
+  return { getEQNodes: () => [filter, filter, filter, filter, filter] }
+}
+
+/**
+ * Stand in for the cascade jsdom never loads.
+ *
+ * This is a deliberate substitution, not the real thing: jsdom parses no
+ * stylesheet, so getPropertyValue('--accent') returns '' for every theme and
+ * _getAccentRGB() falls through to its Meridian fallback regardless. A theme
+ * test written without this stub paints one identical colour whether theming
+ * works or not. The six themes' real hex values are asserted separately, in
+ * tests/unit/theme-accent.test.ts, against the shipping stylesheet.
+ */
+function stubAccent(hex: string): void {
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+    getPropertyValue: (name: string) => (name === '--accent' ? hex : ''),
+  } as unknown as CSSStyleDeclaration)
 }
 
 type Engine = ReturnType<typeof fakeEngine>
@@ -520,6 +550,61 @@ describe('EffectsController', () => {
       // The drawer opens with the canvas at 0px; without this the EQ curve
       // stays blank until something else happens to trigger a draw.
       expect(draws.length).toBeGreaterThan(0)
+    })
+  })
+
+  // ── Theme reactivity ──────────────────────────────────────────────────────
+  // The EQ canvas reads --accent fresh inside its draw path but had no public
+  // way to be told the cascade changed, so App.applyTheme could not repaint it.
+  // It only shows while paused: the spectrum rAF loop re-arms itself while
+  // audio plays and repaints within a frame by accident, then stops once the
+  // ghosts fade -- after which the canvas keeps the old theme's pixels.
+  describe('theme reactivity', () => {
+    it('repaints the curve in the current accent when asked', () => {
+      const c = build()
+      engine.effectsChain = fakeEQChain()
+      stubAccent('#ff0000')
+      draws.length = 0
+
+      c.redrawCurve()
+
+      expect(drawColors(draws)).toContain('rgba(255,0,0,0.85)')
+    })
+
+    it('picks up a new accent on the next repaint and drops the old one', () => {
+      const c = build()
+      engine.effectsChain = fakeEQChain()
+      stubAccent('#ff0000')
+      c.redrawCurve()
+      expect(drawColors(draws)).toContain('rgba(255,0,0,0.85)')
+
+      stubAccent('#00ff00')
+      draws.length = 0
+      c.redrawCurve()
+
+      const colors = drawColors(draws)
+      expect(colors).toContain('rgba(0,255,0,0.85)')
+      // Asserting the old colour is gone is the half that fails if the accent
+      // is read once and cached rather than per draw. It has to match the whole
+      // colour: 'rgba(0,255,0,0.85)' contains the substring '255,0,0', so a
+      // looser check fails against correct code.
+      expect(colors).not.toContain('rgba(255,0,0,0.85)')
+    })
+
+    it('expands a minified 3-digit theme hex instead of falling back', () => {
+      // The CSS minifier shortens #bb44ff to #b4f. _getAccentRGB accepted only
+      // 6-digit hex, so a minified theme silently became the Meridian fallback
+      // -- which is exactly the reported symptom, on a different cause.
+      const c = build()
+      engine.effectsChain = fakeEQChain()
+      stubAccent('#b4f')
+      draws.length = 0
+
+      c.redrawCurve()
+
+      const colors = drawColors(draws)
+      expect(colors).toContain('rgba(187,68,255,0.85)')
+      expect(colors).not.toContain('rgba(180,255,0,0.85)')
     })
   })
 })

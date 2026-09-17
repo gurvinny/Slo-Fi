@@ -36,6 +36,46 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 
+// ── Orb brightness and density ───────────────────────────────────────────────
+// These five numbers decide whether anything happening on the orb's surface can
+// actually be seen, and until now they were literals buried in three different
+// places: two inside the GLSL template, one in each of the two UnrealBloomPass
+// constructions. They are hoisted here because the relationships BETWEEN them
+// are what matter and a literal cannot be checked against another literal.
+//
+// The one that binds: a fragment blooms when its linear luminance exceeds
+// BLOOM_THRESHOLD. Palette colours carry a linear luminance of roughly 0.30-0.42,
+// so the resting orb blooms whenever `base * ~0.35` clears the threshold. That is
+// the difference between bloom as a displacement-gated highlight and bloom as a
+// flat white wash over the whole silhouette.
+//
+// Interpolated into the GLSL with .toFixed(3): a bare integral JS number emits an
+// int literal, and `0.68 + 1 * 0.22` is a type error in GLSL ES.
+
+/** Fragment brightness floor in solid mode, before displacement is added. */
+export const ORB_SOLID_BASE = 0.12
+/** Fragment brightness floor in wireframe mode, before displacement is added. */
+export const ORB_WIRE_BASE = 0.68
+/** Multiplies vDisp before the 0-1 clamp. Sets how fast brightness reaches full. */
+export const ORB_DISP_GAIN = 1.9
+/** How much brightness the clamped displacement term can add. */
+export const ORB_DISP_SPAN = 0.55
+/** Wireframe-arm gain/span. Distinct from the solid arm today; see dispBright. */
+export const ORB_WIRE_GAIN = 0.5
+export const ORB_WIRE_SPAN = 0.22
+/** UnrealBloomPass threshold — the luminance above which a fragment blooms. */
+export const BLOOM_THRESHOLD = 0.22
+
+/**
+ * Icosahedron subdivision per platform.
+ *
+ * Faces are 20 * 4^detail, and buildIcosahedron writes a NON-indexed buffer, so
+ * wireframe draws every triangle's own perimeter with no shared-edge dedup:
+ * detail 6 is 81,920 triangles / 245,760 edge segments against detail 4's
+ * 5,120 / 15,360 -- a 16x gap, not the 4x the old comment here implied.
+ */
+export const ORB_DETAIL = { mobile: 4, desktop: 6 } as const
+
 // ── Simplex 3D noise (Ashima Arts, MIT) ─────────────────────────────────────
 // Embedded so the vertex shader has no external dependencies at runtime.
 const GLSL_NOISE = /* glsl */`
@@ -149,7 +189,7 @@ void main() {
 // Fresnel rim + hemisphere gradient + beat-reactive iridescence + core glow.
 // Color uniforms rotate each frame so the palette cycles with the beat.
 // uReverb adds iridescent wash — high reverb makes the orb look wet and blurry.
-const FRAGMENT_SHADER = /* glsl */`
+export const FRAGMENT_SHADER = /* glsl */`
 precision highp float;
 precision highp int;
 
@@ -205,8 +245,8 @@ void main() {
   // In wireframe mode blend toward a flat high brightness so all edges glow
   // uniformly — the surface shading model (low base at 0.12) makes undisplaced
   // lines near-invisible and creates a patchy, uneven look on the mesh.
-  float dispBrightSolid = 0.12 + clamp(vDisp * 1.9, 0.0, 1.0) * 0.55;
-  float dispBright = mix(dispBrightSolid, 0.68 + clamp(vDisp * 0.5, 0.0, 1.0) * 0.22, uWireframe);
+  float dispBrightSolid = ${ORB_SOLID_BASE.toFixed(3)} + clamp(vDisp * ${ORB_DISP_GAIN.toFixed(3)}, 0.0, 1.0) * ${ORB_DISP_SPAN.toFixed(3)};
+  float dispBright = mix(dispBrightSolid, ${ORB_WIRE_BASE.toFixed(3)} + clamp(vDisp * ${ORB_WIRE_GAIN.toFixed(3)}, 0.0, 1.0) * ${ORB_WIRE_SPAN.toFixed(3)}, uWireframe);
 
   // Subtle iridescent shimmer — kept light so it doesn't hide the palette colors
   float iridHue  = fract(nDotV * 0.40 + vDisp * 0.30 + uTime * 0.035 + uBass * 0.25);
@@ -823,8 +863,9 @@ export class AnomalySphere {
     // ── Sphere geometry + material ───────────────────────────────────────────
     // buildIcosahedron() replaces Three.js IcosahedronGeometry — same geodesic
     // subdivision, but implemented here so that class is not included in the bundle.
-    // Detail 6 → ~10k vertices; detail 4 → ~2.5k (~75% reduction) on mobile.
-    const geo = buildIcosahedron(this._isMobile ? 4 : 6)
+    // See ORB_DETAIL for the real face counts -- the figure that used to sit here
+    // ("~10k vertices") is detail 5's, and understated desktop by 4x.
+    const geo = buildIcosahedron(this._isMobile ? ORB_DETAIL.mobile : ORB_DETAIL.desktop)
 
     this.uniforms = {
       uTime:    { value: 0 },
@@ -874,7 +915,7 @@ export class AnomalySphere {
       new Vector2(bloomRes, bloomRes),
       0.45,  // base strength — dimmer; reverb raises this at runtime
       0.38,
-      0.22,
+      BLOOM_THRESHOLD,
     )
     this.composer.addPass(this.bloom)
 
@@ -989,7 +1030,7 @@ export class AnomalySphere {
       this.composer = new EffectComposer(newRenderer as unknown as WebGLRenderer)
       this.composer.addPass(new RenderPass(this.scene, this.camera))
       const bloomRes = this._isMobile ? 150 : 300
-      this.bloom = new UnrealBloomPass(new Vector2(bloomRes, bloomRes), 0.45, 0.38, 0.22)
+      this.bloom = new UnrealBloomPass(new Vector2(bloomRes, bloomRes), 0.45, 0.38, BLOOM_THRESHOLD)
       this.composer.addPass(this.bloom)
       // Grain and glitch passes use GLSL ShaderPass — skip on WebGPU path for now;
       // they'll be ported to TSL in a follow-up PR

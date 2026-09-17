@@ -51,11 +51,51 @@ the name the dynamic import uses (`App.ts`) and the Rollup chunk name that `prec
   already exported for `tests/unit/orb-shader.test.ts`, so this is free.
 - **Retune `BASS_TAU_DOWN`** from 0.658 s to ~0.30 s. This is the deliberate, separately-reviewed
   change the dt migration deliberately did *not* make.
+- **`d1` now double-counts the bass mass.** `d1 = snoise(...) * uBass * 0.40` was the *old*
+  implementation of "bass makes the orb bulge"; `swell` is the designed layer 1 and carries the same
+  smoothed signal. Having both means the mass is mostly noise-shaped, which is very likely why the
+  ripple reads as "indistinguishable from the general craggy surface noise". Reducing `d1` is the
+  obvious lever and it is a visible character change — hence phase 2, not a defect fix.
+- **The displacement budget is now explicitly allocated.** `mass` 0.36 + `transient` 0.16 = 0.52.
+  A test asserts the sum, so any rebalance here is a deliberate edit to both numbers, not a drift.
 - Lighting and particles rebalanced against the new drivers — better placed, not rewritten.
 
 ---
 
 ## Open, in rough priority order
+
+0. **The ripples are in the vertex data but NOT LEGIBLE at default glow on desktop.**
+   This is phase 2's first job and the one thing blocking ANOMALY III from being worth shipping.
+
+   What is established: the displacement fix is real and present in the shipped bundle (verified
+   independently by reading `dist/`), and the clamp-starvation defect that hid them is fixed and
+   mutation-covered. Two `browser-qa` passes agree the ripples still cannot be told apart from
+   surface noise at **Glow 100% / Reactivity 80%** on percussive material, where the orb reads as a
+   near-white blob. On the **mobile** path it does *not* white out and the surface is legible — the
+   same audio and the same shader, so something in the desktop-only render path is responsible.
+
+   **What is NOT established is the cause, and the obvious hypothesis is wrong.** QA proposed that
+   the `kickVis`-driven bloom "is not releasing fast enough to show a dark baseline between
+   events". That is disproved numerically with the real constants: `kickEnergy`'s decay tau is
+   **0.130 s**, so after a single kick
+
+   | t | kickVis | bloom.strength | meshScale |
+   |---|---|---|---|
+   | 0.0 s | 1.232 | 1.100 (capped) | 1.72 |
+   | 0.2 s | 0.438 | 0.571 | 1.25 |
+   | 0.5 s | 0.044 | 0.288 | 1.03 |
+   | 1.0 s | 0.001 | 0.257 | 1.00 |
+
+   and the floor in silence is `0.20 + reverb * 0.28` = **0.256** against a 1.10 cap. Bloom is back
+   to its floor inside half a second; it cannot be pinned for the 2-3 s that was reported. The
+   likelier candidates are therefore **static** brightness, not release time: `toneMappingExposure`
+   is a flat `0.50`, and the fragment shader adds rim glow and core glow *additively* on top. Note
+   also that a screenshot taken seconds after a `mesh.scale` of up to 1.7 may simply be full of orb.
+
+   **Measure before changing anything.** The honest next step is a numeric capture of the rendered
+   luminance histogram over a sparse kick fixture, not another visual pass — QA cannot time frames
+   to better than several seconds through the tool round-trip, which is what produced the wrong
+   causal claim in the first place.
 
 1. **Phase 5 spike, still carried over:** `anomaly-sphere.spec.ts` skips theme stability on mobile
    because a no-op `setColorTheme` measures 0.0009 against a clean 0.0011. Probe by re-enabling
@@ -92,6 +132,12 @@ the name the dynamic import uses (`App.ts`) and the Rollup chunk name that `prec
 - **e2e cannot see a shader term that is computed and never summed.** It compiles, renders and
   animates, so `frameAdvance`, `nonBlankRatio` and `distinctColors` all pass. That is what
   `tests/unit/orb-shader.test.ts` is for — assert on *use*, not declaration.
+- **A driver pinned at its own clamp is not a driver.** `uRadius` shipped with a x2.2 gain against
+  a signal that already reaches ~1.0, so it sat saturated at 1.4 and layer 1 became a DC offset.
+  Check what a driver actually *reaches* before choosing its gain — measured, not assumed.
+- **Reserve budget for transient layers.** One clamp over every displacement term lets the
+  sustained terms eat all of it, and the transients then render as nothing while looking perfectly
+  correct in the source.
 - **`RIPPLE_W = 0.28` rad is set by mobile vertex spacing, not taste.** Mean angular spacing is
   ~0.07 rad at icosahedron detail 4 (the mobile branch) against ~0.018 at detail 6. A narrower
   wavefront does not look thinner on mobile — it falls between vertices and vanishes.

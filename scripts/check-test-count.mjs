@@ -32,7 +32,7 @@ const ROOTS = ['tests/unit', 'tests/browser', 'tests/dom']
 // so adding tests never trips it; only a net removal does, and that should be
 // a deliberate act -- lower the number in the same commit that removes them.
 const FLOORS = {
-  unit: 178,
+  unit: 185,
   browser: 31,
   dom: 281,
 }

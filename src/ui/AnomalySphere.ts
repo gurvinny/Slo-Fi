@@ -179,8 +179,21 @@ void main() {
     ripple += strength * band * (1.0 - head.w) * 0.16;
   }
 
+  // Two budgets, not one, and this is load-bearing rather than tidy.
+  //
+  // With a single clamp the sustained terms starve the transient ones: measured
+  // at the default reactivity on loud material, swell + d1 alone come to 0.56
+  // against a 0.52 ceiling, so ripple (max 0.16) and shimmer (max 0.014) were
+  // clipped to nothing before they rendered. Layer 2 existed, was computed, was
+  // uploaded, and could not be seen. Giving the transients a reserved budget
+  // means a beat always has room to displace no matter how loud the bass is.
+  //
+  // The total bound is still 0.52, so the orb's silhouette budget is unchanged.
+  float mass      = clamp(dSub + d1 + d2 + d3 + d4 + idle + swell, -0.36, 0.36);
+  float transient = clamp(shimmer + ripple, -0.16, 0.16);
+
   // Crystal flattening: displacement irons toward a perfect sphere when paused.
-  float disp = clamp(dSub + d1 + d2 + d3 + d4 + idle + swell + shimmer + ripple, -0.52, 0.52) * (1.0 - uCrystal * 0.90);
+  float disp = (mass + transient) * (1.0 - uCrystal * 0.90);
   vDisp = disp;
 
   vNormal   = normalize(normalMatrix * normal);
@@ -1416,7 +1429,11 @@ export class AnomalySphere {
     this.orbFast.getByteFrequencyData(this.fastData)
     const drivers = this.orb.update(this.fastData, this.fineData, step, this.playing)
 
-    this.uniforms.uRadius.value  = Math.min(drivers.radius * this.reactivity * 2.2, 1.4)
+    // Gain 1.2, not 2.2. Measured: drivers.radius peaks at ~1.02 on loud material,
+    // so x2.2 at the default reactivity of 0.8 pinned this at its own ceiling --
+    // and a driver held at its ceiling is not a driver, it is a DC offset. Layer
+    // 1 stopped breathing exactly when there was most to breathe to.
+    this.uniforms.uRadius.value  = Math.min(drivers.radius * this.reactivity * 1.2, 1.0)
     this.uniforms.uShimmer.value = Math.min(drivers.shimmer * this.reactivity * 2.2, 1.0)
     this.orb.packRipples(this.uniforms.uRipples.value)
   }

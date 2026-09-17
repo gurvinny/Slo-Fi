@@ -33,7 +33,7 @@ const ROOTS = ['tests/unit', 'tests/browser', 'tests/dom']
 // a deliberate act -- lower the number in the same commit that removes them.
 const FLOORS = {
   unit: 196,
-  browser: 31,
+  browser: 37,
   dom: 281,
 }
 

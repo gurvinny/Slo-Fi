@@ -96,6 +96,16 @@ export class AudioEngine {
 
   // Analyser tapped from effects chain output for the spectrum visualizer
   private _analyserNode: AnalyserNode | null = null
+  // The orb's own analysers, off the same post-effects tap. Two of them
+  // because an AnalyserNode's window is fftSize / sampleRate, so onset latency
+  // and centroid resolution trade directly against each other -- 2048 gives a
+  // 43 ms window but only 11 bins across 20-250 Hz, 8192 resolves the low end
+  // but smears every transient. Both at smoothingTimeConstant 0: stc smooths
+  // per getByteFrequencyData() CALL rather than per second, so any non-zero
+  // value makes the result depend on the read rate, and two consumers reading
+  // one node steal each other's smoothing state.
+  private _orbAnalyserFast: AnalyserNode | null = null
+  private _orbAnalyserFine: AnalyserNode | null = null
 
   // Parallel tap before the EQ chain — used by EffectsController to show pre-EQ spectrum ghost
   private _analyserPreEQNode: AnalyserNode | null = null
@@ -180,6 +190,8 @@ export class AudioEngine {
   get effectsChain(): EffectsChain | null { return this._effectsChain }
   get analyserNode(): AnalyserNode | null { return this._analyserNode }
   get analyserPreEQ(): AnalyserNode | null { return this._analyserPreEQNode }
+  get orbAnalyserFast(): AnalyserNode | null { return this._orbAnalyserFast }
+  get orbAnalyserFine(): AnalyserNode | null { return this._orbAnalyserFine }
 
   getBuffer(): AudioBuffer | null { return this.buffer }
 
@@ -277,6 +289,24 @@ export class AudioEngine {
     this._analyserNode.minDecibels = -90
     this._analyserNode.maxDecibels = -10
     chainOutput.connect(this._analyserNode)
+
+    // Orb analysers: same tap, so what the orb reacts to is the signal the
+    // listener hears, effects and all. Deliberately NOT a retune of the node
+    // above -- that one is read by EffectsController's spectrum ghosts and
+    // App's lite-bass loop, and changing its smoothing would change both.
+    this._orbAnalyserFast = this.context.createAnalyser()
+    this._orbAnalyserFast.fftSize = 2048
+    this._orbAnalyserFast.smoothingTimeConstant = 0
+    this._orbAnalyserFast.minDecibels = -90
+    this._orbAnalyserFast.maxDecibels = -10
+    chainOutput.connect(this._orbAnalyserFast)
+
+    this._orbAnalyserFine = this.context.createAnalyser()
+    this._orbAnalyserFine.fftSize = 8192
+    this._orbAnalyserFine.smoothingTimeConstant = 0
+    this._orbAnalyserFine.minDecibels = -90
+    this._orbAnalyserFine.maxDecibels = -10
+    chainOutput.connect(this._orbAnalyserFine)
 
     // 8D panner sits after the analyser so visualisation sees the pre-spatial signal.
     // Default position (0, 0, -1) = directly ahead — transparent when 8D is off.

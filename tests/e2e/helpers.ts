@@ -117,6 +117,70 @@ export async function measureCanvas(canvas: Locator): Promise<CanvasStats> {
   };
 }
 
+export type OrbContrast = {
+  litRatio: number;
+  meanV: number;
+  localContrast: number;
+  /** localContrast / meanV -- contrast as a share of brightness. */
+  relativeContrast: number;
+};
+
+/**
+ * How much visible surface structure the orb is actually carrying.
+ *
+ * `measureCanvas` reports distinctColors and nonBlankRatio, and both stay
+ * perfectly healthy on an orb with no legible surface at all: a sphere covered
+ * in a uniform mesh is non-blank everywhere and its antialiased edges alone
+ * supply hundreds of distinct colours. That is exactly how a flat luminance
+ * channel and an over-subdivided mesh shipped unnoticed.
+ *
+ * What separates a readable surface from a uniform one is LOCAL contrast --
+ * the brightness step between neighbouring pixels. A global histogram cannot
+ * see it: a frame can hold a wide range of brightnesses and still show no edges
+ * anywhere, and lowering a brightness floor moves the whole distribution
+ * without spreading it. Measured here as mean |dV| between horizontally
+ * adjacent lit pixels, normalised by mean brightness so it does not simply
+ * track how bright the orb happens to be on this beat.
+ *
+ * Restricted to a centred box because the starfield covers most of the canvas
+ * and sits just above any reasonable "lit" cutoff, so a whole-frame measurement
+ * is mostly stars. The camera frames the orb at 38% of viewport height in
+ * landscape and 66% of width in portrait, and mesh.scale peaks near 1.9x on a
+ * kick, so 60% of the short side contains the orb throughout the beat.
+ */
+export async function measureOrbContrast(canvas: Locator): Promise<OrbContrast> {
+  const png = PNG.sync.read(await canvas.screenshot());
+  const half = Math.round(Math.min(png.width, png.height) * 0.3);
+  const cx = png.width >> 1, cy = png.height >> 1;
+  // Above the starfield floor rather than merely above black.
+  const LIT = 40;
+  const value = (i: number) =>
+    Math.max(png.data[i], png.data[i + 1], png.data[i + 2]);
+
+  let lit = 0, sumV = 0, gradSum = 0, gradN = 0, box = 0;
+  for (let y = cy - half; y < cy + half; y++) {
+    for (let x = cx - half; x < cx + half; x++) {
+      box++;
+      const i = (y * png.width + x) * 4;
+      const v = value(i);
+      if (v > LIT) { lit++; sumV += v; }
+      if (x + 1 < cx + half) {
+        const v2 = value(i + 4);
+        if (v > LIT && v2 > LIT) { gradSum += Math.abs(v - v2); gradN++; }
+      }
+    }
+  }
+
+  const meanV = lit ? sumV / lit : 0;
+  const localContrast = gradN ? gradSum / gradN : 0;
+  return {
+    litRatio: box ? lit / box : 0,
+    meanV,
+    localContrast,
+    relativeContrast: meanV ? localContrast / meanV : 0,
+  };
+}
+
 export type CanvasTint = { r: number; g: number; b: number; lit: number };
 
 /**

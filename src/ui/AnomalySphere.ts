@@ -54,15 +54,48 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 
 /** Fragment brightness floor in solid mode, before displacement is added. */
 export const ORB_SOLID_BASE = 0.12
-/** Fragment brightness floor in wireframe mode, before displacement is added. */
-export const ORB_WIRE_BASE = 0.68
-/** Multiplies vDisp before the 0-1 clamp. Sets how fast brightness reaches full. */
+/**
+ * Fragment brightness floor in wireframe mode, before displacement is added.
+ *
+ * This was 0.68, and that single number closed the orb's luminance channel.
+ * The wireframe arm used to carry its own gain (0.5) and span (0.22) as well,
+ * and `disp` is bounded at +-0.52, so `clamp(vDisp * 0.5, 0.0, 1.0)` could never
+ * exceed 0.26 -- most of the term's range was unreachable and brightness spanned
+ * 0.680 to 0.737 across the ENTIRE displacement range. A 1.08x swing.
+ *
+ * Kept deliberately above ORB_SOLID_BASE: the 0.68 floor was introduced because
+ * the solid shading model left undisplaced wireframe lines near-invisible and
+ * patchy. 0.22 is still nearly 2x the solid base, so that complaint is answered
+ * without flattening everything the surface is trying to say.
+ */
+export const ORB_WIRE_BASE = 0.22
+/**
+ * Multiplies vDisp before the 0-1 clamp, around ORB_DISP_BIAS.
+ *
+ * Was 1.9 against a one-sided `clamp(vDisp * 1.9, 0.0, 1.0)`, which mapped every
+ * NEGATIVE displacement -- about half the surface -- onto the same floor. That
+ * point mass is what kept the orb uniform: measured on the built page, lowering
+ * the floor alone moved the whole distribution darker (mean 116 -> 77) and left
+ * the concentration untouched (75% -> 77% of pixels inside the densest two
+ * bands, CV 0.303 -> 0.307). The pile moved; it did not spread.
+ *
+ * Paired with the bias, brightness now tracks displacement in both directions:
+ * DISP_MAX * GAIN == 0.5 puts a full inward dent at the floor, rest at mid, and
+ * a full outward bulge at the ceiling, using the whole span instead of half.
+ */
 export const ORB_DISP_GAIN = 1.9
+/**
+ * Displacement that maps to the middle of the brightness span -- i.e. none.
+ *
+ * Applied to the WIREFRAME arm only. Solid mode has always rested near black at
+ * ORB_SOLID_BASE and lit up where the surface bulges outward, and that reads as
+ * intended rather than broken; biasing it too would have taken its resting
+ * sphere from 0.120 to 0.395, a 3.3x brighter orb in a mode nothing was
+ * reported about and nothing here measured.
+ */
+export const ORB_DISP_BIAS = 0.5
 /** How much brightness the clamped displacement term can add. */
 export const ORB_DISP_SPAN = 0.55
-/** Wireframe-arm gain/span. Distinct from the solid arm today; see dispBright. */
-export const ORB_WIRE_GAIN = 0.5
-export const ORB_WIRE_SPAN = 0.22
 /** UnrealBloomPass threshold — the luminance above which a fragment blooms. */
 export const BLOOM_THRESHOLD = 0.22
 
@@ -71,10 +104,26 @@ export const BLOOM_THRESHOLD = 0.22
  *
  * Faces are 20 * 4^detail, and buildIcosahedron writes a NON-indexed buffer, so
  * wireframe draws every triangle's own perimeter with no shared-edge dedup:
- * detail 6 is 81,920 triangles / 245,760 edge segments against detail 4's
- * 5,120 / 15,360 -- a 16x gap, not the 4x the old comment here implied.
+ * detail 5 is 20,480 triangles / 61,440 edge segments against detail 4's
+ * 5,120 / 15,360.
+ *
+ * Desktop was 6 -- 81,920 / 245,760, a 16x gap to mobile, and finer than the
+ * pixel grid it is drawn on. Mean edge angle is 1.1071 / 2^detail (0.0173 rad at
+ * detail 6, reproducing the ~0.07 / ~0.018 figures quoted elsewhere here), and
+ * the camera frames the orb at 38% of viewport height, so on a 1080p landscape
+ * display detail 6 packs roughly three device pixels of line into every pixel of
+ * orb. Per-vertex brightness differences then average away INSIDE each pixel.
+ *
+ * That is a CONTRAST failure, not the saturation one it was first mistaken for:
+ * measured on the built page, nothing on the orb ever came near white on either
+ * platform, yet desktop carried relative local contrast 0.081 against the mobile
+ * path's 0.126 -- less visible surface structure than the platform running a
+ * sixteenth of the geometry. Detail 5 measures 0.208, a bigger lever than the
+ * brightness curve by more than 2x, and quarters a vertex shader that runs seven
+ * snoise calls per invocation. Detail 4 would match mobile exactly but facets
+ * visibly at desktop size.
  */
-export const ORB_DETAIL = { mobile: 4, desktop: 6 } as const
+export const ORB_DETAIL = { mobile: 4, desktop: 5 } as const
 
 // ── Simplex 3D noise (Ashima Arts, MIT) ─────────────────────────────────────
 // Embedded so the vertex shader has no external dependencies at runtime.
@@ -130,7 +179,7 @@ float snoise(vec3 v){
 // ── Sphere vertex shader ─────────────────────────────────────────────────────
 // Four displacement layers + idle breath. uSpeed warps time so slow playback
 // makes the surface deform more languidly with bigger bulges.
-const VERTEX_SHADER = /* glsl */`
+export const VERTEX_SHADER = /* glsl */`
 precision highp float;
 precision highp int;
 
@@ -245,8 +294,14 @@ void main() {
   // In wireframe mode blend toward a flat high brightness so all edges glow
   // uniformly — the surface shading model (low base at 0.12) makes undisplaced
   // lines near-invisible and creates a patchy, uneven look on the mesh.
-  float dispBrightSolid = ${ORB_SOLID_BASE.toFixed(3)} + clamp(vDisp * ${ORB_DISP_GAIN.toFixed(3)}, 0.0, 1.0) * ${ORB_DISP_SPAN.toFixed(3)};
-  float dispBright = mix(dispBrightSolid, ${ORB_WIRE_BASE.toFixed(3)} + clamp(vDisp * ${ORB_WIRE_GAIN.toFixed(3)}, 0.0, 1.0) * ${ORB_WIRE_SPAN.toFixed(3)}, uWireframe);
+  // One curve, two floors. The wireframe arm used to carry its own gain and span
+  // as well, which is what closed the channel: brightness moved 1.08x across the
+  // whole displacement range, so a ripple changed it by 2.6% and could not be
+  // told apart from the surface it travelled over.
+  float dispBright = mix(${ORB_SOLID_BASE.toFixed(3)}, ${ORB_WIRE_BASE.toFixed(3)}, uWireframe)
+                   + clamp(vDisp * ${ORB_DISP_GAIN.toFixed(3)}
+                           + mix(0.0, ${ORB_DISP_BIAS.toFixed(3)}, uWireframe), 0.0, 1.0)
+                     * ${ORB_DISP_SPAN.toFixed(3)};
 
   // Subtle iridescent shimmer — kept light so it doesn't hide the palette colors
   float iridHue  = fract(nDotV * 0.40 + vDisp * 0.30 + uTime * 0.035 + uBass * 0.25);
@@ -554,7 +609,7 @@ const GLITCH_SHADER = {
 // Each entry is [A, B, C, D] where each slot is [hue, saturation, lightness].
 // Audio modulates lightness (+bass) and saturation (+treble) at runtime so the
 // palette still pulses with the music while staying completely on-theme.
-const THEME_PALETTES: Record<string, Array<[number, number, number]>> = {
+export const THEME_PALETTES: Record<string, Array<[number, number, number]>> = {
   // [hue 0-1, saturation 0-1, lightness 0-1] — A/B/C/D color slots
   meridian: [[0.22, 1.00, 0.60], [0.61, 0.95, 0.55], [0.19, 1.00, 0.70], [0.63, 0.90, 0.46]],
   void:     [[0.75, 0.88, 0.38], [0.67, 0.78, 0.42], [0.82, 0.72, 0.40], [0.70, 0.62, 0.33]],

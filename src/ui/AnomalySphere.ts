@@ -33,6 +33,8 @@ import type { IUniform } from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { AdaptiveRange } from '../audio/AdaptiveRange'
+import { computeKickVis, computeBloomStrength } from './orbDrivers'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 
@@ -746,6 +748,11 @@ export class AnomalySphere {
   // heavy mastering / limiting (where raw bass barely varies), remapping
   // bassFloor→bassCeiling to 0→1 makes the orb feel alive even when the
   // waveform looks like a solid rectangle in a DAW.
+  // Adaptive range for the kick channel. bVis has had normalisation since the
+  // beginning; kickVis -- which drives ALL motion -- never did, so how hard the
+  // orb moved was decided by how loud the master was.
+  private kickRange     = new AdaptiveRange()
+  private _prevOrbT     = 0   // previous frame's elapsed, for dtOrb
   private bassFloor     = 0   // slow-rising floor: ignores brief dips, tracks silence
   private bassCeiling   = 0.4 // fast-rising ceiling: immediately captures peaks
   // ── Kick detection via spectral flux ─────────────────────────────────────
@@ -1350,6 +1357,14 @@ export class AnomalySphere {
 
     const elapsed = this.clock.getElapsedTime()
 
+    // A dt for the adaptive range, derived from `elapsed` rather than from
+    // clock.getDelta(): getElapsedTime() and getDelta() both advance the same
+    // internal oldTime, so calling one breaks the other, and this loop needs
+    // the absolute time as well. Clamped so a backgrounded tab returning does
+    // not hand the estimator a multi-second step.
+    const dtOrb = Math.min(Math.max(elapsed - this._prevOrbT, 0), 0.1)
+    this._prevOrbT = elapsed
+
     // Under reduced motion: render the orb as a static glowing sphere with
     // no vertex displacement or beat-driven animation. The bloom and color
     // still render so the orb remains visible, just motionless.
@@ -1492,7 +1507,8 @@ export class AnomalySphere {
     //   kickVis drives: vertex displacement (uBass), bloom, scale pulse, rotation,
     //   crack veins, glitch, and lightning.  This makes ALL motion effects respond
     //   to individual kick transients rather than sustained bass level.
-    const kickVis = Math.min(this.kickEnergy * this.reactivity * 2.8, 1.4)
+    const kickNorm = this.kickRange.update(this.kickEnergy, dtOrb)
+    const kickVis = computeKickVis(this.kickEnergy, kickNorm, this.reactivity)
 
     // mVis / tVis — mid and treble visual levels; used for colour and particles only.
     const mVis    = this.mid    * this.reactivity
@@ -1586,7 +1602,7 @@ export class AnomalySphere {
     // Bloom spikes on bass hits; intro adds a brief acceptance surge (sin arc)
     // peaks at the midpoint of the reveal, fades out as the orb settles
     const introSurge = Math.sin(introClamp * Math.PI) * 0.55
-    this.bloom.strength = (Math.min(0.20 + this.reverb * 0.28 + kickVis * 0.72, 1.10) + introSurge) * this.glowMult * this.visualFade * introClamp
+    this.bloom.strength = computeBloomStrength(kickVis, this.reverb, this.glowMult, this.visualFade, introSurge, introClamp)
 
     // Mesh scale: intro reveal + base size + optional bass pulse + loop pulse
     // introProgress uses ease-out-back so the orb slightly overshoots before settling

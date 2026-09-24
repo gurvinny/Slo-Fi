@@ -256,6 +256,46 @@ export async function skipSplash(page: Page): Promise<void> {
 }
 
 /**
+ * Start playback, and prove it started.
+ *
+ * `setInputFiles` loads a track; it does not play one. Every orb spec here
+ * stopped at the load, so the analysers read silence and EVERY audio-derived
+ * uniform sat at exactly zero -- measured over 291 frames: uBass 0, uRadius 0,
+ * uShimmer 0, no ripple ever packed. Specs written to measure how the surface
+ * responds to audio were measuring an orb at rest, and passed.
+ *
+ * The autoplay flag in playwright.config.ts is why this looked handled. It
+ * only grants permission to play; something still has to ask, and nothing did.
+ *
+ * Returns once a driver is actually non-zero rather than after a fixed wait,
+ * because "clicked play" and "audio is driving the shader" are different
+ * claims and only the second one makes a measurement meaningful.
+ */
+export async function startPlayback(page: Page, timeoutMs = 20_000): Promise<void> {
+  const btn = page.locator("#playPauseBtn");
+  await btn.waitFor({ state: "attached", timeout: timeoutMs });
+  // force: the control sits under the player chrome and can be overlapped
+  // mid-transition; the click is a real user gesture either way.
+  await btn.click({ force: true });
+
+  // The readiness signal has to come from the real source. The app plays
+  // through an AudioBufferSourceNode, and the only <audio> element in the page
+  // is a SILENT keepalive fed by a MediaStreamDestination -- it reports
+  // !paused whether or not a track is running, so querySelector("audio") would
+  // confirm playback that is not happening. #currentTime is rendered from the
+  // buffer source's own progress, so it moves only when audio really moves.
+  await page.waitForFunction(
+    () => {
+      const el = document.getElementById("currentTime");
+      const t = el?.textContent?.trim() ?? "";
+      return t !== "" && t !== "0:00" && t !== "00:00" && t !== "-:--";
+    },
+    undefined,
+    { timeout: timeoutMs },
+  );
+}
+
+/**
  * Fraction of pixels that changed on a canvas over `ms`.
  *
  * Exists because **a WebGL canvas keeps its last painted pixels** after the

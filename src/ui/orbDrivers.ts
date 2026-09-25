@@ -21,20 +21,6 @@ export const KICK_NORM_GAIN = 1.3
 /** Bloom floor with no audio at all. */
 export const BLOOM_BASE = 0.20
 export const BLOOM_REVERB_COEFF = 0.28
-/**
- * 0.52, not the 0.72 that shipped.
- *
- * The coefficient has to leave headroom under BLOOM_CAP at the WORST case, not
- * the typical one: maximum kick AND maximum reverb together. At 0.72 that sum
- * reaches 1.246 against a 1.10 cap, so bloom re-pins at high reverb settings
- * even with kickVis behaving -- the same defect, hidden behind a control most
- * measurements leave at zero.
- *
- * 0.20 + 0.28 + 1.064 x 0.52 = 1.033, which clears the cap with room to spare.
- * Peak glow is lower than it was; that is the point, and glowMult still scales
- * the whole thing for anyone who wants more.
- */
-export const BLOOM_KICK_COEFF = 0.52
 export const BLOOM_CAP = 1.10
 
 /**
@@ -56,28 +42,126 @@ export function computeKickVis(kickEnergy: number, norm: number, reactivity: num
   return Math.min(Math.max(expanded * reactivity, 0), KICK_MAX)
 }
 
+/** Largest kickVis reachable at a given reactivity, for headroom assertions. */
+export function maxKickVis(reactivity: number): number {
+  return computeKickVis(KICK_MAX, 1, reactivity)
+}
+
+// ── Scale pulse ─────────────────────────────────────────────────────────────
+//
+// Extracted so the camera framing and the mesh scale read the SAME numbers.
+// They were independent before: resize() solved for a radius-1 sphere while the
+// mesh was scaled by orbBaseScale and then pulsed, so the fraction the framing
+// targeted was never the fraction on screen.
+
+export const ORB_PULSE_BASS = 0.44
+export const ORB_PULSE_ALWAYS = 0.14
+export const ORB_LOOP_PULSE = 0.08
+
+/** The multiplier applied to orbBaseScale for one frame. */
+export function computeOrbPulse(kickVis: number, bassPulse: boolean, loopPulseAmount = 0): number {
+  const pulse = (bassPulse ? kickVis * ORB_PULSE_BASS : 0) + kickVis * ORB_PULSE_ALWAYS
+  return 1 + pulse + loopPulseAmount * ORB_LOOP_PULSE
+}
+
 /**
- * Bloom strength for a frame.
+ * The largest pulse the orb can reach, for the camera to frame against.
  *
- * This is where the blow-out happened. With kickVis pinned at 1.4 the kick term
- * alone contributes 1.008, so the expression saturated its own 1.10 cap and
- * bloom sat at maximum continuously -- measured at up to 144,313 fully
- * achromatic pixels in a single frame, against zero once playback stopped.
- * Bloom held at its cap is not a response to the music, it is a constant.
+ * Derived from the same constants computeOrbPulse uses, so the two cannot drift
+ * apart -- a framing constant copied by hand goes stale the first time the
+ * pulse is retuned.
  */
-export function computeBloomStrength(
-  kickVis: number,
+export function maxOrbPulse(reactivity = 1, loopPulseAmount = 1): number {
+  return computeOrbPulse(maxKickVis(reactivity), true, loopPulseAmount)
+}
+
+// ── Two-stage bloom ─────────────────────────────────────────────────────────
+//
+// One term could not serve both jobs. A single coefficient on the kick channel
+// means a dense passage holds bloom high CONTINUOUSLY -- measured at up to
+// 43.6% of bright pixels carrying no colour, because sustained material parks
+// the sum at the clip point and every hit lands on an already saturated frame.
+// Loud stopped meaning anything.
+
+export const BLOOM_MUSIC_COEFF = 0.22
+export const BLOOM_FLASH_PEAK = 0.35
+/**
+ * Applied to the NORMALISED kick, so it means "hard for this track" rather than
+ * "loud in absolute terms". Sustained bass sits below it and never flashes.
+ */
+export const BLOOM_FLASH_THRESHOLD = 0.72
+/** Flash release. Short, so it reads as a strike and not a swell. */
+export const BLOOM_FLASH_TAU = 0.11
+
+/** How hard a flash this frame's kick deserves, 0..1. */
+export function flashTarget(kickNorm: number): number {
+  if (kickNorm <= BLOOM_FLASH_THRESHOLD) return 0
+  return Math.min((kickNorm - BLOOM_FLASH_THRESHOLD) / (1 - BLOOM_FLASH_THRESHOLD), 1)
+}
+
+/**
+ * Instant attack, exponential release. A kick that fades in is not a kick, and
+ * the release is dt-based so it lasts the same wall-clock time at any rate.
+ */
+export function updateFlash(prev: number, kickNorm: number, dt: number): number {
+  const target = flashTarget(kickNorm)
+  if (target > prev) return target
+  return prev * Math.exp(-Math.max(dt, 0) / BLOOM_FLASH_TAU)
+}
+
+export function computeBloomTwoStage(
+  kickNorm: number,
+  flash: number,
   reverb: number,
   glowMult: number,
   visualFade: number,
   introSurge = 0,
   introClamp = 1,
 ): number {
-  const core = Math.min(BLOOM_BASE + reverb * BLOOM_REVERB_COEFF + kickVis * BLOOM_KICK_COEFF, BLOOM_CAP)
+  const sustained = BLOOM_BASE + reverb * BLOOM_REVERB_COEFF + Math.min(Math.max(kickNorm, 0), 1) * BLOOM_MUSIC_COEFF
+  const core = Math.min(sustained + Math.min(Math.max(flash, 0), 1) * BLOOM_FLASH_PEAK, BLOOM_CAP)
   return (core + introSurge) * glowMult * visualFade * introClamp
 }
 
-/** Largest kickVis reachable at a given reactivity, for headroom assertions. */
-export function maxKickVis(reactivity: number): number {
-  return computeKickVis(KICK_MAX, 1, reactivity)
+/** Highest sustained level reachable with no flash at all. */
+export function maxSustainedBloom(): number {
+  return BLOOM_BASE + BLOOM_REVERB_COEFF + BLOOM_MUSIC_COEFF
+}
+
+// ── Camera framing ──────────────────────────────────────────────────────────
+//
+// The framing used to solve for a radius-1 sphere while the mesh was scaled by
+// orbBaseScale and pulsed by up to ~1.85x. Measured on the shipped build that
+// put the orb at 58.3% of viewport height on desktop and 107.2% of viewport
+// WIDTH in portrait -- it did not fit on a phone when a kick landed. Both
+// figures are exactly the stated target times the peak pulse: the camera never
+// knew the orb pulses.
+
+/** Share of the viewport the orb spans AT PEAK. */
+export const ORB_PEAK_FRACTION = {
+  landscape: 0.45,
+  portrait: 0.60,
+} as const
+
+export const ORB_Z_MIN = 3.5
+/** Portrait genuinely needs ~8.7; the previous 7.5 would have capped the fix. */
+export const ORB_Z_MAX = 12.0
+
+export function computeCameraZ(
+  aspect: number,
+  fovDeg: number,
+  baseScale: number,
+  reactivity = 1,
+): number {
+  const tanHalfFov = Math.tan((fovDeg * Math.PI / 180) / 2)
+  const peakScale = baseScale * maxOrbPulse(reactivity, 1)
+  const z = aspect >= 1
+    ? peakScale / (ORB_PEAK_FRACTION.landscape * tanHalfFov)
+    : peakScale / (ORB_PEAK_FRACTION.portrait * aspect * tanHalfFov)
+  return Math.max(ORB_Z_MIN, Math.min(z, ORB_Z_MAX))
+}
+
+/** Share of viewport height the orb spans, for a given scale and distance. */
+export function orbHeightFraction(scale: number, z: number, fovDeg: number): number {
+  return scale / (z * Math.tan((fovDeg * Math.PI / 180) / 2))
 }

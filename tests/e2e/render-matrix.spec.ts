@@ -19,6 +19,7 @@ import {
   frameAdvance,
   glRenderer,
   isSoftwareRenderer,
+  expectsHardwareGl,
   skipSplash,
 } from "./helpers";
 import { makeWavFile } from "./fixtures";
@@ -55,12 +56,21 @@ test("the orb renders and keeps rendering on this client", async ({ page }, test
   // The hardware project must not pass on a silent fallback. Chromium does not
   // error when it cannot get a GPU -- it quietly uses SwiftShader, which would
   // make this a test claiming hardware coverage while exercising software.
-  // Skipping with the reason is honest; passing would not be.
+  //
+  // Where no render node exists (CI), skipping with the reason is honest.
+  // Where one DOES exist, a fallback is a regression and has to fail: the
+  // renderer string names which kind -- "SwiftShader" means the ANGLE flags are
+  // wrong, "llvmpipe" means the flags are right and this process cannot read
+  // the render node.
   if (testInfo.project.name === "desktop-hardware-gl") {
-    test.skip(
-      isSoftwareRenderer(renderer),
-      `no hardware GL on this host (renderer: ${renderer})`,
-    );
+    if (expectsHardwareGl()) {
+      expect(
+        isSoftwareRenderer(renderer),
+        `/dev/dri/renderD128 exists, so this project must run on the GPU, but got: ${renderer}`,
+      ).toBe(false);
+    } else {
+      test.skip(true, `no hardware GL on this host (renderer: ${renderer})`);
+    }
   }
 
   await loadTrack(page);
@@ -86,7 +96,12 @@ test("the canvas is sized for this device's pixel ratio", async ({ page }, testI
   await skipSplash(page);
   await page.goto("/", { waitUntil: "networkidle" });
   if (testInfo.project.name === "desktop-hardware-gl") {
-    test.skip(isSoftwareRenderer(await glRenderer(page)), "no hardware GL on this host");
+    const renderer = await glRenderer(page);
+    if (expectsHardwareGl()) {
+      expect(isSoftwareRenderer(renderer), `expected the GPU, got: ${renderer}`).toBe(false);
+    } else {
+      test.skip(true, "no hardware GL on this host");
+    }
   }
   await loadTrack(page);
 

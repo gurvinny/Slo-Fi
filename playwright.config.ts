@@ -22,9 +22,23 @@ const SOFTWARE_GL = [
 // this silently falls back -- Chromium does not error, it just uses SwiftShader,
 // and a project that claimed hardware coverage while running software would be
 // exactly the kind of green check that proves nothing.
+//
+// `--use-angle=gl-egl` is load-bearing, not a synonym for `--use-angle=gl`.
+// Measured on this host with /dev/dri passed through: `gl` returned the
+// SwiftShader renderer string byte-for-byte identically to the software
+// project, while `gl-egl` returned "ANGLE (Intel, Mesa Intel(R) UHD Graphics
+// 770 (ADL-S GT1))". There is no X server here, so ANGLE's default GL backend
+// finds no display and falls back silently; gl-egl selects Mesa's surfaceless
+// EGL platform, which is the only one that initialises headless.
+// `--ozone-platform=headless` was tested and changes nothing either way.
+//
+// The two software renderer strings are a useful diagnostic pair: "SwiftShader"
+// means the FLAGS are wrong, "llvmpipe" means the flags are right and the
+// process lacks read access to the render node (its group). isSoftwareRenderer
+// matches both.
 const HARDWARE_GL = [
   "--use-gl=angle",
-  "--use-angle=gl",
+  "--use-angle=gl-egl",
   "--ignore-gpu-blocklist",
   "--enable-gpu-rasterization",
 ];

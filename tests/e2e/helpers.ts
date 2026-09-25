@@ -2,6 +2,7 @@
  * Shared browser-QA helpers.
  * Author: gurvinny
  */
+import { existsSync } from "node:fs";
 import { PNG } from "pngjs";
 import type { Page, Locator } from "@playwright/test";
 
@@ -353,6 +354,23 @@ export async function glRenderer(page: Page): Promise<string | null> {
 }
 
 /** True when the active backend is a software rasteriser rather than a GPU. */
+/**
+ * Whether this host is expected to deliver hardware GL.
+ *
+ * Exists so the hardware project can ASSERT rather than skip. Skipping on a
+ * silent SwiftShader fallback is honest on a GPU-less CI runner, but on a host
+ * where the render node is present it converts a real regression -- a reverted
+ * ANGLE flag, or the test process losing the render node's group -- into a
+ * green run with a skip nobody reads.
+ *
+ * Gated on the node existing rather than on being readable: if it exists but
+ * this process cannot open it, ANGLE falls back to llvmpipe, and we want that
+ * to FAIL loudly with the renderer string rather than quietly skip.
+ */
+export function expectsHardwareGl(): boolean {
+  return existsSync("/dev/dri/renderD128");
+}
+
 export function isSoftwareRenderer(renderer: string | null): boolean {
   return (
     renderer === null ||

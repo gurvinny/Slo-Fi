@@ -26,12 +26,20 @@ import {
   Texture,
   FrontSide,
   AdditiveBlending,
-  ACESFilmicToneMapping,
+  NeutralToneMapping,
 } from 'three'
 import type { IUniform } from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { AdaptiveRange } from '../audio/AdaptiveRange'
+import {
+  computeKickVis,
+  computeBloomTwoStage,
+  computeOrbPulse,
+  computeCameraZ,
+  updateFlash,
+} from './orbDrivers'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { alpha, tauFromLerp } from '../audio/envelope'
@@ -879,6 +887,13 @@ export class AnomalySphere {
   // heavy mastering / limiting (where raw bass barely varies), remapping
   // bassFloor→bassCeiling to 0→1 makes the orb feel alive even when the
   // waveform looks like a solid rectangle in a DAW.
+  // Adaptive range for the kick channel. bVis has had normalisation since the
+  // beginning; kickVis -- which drives ALL motion -- never did, so how hard the
+  // orb moved was decided by how loud the master was.
+  private kickRange     = new AdaptiveRange()
+  private _prevOrbT     = 0   // previous frame's elapsed, for dtOrb
+  private _bloomFlash   = 0   // transient flash envelope, second bloom stage
+  private _kickNorm     = 0   // adapted kick 0-1, shared by bloom and the flash gate
   private bassFloor     = 0   // slow-rising floor: ignores brief dips, tracks silence
   private bassCeiling   = 0.4 // fast-rising ceiling: immediately captures peaks
   // ── Kick detection via spectral flux ─────────────────────────────────────
@@ -1044,8 +1059,14 @@ export class AnomalySphere {
     })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 2 : 3))
     this.renderer.setClearColor(new Color('#080810'), 1)
-    // ACESFilmic gracefully compresses HDR bloom values instead of clipping to white
-    this.renderer.toneMapping         = ACESFilmicToneMapping
+    // Neutral (Khronos PBR Neutral), not ACESFilmic. ACES desaturates highlights
+    // by design -- its curve converges toward white as luminance rises, which is
+    // exactly "bright but colourless". Measured on a real track at Glow 100 /
+    // Reactivity 80: mean chroma of bright pixels 0.244 -> 0.303 (+24%), frames
+    // carrying a white-out 11/24 -> 7/24, local contrast 0.149 -> 0.156, at the
+    // same exposure. AgX was far worse (64% of bright pixels colourless) and
+    // Reinhard bought fewer blow-outs by dulling everything (60.7%, worst detail).
+    this.renderer.toneMapping         = NeutralToneMapping
     this.renderer.toneMappingExposure = 0.50
 
     // Size to something non-zero right away so the composer doesn't start at 1x1
@@ -1237,7 +1258,7 @@ export class AnomalySphere {
 
       newRenderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 2 : 3))
       newRenderer.setClearColor(new Color('#080810'), 1)
-      newRenderer.toneMapping        = ACESFilmicToneMapping
+      newRenderer.toneMapping        = NeutralToneMapping
       newRenderer.toneMappingExposure = 0.50
 
       // Rebuild the EffectComposer with the new renderer.
@@ -1567,6 +1588,14 @@ export class AnomalySphere {
     this._elapsed += dt
     const elapsed = this._elapsed
 
+    // A dt for the adaptive range, derived from `elapsed` rather than from
+    // clock.getDelta(): getElapsedTime() and getDelta() both advance the same
+    // internal oldTime, so calling one breaks the other, and this loop needs
+    // the absolute time as well. Clamped so a backgrounded tab returning does
+    // not hand the estimator a multi-second step.
+    const dtOrb = Math.min(Math.max(elapsed - this._prevOrbT, 0), 0.1)
+    this._prevOrbT = elapsed
+
     // Under reduced motion: render the orb as a static glowing sphere with
     // no vertex displacement or beat-driven animation. The bloom and color
     // still render so the orb remains visible, just motionless.
@@ -1718,7 +1747,13 @@ export class AnomalySphere {
     //   kickVis drives: vertex displacement (uBass), bloom, scale pulse, rotation,
     //   crack veins, glitch, and lightning.  This makes ALL motion effects respond
     //   to individual kick transients rather than sustained bass level.
-    const kickVis = Math.min(this.kickEnergy * this.reactivity * 2.8, 1.4)
+    const kickNorm = this.kickRange.update(this.kickEnergy, dtOrb)
+    this._kickNorm = kickNorm
+    // Instant attack, ~110ms release, gated on the NORMALISED kick so "hard"
+    // means hard for this track -- which is what lets sustained bass glow
+    // without strobing.
+    this._bloomFlash = updateFlash(this._bloomFlash, kickNorm, dtOrb)
+    const kickVis = computeKickVis(this.kickEnergy, kickNorm, this.reactivity)
 
     // mVis / tVis — mid and treble visual levels; used for colour and particles only.
     const mVis    = this.mid    * this.reactivity
@@ -1831,14 +1866,13 @@ export class AnomalySphere {
     // Bloom spikes on bass hits; intro adds a brief acceptance surge (sin arc)
     // peaks at the midpoint of the reveal, fades out as the orb settles
     const introSurge = Math.sin(introClamp * Math.PI) * 0.55
-    this.bloom.strength = (Math.min(0.20 + this.reverb * 0.28 + kickVis * 0.72, 1.10) + introSurge) * this.glowMult * this.visualFade * introClamp
+    this.bloom.strength = computeBloomTwoStage(this._kickNorm, this._bloomFlash, this.reverb, this.glowMult, this.visualFade, introSurge, introClamp)
 
     // Mesh scale: intro reveal + base size + optional bass pulse + loop pulse
     // introProgress uses ease-out-back so the orb slightly overshoots before settling
-    const pulseFactor = (this.bassPulse ? kickVis * 0.44 : 0) + kickVis * 0.14
-    this._loopPulseAmount -= this._loopPulseAmount * alpha(LOOP_PULSE_TAU, dt)   // ~1.5 s decay
-    const loopPulseFactor  = this._loopPulseAmount * 0.08
-    this.mesh.scale.setScalar(this.orbBaseScale * (1.0 + pulseFactor + loopPulseFactor) * this.introProgress)
+    this._loopPulseAmount -= this._loopPulseAmount * alpha(LOOP_PULSE_TAU, dt)   // ~1.5 s decay, frame-rate independent
+    const orbPulse = computeOrbPulse(kickVis, this.bassPulse, this._loopPulseAmount)
+    this.mesh.scale.setScalar(this.orbBaseScale * orbPulse * this.introProgress)
 
     // Rotation: when 8D mode is active, the orb tracks the panner angle directly.
     // Otherwise the normal audio-reactive rotation drives it.
@@ -1958,16 +1992,12 @@ export class AnomalySphere {
     const aspect     = w / h
     this.camera.aspect = aspect
 
-    // Target a consistent visual size on every display:
-    //   Landscape — orb fills 38% of viewport height
-    //   Portrait  — orb fills 66% of viewport width (feels balanced on phone)
-    // sphere radius = 1 unit; tan(30°) ≈ 0.577 for FOV 60°
-    const tanHalfFov = Math.tan((this.camera.fov * Math.PI / 180) / 2)
-    const z = aspect >= 1
-      ? 1.0 / (0.38 * tanHalfFov)               // landscape: 38% of height
-      : 1.0 / (0.66 * aspect * tanHalfFov)       // portrait:  66% of width
-
-    this.camera.position.z = Math.max(3.5, Math.min(z, 7.5))
+    // Frame the PEAK, not the resting orb. Solving for a radius-1 sphere while
+    // the mesh pulses to ~1.85x measured 58.3% of viewport height on desktop and
+    // 107.2% of viewport WIDTH in portrait -- on a phone the orb did not fit on
+    // screen when a kick landed. Peak scale is read from the same constants the
+    // pulse uses so the two cannot drift apart again.
+    this.camera.position.z = computeCameraZ(aspect, this.camera.fov, this.orbBaseScale)
 
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h, false)

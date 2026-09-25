@@ -14,7 +14,6 @@ import {
   Scene,
   PerspectiveCamera,
   Mesh,
-  Clock,
   Line,
   LineBasicMaterial,
   Points,
@@ -43,6 +42,10 @@ import {
 } from './orbDrivers'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { alpha, tauFromLerp } from '../audio/envelope'
+import { OrbSignal } from '../audio/OrbSignal'
+import { RIPPLE_CAPACITY, RIPPLE_STRIDE } from '../audio/RippleBank'
+import { bandEnergy as bandEnergyOf, freqToBin as freqToBinOf } from '../audio/spectrum'
 
 // ── Orb brightness and density ───────────────────────────────────────────────
 // These five numbers decide whether anything happening on the orb's surface can
@@ -210,6 +213,19 @@ uniform float uSpeed;   // 0.25-1.0 — slower = dreamier, larger distortion
 uniform float uCrystal; // 0-1 — flattens displacement toward a perfect sphere when paused
 uniform float uSubBass; // isolated 20-80 Hz sub-bass — drives slow ominous 808 rumble
 
+// ── ANOMALY III drivers ──────────────────────────────────────────────────────
+// uRadius is layer 1: the breathing MASS. It is a uniform radial swell rather
+// than another noise term, because the thing it represents is how much low end
+// the track is carrying, not where on the surface it lands.
+uniform float uRadius;
+// uShimmer is layer 3: high-frequency surface micro-detail.
+uniform float uShimmer;
+// uRipples is layer 2, packed as RIPPLE_CAPACITY x 2 vec4s:
+//   [i*2]   = origin.xyz (a point on the unit sphere), age normalised 0-1
+//   [i*2+1] = strength, then three unused slots
+// Unfilled slots are zeroed, and zero strength contributes nothing.
+uniform vec4 uRipples[8];
+
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 varying float vDisp;
@@ -230,8 +246,51 @@ void main() {
   float d3   = snoise(normal * 9.2 + t * 1.05) * uTreble * 0.05;
   float idle = snoise(normal * 1.9 + t * 0.16) * 0.028;
 
+  // Layer 1 — the mass. Uniform in every direction, so it reads as the orb
+  // breathing rather than as more noise.
+  float swell = uRadius * 0.22 * slowAmp;
+
+  // Layer 3 — shimmer. Very high spatial frequency, tiny amplitude: it should
+  // register as surface texture, not as shape.
+  float shimmer = snoise(normal * 16.0 + t * 1.6) * uShimmer * 0.035;
+
+  // Layer 2 — travelling ripples. Each onset spawns a wavefront at a point on
+  // the sphere that expands to the antipode over the ripple's life.
+  //
+  // RIPPLE_W is in radians of angular distance and is deliberately generous.
+  // Mean vertex spacing is ~0.07 rad at icosahedron detail 4 (the mobile
+  // branch) against ~0.018 at detail 6, so a narrow wavefront would not read as
+  // thinner on mobile -- it would fall between vertices and vanish entirely.
+  const float RIPPLE_W = 0.28;
+  const float PI = 3.14159265;
+  float ripple = 0.0;
+  for (int i = 0; i < 4; i++) {
+    vec4 head = uRipples[i * 2];
+    float strength = uRipples[i * 2 + 1].x;
+    // Angular distance from this vertex to the ripple's origin.
+    float d = acos(clamp(dot(normal, head.xyz), -1.0, 1.0));
+    // The wavefront position: 0 at the origin, PI at the antipode.
+    float front = head.w * PI;
+    float band = exp(-pow((d - front) / RIPPLE_W, 2.0));
+    // Fade with age as well, so a ripple dies out instead of snapping off.
+    ripple += strength * band * (1.0 - head.w) * 0.16;
+  }
+
+  // Two budgets, not one, and this is load-bearing rather than tidy.
+  //
+  // With a single clamp the sustained terms starve the transient ones: measured
+  // at the default reactivity on loud material, swell + d1 alone come to 0.56
+  // against a 0.52 ceiling, so ripple (max 0.16) and shimmer (max 0.014) were
+  // clipped to nothing before they rendered. Layer 2 existed, was computed, was
+  // uploaded, and could not be seen. Giving the transients a reserved budget
+  // means a beat always has room to displace no matter how loud the bass is.
+  //
+  // The total bound is still 0.52, so the orb's silhouette budget is unchanged.
+  float mass      = clamp(dSub + d1 + d2 + d3 + d4 + idle + swell, -0.36, 0.36);
+  float transient = clamp(shimmer + ripple, -0.16, 0.16);
+
   // Crystal flattening: displacement irons toward a perfect sphere when paused.
-  float disp = clamp(dSub + d1 + d2 + d3 + d4 + idle, -0.52, 0.52) * (1.0 - uCrystal * 0.90);
+  float disp = (mass + transient) * (1.0 - uCrystal * 0.90);
   vDisp = disp;
 
   vNormal   = normalize(normalMatrix * normal);
@@ -263,6 +322,7 @@ uniform float uReverb;    // 0-1 — higher = more iridescent / glowy wash
 uniform float uCrack;     // 0-1 — fracture vein intensity, peaks on hard bass
 uniform float uCrystal;   // 0-1 — crystallization, lerps toward 1 when paused
 uniform float uWireframe; // 1.0 = wireframe mode — flat bright lines, no surface shading
+uniform float uShimmer;   // 0-1 — high-frequency surface detail, layer 3
 uniform vec3  uColorA;    // hue 0   — cycles each frame
 uniform vec3  uColorB;    // hue +0.28 offset
 uniform vec3  uColorC;    // hue +0.55 offset
@@ -314,7 +374,7 @@ void main() {
   // Subtle iridescent shimmer — kept light so it doesn't hide the palette colors
   float iridHue  = fract(nDotV * 0.40 + vDisp * 0.30 + uTime * 0.035 + uBass * 0.25);
   vec3 iridColor = hsv2rgb(vec3(iridHue, 0.60, 0.65));
-  float iridMix  = 0.05 + uTreble * 0.08 + uReverb * 0.12;
+  float iridMix  = 0.05 + uTreble * 0.08 + uShimmer * 0.10 + uReverb * 0.12;
   color = mix(color, iridColor, clamp(iridMix, 0.0, 0.28));
 
   color *= dispBright;
@@ -529,16 +589,64 @@ const GRAIN_CA_SHADER = {
   `,
 }
 
-// ── Damping constants ────────────────────────────────────────────────────────
-// Bass uses asymmetric lerp (fast attack, slow decay) for punchy impact.
-const BASS_LERP_UP   = 0.32   // fast attack — orb snaps to the beat immediately
-const BASS_LERP_DOWN = 0.025  // slow decay  — energy lingers after the hit
-const MID_LERP       = 0.040
-const TREBLE_LERP    = 0.060
+// ── Damping constants, as time constants ─────────────────────────────────────
+// These were per-frame lerp factors, and that made every envelope in the orb
+// frame-rate dependent. Desktop is uncapped (_targetFps 0), so on a 144 Hz
+// display every attack and decay ran ~2.4x fast, and setLowPower() halves
+// mobile to 30 fps, which doubles them. The orb literally moved differently on
+// different monitors.
+//
+// Every tau below is derived from the constant it replaces at 60 fps via
+// tauFromLerp, so this conversion preserves the current feel BY CONSTRUCTION
+// rather than by taste. A `*= m` decay is the same shape with a target of zero,
+// so its tau is tauFromLerp(1 - m).
+//
+// Notable: BASS_TAU_DOWN works out at 0.658 s, which is what makes the bass
+// feel laggy. That is kept as-is here on purpose -- retuning it is a separate,
+// deliberate change, not a side effect of a mechanical conversion.
+const BASS_TAU_UP    = tauFromLerp(0.32)   // fast attack — snaps to the beat
+const BASS_TAU_DOWN  = tauFromLerp(0.025)  // slow decay  — energy lingers
+const MID_TAU        = tauFromLerp(0.040)
+const TREBLE_TAU     = tauFromLerp(0.060)
+const SUB_TAU_UP     = tauFromLerp(0.38)   // 808 strikes register immediately
+const SUB_TAU_DOWN   = tauFromLerp(0.028)  // energy holds through the long tail
 // UI beat-pulse values — fast attack + moderate decay for snappy site-wide reactivity
-const UI_BASS_UP     = 0.32   // near-instant attack so UI hits land on the beat
-const UI_BASS_DOWN   = 0.08   // faster decay than aurora bass (~12 frames)
-const UI_TREBLE_LERP = 0.10
+const UI_BASS_TAU_UP   = tauFromLerp(0.32)
+const UI_BASS_TAU_DOWN = tauFromLerp(0.08)
+const UI_TREBLE_TAU    = tauFromLerp(0.10)
+// Adaptive floor/ceiling: the floor is deliberately glacial, the ceiling chases
+// peaks fast and releases slowly.
+const BASS_FLOOR_TAU      = tauFromLerp(0.0006)
+const BASS_CEIL_TAU_UP    = tauFromLerp(0.04)
+const BASS_CEIL_TAU_DOWN  = tauFromLerp(0.003)
+const KICK_TAU_UP    = tauFromLerp(0.55)
+const KICK_TAU_DOWN  = tauFromLerp(0.12)
+// Decays used while stopped, as `*= m` at 60 fps.
+const CALM_TAU       = tauFromLerp(1 - 0.96)
+const CALM_KICK_TAU  = tauFromLerp(1 - 0.90)
+const CALM_UI_TAU    = tauFromLerp(1 - 0.92)
+const FADE_TAU       = tauFromLerp(0.028)
+const LOOP_PULSE_TAU = tauFromLerp(1 - 0.985)
+const CRYSTAL_TAU_PLAYING = tauFromLerp(0.010)
+const CRYSTAL_TAU_IDLE    = tauFromLerp(0.005)
+const CRYSTAL_TAU_OFF     = tauFromLerp(0.05)
+const CRACK_TAU_UP   = tauFromLerp(0.28)
+const CRACK_TAU_DOWN = tauFromLerp(0.10)
+const CRACK_TAU_OFF  = tauFromLerp(1 - 0.85)
+const GLITCH_TAU_UP   = tauFromLerp(0.22)
+const GLITCH_TAU_DOWN = tauFromLerp(0.10)
+const GLITCH_TAU_OFF  = tauFromLerp(1 - 0.80)
+
+// A tab return, a GC pause or a breakpoint hands the loop a dt of seconds. The
+// envelopes would saturate harmlessly, but uTime is integrated, so an unclamped
+// dt makes the noise field jump -- which is the hidden-tab time jump.
+const MAX_DT = 0.1
+
+// Read gates for the orb pipeline. 120 Hz is generous for motion and halves the
+// work on a 240 Hz display; 4 Hz is plenty for a question whose answer changes
+// over seconds.
+const ORB_MIN_INTERVAL  = 1 / 120
+const ORB_FINE_INTERVAL = 1 / 4
 
 // ── Glitch / scanline corruption pass ────────────────────────────────────────
 // A post-processing ShaderPass that simulates digital video corruption.
@@ -712,7 +820,32 @@ export class AnomalySphere {
   private composer:  EffectComposer
   private bloom:     UnrealBloomPass
   private grainPass?: ShaderPass
-  private clock:     Clock
+  // ── ANOMALY III signal pipeline ──────────────────────────────────────────
+  // OrbSignal owns the whole audio -> motion chain and takes no analyser, no
+  // three.js and no DOM -- two byte arrays and a dt. That is what makes the
+  // maths in it testable in node, which none of it was while it lived here.
+  private orb: OrbSignal | null = null
+  private orbFast: AnalyserNode | null = null
+  private orbFine: AnalyserNode | null = null
+  private readonly rippleBuf = new Float32Array(RIPPLE_CAPACITY * RIPPLE_STRIDE)
+  // Typed as Uint8Array<ArrayBuffer> rather than cast at the call site:
+  // getByteFrequencyData will not accept a possibly-shared buffer, and
+  // allocating a plain ArrayBuffer states that directly instead of asserting it
+  // away with `as`, which would also hide any real mismatch here later.
+  private fastData: Uint8Array<ArrayBuffer> | null = null
+  private fineData: Uint8Array<ArrayBuffer> | null = null
+  // The fine analyser answers "where does this track keep its low end", which
+  // changes over seconds. Reading its 4096 bins every frame would be pure waste.
+  private _fineAccum = 0
+  // Gate the pipeline to <=120 Hz: desktop is uncapped, and a 240 Hz display
+  // should not run four times the JS for motion nobody can see.
+  private _orbAccum = 0
+
+  // Wall-clock state for the loop. _prevFrameT is the previous rAF timestamp
+  // and _elapsed the clamped integral of dt -- together they replace Clock,
+  // whose getElapsedTime() and getDelta() cannot both be used on one instance.
+  private _prevFrameT = performance.now()
+  private _elapsed    = 0
 
   private analyser: AnalyserNode
   private freqData: Uint8Array<ArrayBuffer>
@@ -834,6 +967,9 @@ export class AnomalySphere {
     uCrack:      IUniform<number>
     uCrystal:    IUniform<number>
     uWireframe:  IUniform<number>
+    uRadius:     IUniform<number>
+    uShimmer:    IUniform<number>
+    uRipples:    IUniform<Float32Array>
     uColorA:     IUniform<Color>
     uColorB:  IUniform<Color>
     uColorC:  IUniform<Color>
@@ -874,11 +1010,36 @@ export class AnomalySphere {
   // fast-attack uiBass/uiTreble for snappy site-wide UI reactivity.
   public onEnergyUpdate: ((bass: number, mid: number, treble: number, uiBass: number, uiTreble: number) => void) | null = null
 
-  constructor(container: HTMLElement, analyser: AnalyserNode) {
+  /**
+   * @param analyser     the shared post-effects node, still used for the
+   *                     colour/particle channels and onEnergyUpdate
+   * @param orbFast      2048-point analyser, stc 0 -- onsets and band energy
+   * @param orbFine      8192-point analyser, stc 0 -- the low-end centroid
+   *
+   * The orb analysers are optional so a caller with nothing to supply still
+   * gets a working orb on the old channels, rather than a crash.
+   */
+  constructor(
+    container: HTMLElement,
+    analyser: AnalyserNode,
+    orbFast?: AnalyserNode | null,
+    orbFine?: AnalyserNode | null,
+  ) {
     this.analyser  = analyser
     this.freqData  = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>
-    this.clock     = new Clock()
     this.container = container
+
+    if (orbFast && orbFine) {
+      this.fastData = new Uint8Array(new ArrayBuffer(orbFast.frequencyBinCount))
+      this.fineData = new Uint8Array(new ArrayBuffer(orbFine.frequencyBinCount))
+      this.orbFast  = orbFast
+      this.orbFine  = orbFine
+      this.orb = new OrbSignal({
+        sampleRate: orbFast.context.sampleRate,
+        fastBins:   orbFast.frequencyBinCount,
+        fineBins:   orbFine.frequencyBinCount,
+      })
+    }
 
     // ── Renderer ────────────────────────────────────────────────────────────
     // Match the page background exactly so removing the CSS box makes the
@@ -954,6 +1115,11 @@ export class AnomalySphere {
       uCrack:      { value: 0 },
       uCrystal:    { value: 0 },
       uWireframe:  { value: 1.0 },
+      uRadius:     { value: 0 },
+      uShimmer:    { value: 0 },
+      // A flat Float32Array, which three.js uploads with uniform4fv -- and it is
+      // exactly what RippleBank.pack writes, so no per-frame copy or conversion.
+      uRipples:    { value: this.rippleBuf },
       uColorA:     { value: new Color('#9b6dff') },
       uColorB:  { value: new Color('#00d4aa') },
       uColorC:  { value: new Color('#ff6eb4') },
@@ -1348,6 +1514,47 @@ export class AnomalySphere {
   // Called from App.ts whenever the speed slider changes (0.25-1.0)
   setSpeed(v: number): void { this.speed = v }
 
+  /**
+   * Drive the ANOMALY III pipeline and publish its drivers to the shader.
+   *
+   * Two independent read gates, for two different reasons:
+   *
+   * The fast analyser and OrbSignal run at up to 120 Hz. Desktop is uncapped,
+   * so a 240 Hz display would otherwise run four times the JS for motion that
+   * cannot be seen -- and dt is accumulated across skipped frames rather than
+   * dropped, so the envelopes integrate the same total time either way.
+   *
+   * The fine analyser runs at ~4 Hz. It exists to answer "where does this track
+   * keep its low end", which changes over seconds; reading its 4096 bins every
+   * frame would be waste. Its buffer persists between reads, so OrbSignal is
+   * still handed a full spectrum on every update.
+   */
+  private updateOrbSignal(dt: number): void {
+    if (!this.orb || !this.orbFast || !this.orbFine || !this.fastData || !this.fineData) return
+
+    this._fineAccum += dt
+    if (this._fineAccum >= ORB_FINE_INTERVAL) {
+      this._fineAccum = 0
+      this.orbFine.getByteFrequencyData(this.fineData)
+    }
+
+    this._orbAccum += dt
+    if (this._orbAccum < ORB_MIN_INTERVAL) return
+    const step = this._orbAccum
+    this._orbAccum = 0
+
+    this.orbFast.getByteFrequencyData(this.fastData)
+    const drivers = this.orb.update(this.fastData, this.fineData, step, this.playing)
+
+    // Gain 1.2, not 2.2. Measured: drivers.radius peaks at ~1.02 on loud material,
+    // so x2.2 at the default reactivity of 0.8 pinned this at its own ceiling --
+    // and a driver held at its ceiling is not a driver, it is a DC offset. Layer
+    // 1 stopped breathing exactly when there was most to breathe to.
+    this.uniforms.uRadius.value  = Math.min(drivers.radius * this.reactivity * 1.2, 1.0)
+    this.uniforms.uShimmer.value = Math.min(drivers.shimmer * this.reactivity * 2.2, 1.0)
+    this.orb.packRipples(this.uniforms.uRipples.value)
+  }
+
   private loop(now: number = performance.now()): void {
     this.rafId = requestAnimationFrame((t) => this.loop(t))
 
@@ -1369,7 +1576,17 @@ export class AnomalySphere {
       this._lastFrameT = now
     }
 
-    const elapsed = this.clock.getElapsedTime()
+    // dt, and an accumulator in place of Clock.getElapsedTime().
+    //
+    // Clock cannot supply both: getElapsedTime() and getDelta() each advance the
+    // same internal oldTime, so calling one breaks the other. And an accumulator
+    // is the better answer anyway -- clamping dt means a return from a hidden tab
+    // resumes where the animation left off instead of jumping forward by however
+    // long the tab was away.
+    const dt = Math.min(Math.max((now - this._prevFrameT) / 1000, 0), MAX_DT)
+    this._prevFrameT = now
+    this._elapsed += dt
+    const elapsed = this._elapsed
 
     // A dt for the adaptive range, derived from `elapsed` rather than from
     // clock.getDelta(): getElapsedTime() and getDelta() both advance the same
@@ -1388,6 +1605,9 @@ export class AnomalySphere {
       this.uniforms.uMid.value     = 0
       this.uniforms.uTreble.value  = 0
       this.uniforms.uSubBass.value = 0
+      this.uniforms.uRadius.value  = 0
+      this.uniforms.uShimmer.value = 0
+      this.uniforms.uRipples.value.fill(0)
       this.bloom.strength = 0.25 * this.glowMult
       this.composer.render()
       return
@@ -1423,13 +1643,14 @@ export class AnomalySphere {
 
       // Bass uses the globally-tuned asymmetric lerp constants so it snaps
       // fast on attack and lingers on decay (punchy but weighty feel).
-      const bassLerp = rawBass > this.bass ? BASS_LERP_UP : BASS_LERP_DOWN
-      this.bass    += (rawBass    - this.bass)    * bassLerp
-      // Sub-bass: fast attack (0.38) so 808 strikes register immediately,
-      // very slow decay (0.028) so the energy holds through the long tail.
-      this.subBass += (rawSubBass - this.subBass) * (rawSubBass > this.subBass ? 0.38 : 0.028)
-      this.mid     += (rawMid    - this.mid)    * MID_LERP
-      this.treble  += (rawTreble - this.treble) * TREBLE_LERP
+      const bassTau = rawBass > this.bass ? BASS_TAU_UP : BASS_TAU_DOWN
+      this.bass    += (rawBass    - this.bass)    * alpha(bassTau, dt)
+      // Sub-bass: fast attack so 808 strikes register immediately, very slow
+      // decay so the energy holds through the long tail.
+      this.subBass += (rawSubBass - this.subBass) *
+        alpha(rawSubBass > this.subBass ? SUB_TAU_UP : SUB_TAU_DOWN, dt)
+      this.mid     += (rawMid    - this.mid)    * alpha(MID_TAU, dt)
+      this.treble  += (rawTreble - this.treble) * alpha(TREBLE_TAU, dt)
 
       // ── Adaptive floor / ceiling ────────────────────────────────────────────
       // bassFloor rises very slowly (α = 0.0006 ≈ 1 000+ frames to settle),
@@ -1441,8 +1662,9 @@ export class AnomalySphere {
       // Together, floor→ceiling defines the "active range" of this specific track.
       // normalizedBass later remaps this range to 0→1 so the orb always uses its
       // full motion envelope regardless of how hard the master was compressed.
-      this.bassFloor   += ((rawBass * 0.7) - this.bassFloor)   * 0.0006
-      this.bassCeiling += (rawBass - this.bassCeiling) * (rawBass > this.bassCeiling ? 0.04 : 0.003)
+      this.bassFloor   += ((rawBass * 0.7) - this.bassFloor) * alpha(BASS_FLOOR_TAU, dt)
+      this.bassCeiling += (rawBass - this.bassCeiling) *
+        alpha(rawBass > this.bassCeiling ? BASS_CEIL_TAU_UP : BASS_CEIL_TAU_DOWN, dt)
       // Hard minimum gap of 0.12 so the range never collapses to near-zero during
       // a silent section and cause a division-by-near-zero blow-up below.
       this.bassCeiling  = Math.max(this.bassCeiling, this.bassFloor + 0.12)
@@ -1479,7 +1701,8 @@ export class AnomalySphere {
         kickFlux = Math.min(kickFlux / ((kickHi - kickLo + 1) * 255) * 8.0, 1.0)
       }
       // Asymmetric smoothing: fast attack (0.55), moderate decay (0.12)
-      this.kickEnergy += (kickFlux - this.kickEnergy) * (kickFlux > this.kickEnergy ? 0.55 : 0.12)
+      this.kickEnergy += (kickFlux - this.kickEnergy) *
+        alpha(kickFlux > this.kickEnergy ? KICK_TAU_UP : KICK_TAU_DOWN, dt)
 
       // Lazy-allocate the previous-frame buffer on the first playing frame.
       // After allocation, copy current frame so next frame has something to diff.
@@ -1487,20 +1710,23 @@ export class AnomalySphere {
       this.prevFreqData.set(this.freqData)
 
       // Fast-attack UI pulse values for site-wide reactivity
-      const uiBassLerp = rawBass > this.uiBass ? UI_BASS_UP : UI_BASS_DOWN
-      this.uiBass   += (rawBass   - this.uiBass)   * uiBassLerp
-      this.uiTreble += (rawTreble - this.uiTreble) * UI_TREBLE_LERP
+      const uiBassTau = rawBass > this.uiBass ? UI_BASS_TAU_UP : UI_BASS_TAU_DOWN
+      this.uiBass   += (rawBass   - this.uiBass)   * alpha(uiBassTau, dt)
+      this.uiTreble += (rawTreble - this.uiTreble) * alpha(UI_TREBLE_TAU, dt)
 
       this.onEnergyUpdate?.(this.bass, this.mid, this.treble, this.uiBass, this.uiTreble)
     } else {
       // Decay toward zero so the sphere calms down after stopping
-      this.bass       *= 0.96
-      this.subBass    *= 0.96
-      this.mid        *= 0.96
-      this.treble     *= 0.96
-      this.kickEnergy *= 0.90
-      this.uiBass     *= 0.92
-      this.uiTreble   *= 0.92
+      const calm     = alpha(CALM_TAU, dt)
+      const calmKick = alpha(CALM_KICK_TAU, dt)
+      const calmUi   = alpha(CALM_UI_TAU, dt)
+      this.bass       -= this.bass       * calm
+      this.subBass    -= this.subBass    * calm
+      this.mid        -= this.mid        * calm
+      this.treble     -= this.treble     * calm
+      this.kickEnergy -= this.kickEnergy * calmKick
+      this.uiBass     -= this.uiBass     * calmUi
+      this.uiTreble   -= this.uiTreble   * calmUi
     }
 
     // ── Reactivity scaling ───────────────────────────────────────────────────
@@ -1552,7 +1778,9 @@ export class AnomalySphere {
       // fast during loud sections and drift slowly during quiet passages.
 
       // 1) Base drift + energy-scaled acceleration
-      this.hueOffset = (this.hueOffset + 0.0012 + energy * 0.004) % 1
+      // Per-frame increments become rates: the same distance per second at any
+      // frame rate. x60 recovers the rate these constants encoded at 60 fps.
+      this.hueOffset = (this.hueOffset + (0.0012 + energy * 0.004) * 60 * dt) % 1
 
       // 2) Bass transient → sharp hue jump on every kick
       if (bassTransient > 0.04) {
@@ -1560,7 +1788,7 @@ export class AnomalySphere {
       }
 
       // 3) Mid energy nudges hue forward continuously
-      this.hueOffset = (this.hueOffset + mN * 0.0008) % 1
+      this.hueOffset = (this.hueOffset + mN * 0.0008 * 60 * dt) % 1
 
       const sat   = 0.78 + energy * 0.18
       const light = 0.40 + energy * 0.14
@@ -1588,16 +1816,33 @@ export class AnomalySphere {
     this.prevBass    = this.bass
     this.prevSubBass = this.subBass
 
+    // ── ANOMALY III drivers ─────────────────────────────────────────────────
+    this.updateOrbSignal(dt)
+
     // Update sphere uniforms — use visual (reactivity-scaled) values
     this.uniforms.uTime.value    = elapsed
     this.uniforms.uSubBass.value = Math.min(this.subBass * this.reactivity * 1.4, 1.0)
-    this.uniforms.uBass.value    = kickVis
+    // uBass now carries bVis -- the heavily smoothed, auto-gained bass mass --
+    // and NOT kickVis. That assignment was the reported jitter: kickVis is
+    // 40-150 Hz spectral flux, a derivative, gained x8 with a 0.55 attack, so
+    // the geometry was wired to the twitchiest signal in the file while the
+    // carefully smoothed value only ever reached colour and particles. The
+    // transients now have a channel of their own in uRipples, which is what
+    // lets this one be calm.
+    this.uniforms.uBass.value    = bVis
     this.uniforms.uMid.value    = mVis
     this.uniforms.uTreble.value = tVis
     this.uniforms.uReverb.value = this.reverb
     this.uniforms.uSpeed.value  = this.speed
 
-    // Mirror values to TSL uniform nodes when WebGPU renderer is active
+    // Mirror values to TSL uniform nodes when WebGPU renderer is active.
+    //
+    // uRadius, uShimmer and uRipples are deliberately NOT mirrored: the TSL
+    // port is partial and gated off behind ENABLE_WEBGPU_UPGRADE, so adding
+    // half-wired nodes here would put the WebGPU path further out of step with
+    // the WebGL one rather than closer. It is the WebGPU phase's job to port
+    // all three properly, and this comment exists so the omission reads as a
+    // decision rather than as something that was missed.
     if (this._tslUniforms) {
       this._tslUniforms.uTime.value    = elapsed
       this._tslUniforms.uSubBass.value = this.uniforms.uSubBass.value
@@ -1613,7 +1858,7 @@ export class AnomalySphere {
     }
 
     // Smooth fade for pause/play — slow lerp for an organic, weighty feel
-    this.visualFade += (this.targetFade - this.visualFade) * 0.028
+    this.visualFade += (this.targetFade - this.visualFade) * alpha(FADE_TAU, dt)
     // Clamp introProgress so it never over-brighten the exposure
     const introClamp = Math.min(this.introProgress, 1)
     this.renderer.toneMappingExposure = 0.50 * this.visualFade * introClamp
@@ -1625,8 +1870,8 @@ export class AnomalySphere {
 
     // Mesh scale: intro reveal + base size + optional bass pulse + loop pulse
     // introProgress uses ease-out-back so the orb slightly overshoots before settling
+    this._loopPulseAmount -= this._loopPulseAmount * alpha(LOOP_PULSE_TAU, dt)   // ~1.5 s decay, frame-rate independent
     const orbPulse = computeOrbPulse(kickVis, this.bassPulse, this._loopPulseAmount)
-    this._loopPulseAmount *= 0.985   // ~1.5 s decay at 60 fps
     this.mesh.scale.setScalar(this.orbBaseScale * orbPulse * this.introProgress)
 
     // Rotation: when 8D mode is active, the orb tracks the panner angle directly.
@@ -1640,7 +1885,7 @@ export class AnomalySphere {
       this.mesh.rotation.x += 0.0006 * rotScale
     } else {
       const rotScale = (0.35 + this.speed * 0.65) * this.rotationSpeed
-      this.mesh.rotation.y += (0.0018 + kickVis * 0.010) * rotScale
+      this.mesh.rotation.y += (0.0018 + kickVis * 0.010) * rotScale * 60 * dt
       this.mesh.rotation.x += 0.0006 * rotScale
     }
 
@@ -1675,10 +1920,11 @@ export class AnomalySphere {
     // transitions smoothly rather than hard-jumping to zero.
     if (this.crystalEnabled) {
       const crystalTarget = this.playing ? 0.0 : 1.0
-      this.crystalAmount += (crystalTarget - this.crystalAmount) * (this.playing ? 0.010 : 0.005)
+      this.crystalAmount += (crystalTarget - this.crystalAmount) *
+        alpha(this.playing ? CRYSTAL_TAU_PLAYING : CRYSTAL_TAU_IDLE, dt)
     } else {
       // Drain smoothly when disabled mid-session (toggle flipped while paused)
-      this.crystalAmount += (0 - this.crystalAmount) * 0.05
+      this.crystalAmount += (0 - this.crystalAmount) * alpha(CRYSTAL_TAU_OFF, dt)
     }
     this.uniforms.uCrystal.value = this.crystalAmount
 
@@ -1692,9 +1938,10 @@ export class AnomalySphere {
     // When the toggle is turned off, the uniform drains at ×0.85/frame.
     if (this.crackEnabled) {
       const crackRaw = Math.max(0, kickVis - 0.30) / 0.50
-      this.uniforms.uCrack.value += (crackRaw - this.uniforms.uCrack.value) * (crackRaw > this.uniforms.uCrack.value ? 0.28 : 0.10)
+      this.uniforms.uCrack.value += (crackRaw - this.uniforms.uCrack.value) *
+        alpha(crackRaw > this.uniforms.uCrack.value ? CRACK_TAU_UP : CRACK_TAU_DOWN, dt)
     } else {
-      this.uniforms.uCrack.value *= 0.85
+      this.uniforms.uCrack.value -= this.uniforms.uCrack.value * alpha(CRACK_TAU_OFF, dt)
     }
 
     // ── Effect: glitch / scanline corruption ─────────────────────────────────
@@ -1709,9 +1956,11 @@ export class AnomalySphere {
     // screen clean immediately after the toggle is switched off.
     if (this.glitchEnabled) {
       const glitchRaw = kickVis > 0.50 ? Math.min(1.0, (kickVis - 0.50) * 2.5) : 0.0
-      this.glitchAmount += (glitchRaw - this.glitchAmount) * (glitchRaw > this.glitchAmount ? 0.22 : 0.10)
+      this.glitchAmount += (glitchRaw - this.glitchAmount) *
+        alpha(glitchRaw > this.glitchAmount ? GLITCH_TAU_UP : GLITCH_TAU_DOWN, dt)
     } else {
-      this.glitchAmount *= 0.80   // drain quickly so the screen clears on toggle-off
+      // drain quickly so the screen clears on toggle-off
+      this.glitchAmount -= this.glitchAmount * alpha(GLITCH_TAU_OFF, dt)
     }
     if (this.glitchPass) {
       this.glitchPass.uniforms['uGlitch'].value = this.glitchAmount
@@ -1760,20 +2009,24 @@ export class AnomalySphere {
   }
 
   // Maps a frequency in Hz to the nearest FFT bin index
+  // Adapters over src/audio/spectrum, so there is one implementation of each
+  // rather than two that drift. The local copies differed subtly and in
+  // opposite directions: this freqToBin never clamped its LOW end, and this
+  // bandEnergy guarded hi <= lo where the shared one does not. Keeping both
+  // risked the orb and the tested pipeline disagreeing about what a band is.
   private freqToBin(freq: number): number {
-    const binCount  = this.freqData.length
-    const sampleRate = this.analyser.context.sampleRate
-    return Math.min(binCount - 1, Math.round((freq * binCount * 2) / sampleRate))
+    return freqToBinOf(freq, this.freqData.length, this.analyser.context.sampleRate)
   }
 
   // Average normalized energy (0-1) across a frequency band
   private bandEnergy(minHz: number, maxHz: number): number {
     const lo = this.freqToBin(minHz)
     const hi = this.freqToBin(maxHz)
+    // The hi <= lo guard is kept here, not pushed into the shared function: a
+    // collapsed band is only reachable through this hz-based entry point, where
+    // a band edge can land above Nyquist.
     if (hi <= lo) return 0
-    let sum = 0
-    for (let i = lo; i <= hi; i++) sum += this.freqData[i] ?? 0
-    return sum / ((hi - lo + 1) * 255)
+    return bandEnergyOf(this.freqData, lo, hi)
   }
 
   setParticleCount(n: number): void {

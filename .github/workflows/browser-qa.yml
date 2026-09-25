@@ -115,7 +115,7 @@ jobs:
 
       - name: Upload failure screenshots
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-qa-failures-${{ matrix.shard }}
           path: test-results/
@@ -141,7 +141,7 @@ jobs:
         run: npm ci
 
       - name: Download shard reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: blob-report-*
           path: all-blob-reports
@@ -151,7 +151,7 @@ jobs:
         run: npx playwright merge-reports --reporter html ./all-blob-reports
 
       - name: Upload merged report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-qa-report
           path: playwright-report/

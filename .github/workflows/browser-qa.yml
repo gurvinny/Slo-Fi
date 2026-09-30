@@ -141,7 +141,7 @@ jobs:
         run: npm ci
 
       - name: Download shard reports
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: blob-report-*
           path: all-blob-reports

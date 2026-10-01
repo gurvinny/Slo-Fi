@@ -1,4 +1,5 @@
 import type { Toast } from './Toast'
+import { isMobileDevice } from './device'
 
 // The beforeinstallprompt event isn't in lib.dom — minimal shape we use.
 interface BeforeInstallPromptEvent extends Event {
@@ -37,6 +38,15 @@ export class InstallController {
 
   // Call once after the first track loads.
   maybePrompt(): void {
+    // Device class first. "Add to Home Screen" has no meaning on a desktop, and
+    // desktop Chrome fires beforeinstallprompt, so without this gate every
+    // check below passes and the toast appears anyway. Form factor rather than
+    // platform: a tablet in desktop mode sends a desktop user agent.
+    //
+    // Returns BEFORE the session key is read or written -- declining to ask is
+    // not the same as having asked, and recording it as such would suppress the
+    // prompt on a device that never saw it.
+    if (!isMobileDevice()) return                                  // desktop: nothing to add
     if (this.isStandalone) return                                  // already installed
     try { if (sessionStorage.getItem(this.SHOWN_KEY) === '1') return } catch { /* ignore */ }
 

@@ -6,6 +6,7 @@ import { resetDom, stubMatchMedia, stubUserAgent } from '../helpers/dom'
 
 const IOS_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1'
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/128.0 Mobile Safari/537.36'
+const DESKTOP_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128.0 Safari/537.36'
 
 // The controller only ever calls toast.show, so a recording stub is the whole
 // dependency -- and it keeps this suite from needing the toast markup.
@@ -150,6 +151,62 @@ describe('InstallController', () => {
     controller.maybePrompt()
 
     expect(next.shown).toEqual([])
+  })
+
+  // The defect this controller shipped with: desktop Chrome fires
+  // beforeinstallprompt, so the toast appeared on machines that have no home
+  // screen to add to. Every other gate above passed on that machine.
+  it('stays silent on desktop even when the browser offers a real install prompt', () => {
+    stubUserAgent(DESKTOP_UA)
+    stubMatchMedia({ 'display-mode: standalone': false, 'pointer: coarse': false })
+    const toast = fakeToast()
+    const controller = new InstallController(toast as never)
+    fireInstallPrompt()
+    controller.maybePrompt()
+
+    expect(toast.shown).toEqual([])
+  })
+
+  // And the gate must not spend the session key on a device it refused to ask.
+  // Otherwise a desktop visit would poison a session that later goes mobile --
+  // and more importantly, "we already asked" would be recorded as true when
+  // nothing was ever shown.
+  it('does not burn the once-per-session key when it declines to ask', () => {
+    stubUserAgent(DESKTOP_UA)
+    stubMatchMedia({ 'display-mode: standalone': false, 'pointer: coarse': false })
+    const controller = new InstallController(fakeToast() as never)
+    fireInstallPrompt()
+    controller.maybePrompt()
+
+    expect(sessionStorage.getItem('slofi-install-shown')).toBeNull()
+  })
+
+  // A tablet in desktop mode sends a desktop UA. The pointer is what gives it
+  // away, and it is the device where A2HS is most worth offering -- so UA
+  // sniffing alone would have under-corrected the fix above.
+  it('still asks a coarse-pointer device that sends a desktop user agent', () => {
+    stubUserAgent(DESKTOP_UA)
+    stubMatchMedia({ 'display-mode: standalone': false, 'pointer: coarse': true })
+    const toast = fakeToast()
+    const controller = new InstallController(toast as never)
+    fireInstallPrompt()
+    controller.maybePrompt()
+
+    expect(toast.shown).toHaveLength(1)
+    expect(toast.shown[0].actionLabel).toBe('Install')
+  })
+
+  // The install gate is about form factor; the standalone gate is about already
+  // being installed. An installed PWA on a phone passes the device check, so
+  // the order of the two returns cannot be allowed to matter.
+  it('keeps the standalone gate ahead of nothing it can shadow', () => {
+    stubMatchMedia({ 'display-mode: standalone': true, 'pointer: coarse': true })
+    const toast = fakeToast()
+    const controller = new InstallController(toast as never)
+    fireInstallPrompt()
+    controller.maybePrompt()
+
+    expect(toast.shown).toEqual([])
   })
 
   it('still works when sessionStorage throws, as it does in private mode', () => {

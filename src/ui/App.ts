@@ -12,6 +12,7 @@ import { ExportController } from './ExportController'
 import { MobileController } from './MobileController'
 import { Toast } from './Toast'
 import { InstallController } from './InstallController'
+import { isMobileUserAgent } from './device'
 import type { AudioParams, ReverbType } from '../types'
 
 function formatTime(seconds: number): string {
@@ -44,7 +45,7 @@ export class App {
   private exporter: ExportController
   private _mobile!: MobileController
 
-  private _isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  private _isMobile = isMobileUserAgent()
   // Core DOM refs
   private dropzone = document.getElementById('dropzone')!
   private fileInput = document.getElementById('fileInput') as HTMLInputElement

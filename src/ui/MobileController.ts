@@ -1,4 +1,5 @@
 import type { AudioEngine } from '../audio/AudioEngine'
+import { isMobileUserAgent } from './device'
 
 // Haptic pulse durations in milliseconds. Short and distinct so they feel
 // like confirmation taps rather than interruptions.
@@ -9,7 +10,7 @@ const HAPTIC_SEEK  = [4]
 // True on iOS/Android where the AudioContext is suspended when the page is
 // hidden. On macOS/Windows/Linux desktop browsers the context keeps running,
 // so the background gain-fade and session-pause logic must be skipped there.
-const IS_MOBILE_PLATFORM = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+const IS_MOBILE_PLATFORM = isMobileUserAgent()
 
 // MobileController owns all mobile-specific browser APIs:
 //   - Media Session API: populates the OS lock screen / notification transport

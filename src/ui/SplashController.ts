@@ -1,6 +1,8 @@
+import { isMobileUserAgent } from './device'
+
 export class SplashController {
   private readonly STORAGE_KEY = 'sf_visited'
-  private readonly IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  private readonly IS_MOBILE = isMobileUserAgent()
 
   constructor() {
     // Immediately hide landing content so the reveal feels intentional, not a flash

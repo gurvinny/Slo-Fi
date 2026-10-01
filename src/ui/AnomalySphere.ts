@@ -43,6 +43,7 @@ import {
 } from './orbDrivers'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { isMobileUserAgent } from './device'
 
 // ── Orb brightness and density ───────────────────────────────────────────────
 // These five numbers decide whether anything happening on the orb's surface can
@@ -885,7 +886,9 @@ export class AnomalySphere {
     // renderer area seamless — the orb appears to float over the page.
     // On mobile (DPR ≥ 3) cap at 2 to reduce WebGL framebuffer memory pressure.
     // Capping 3→2 cuts FBO size by ~44% — critical for avoiding iOS OOM page reloads.
-    this._isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    // Platform, NOT form factor: a coarse-pointer desktop has a desktop GPU
+    // and must not be dropped to the mobile geometry tier. See src/ui/device.ts.
+    this._isMobile = isMobileUserAgent()
     this._targetFps = this._isMobile ? 60 : 0   // cap mobile at 60; desktop uncapped
     // Fewer particles on mobile to reduce JS heap pressure alongside the large
     // decoded AudioBuffer that can exceed 100 MB for long tracks.

@@ -50,6 +50,20 @@ jobs:
   render:
     name: Render check
     runs-on: ubuntu-latest
+    # This job runs the WHOLE e2e suite unsharded, workers: 1, on a runner with
+    # no GPU -- ~23 minutes measured, against ~13.5 with hardware locally. 45 is
+    # roughly double the measured time, so it cannot race a slow-but-healthy run
+    # on a loaded runner.
+    #
+    # Unbounded, this job carries a worse exposure than the sharded PR workflow
+    # #170 bounded: this workflow's concurrency is `cancel-in-progress: false`
+    # on purpose (cancelling a half-finished upload is worse than letting it
+    # land), so a later push will not displace a wedged run either. A job whose
+    # steps have all completed while its job-level status never resolves cannot
+    # be cancelled, force-cancelled or rerun -- every API refuses it -- so
+    # without a timeout GitHub's 360-minute default is the only exit, and
+    # deploys are blocked for six hours.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

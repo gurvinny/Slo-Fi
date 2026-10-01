@@ -50,6 +50,20 @@ jobs:
   shard:
     name: shard ${{ matrix.shard }} of 8
     runs-on: ubuntu-latest
+    # Six times the slowest observed shard (4m56s), and far above the suite's own
+    # 120s per-test timeout, so this never races a legitimately slow run.
+    #
+    # It exists for a failure the per-test timeouts cannot reach. A shard once
+    # finished every step -- "Complete job" included, all green -- while its
+    # JOB-level status stayed `in_progress` with no conclusion. That record is
+    # unreachable: `cancel`, `force-cancel`, `rerun --job` and `rerun` were all
+    # refused with "not in progress" / "cannot be rerun", and `cancel-in-progress`
+    # on the concurrency group could not evict it either, for the same reason.
+    # The group is keyed on github.ref, which for a PR is refs/pull/N/merge, so
+    # every subsequent push queued behind it and the required `Browser QA`
+    # context never reported. Without this, GitHub's own reaper is the only exit
+    # and it waits out the 360-minute default -- a PR blocked for six hours.
+    timeout-minutes: 30
     strategy:
       # Report every shard's result. Cancelling siblings on the first failure
       # hides whether a break is one spec or the whole renderer, which is the
@@ -125,6 +139,9 @@ jobs:
   e2e:
     name: Browser QA
     runs-on: ubuntu-latest
+    # Merge and report only; no browser work. Generous against npm ci on a cold
+    # cache, tight enough that a wedge here cannot hold the required context.
+    timeout-minutes: 15
     needs: shard
     # Runs even when a shard fails, so the merged report covers the failure
     # rather than only ever describing green runs.

@@ -62,14 +62,47 @@ function makeBassWav(seconds = 30, rate = 44100): string {
   return path;
 }
 
-test("the orb surface carries local contrast at the shipped defaults", async ({ page }) => {
+// HARDWARE ONLY, measured 2026-10-01.
+//
+// A single absolute floor cannot serve all three projects, because they do not
+// disagree by noise -- they disagree by a FACTOR OF FIVE on identical code:
+//
+//   desktop-hardware-gl   0.0238  (n=4, stdev 0.0038)   local, real iGPU
+//   desktop-software-gl   0.0904                        local
+//   desktop-software-gl  >0.12    PASSED TWICE          GitHub runner, no GPU
+//
+// So this spec's expected failure was greened in CI by the weakest instrument
+// while the orb on real hardware measured five times WORSE than the floor. That
+// is not a flaky threshold, it is the recorded law that software measurements
+// MIS-RANK rather than merely adding noise -- and here the mis-ranking inverted
+// the verdict on the one oracle that is supposed to tell us the white-out is
+// fixed.
+//
+// Skipped rather than given per-project floors: three thresholds whose
+// relationship to each other nobody has validated is three chances to be
+// confidently wrong. The cost is explicit -- CI no longer watches this oracle,
+// so a genuine fix is visible only in a local hardware run. A CI pass on a
+// renderer that reads 5x high was worse than no signal, because it looked like
+// good news.
+test("the orb surface carries local contrast at the shipped defaults", async ({ page }, testInfo) => {
+  // Before anything else: this measurement is only meaningful on the real GPU.
+  testInfo.project.name === "desktop-hardware-gl" ||
+    test.skip(true, "software renderers read this metric ~5x high — see above");
+
   // EXPECTED TO FAIL, and the failure is the point.
   //
   // This spec passed for exactly one reason: nothing in this suite had ever
   // pressed play, so it measured a motionless, silent orb. With startPlayback
   // in place it measures the condition the bug was actually reported in, and
-  // the orb does not survive it -- 0.068 to 0.081 on all three projects
-  // against this floor of 0.12.
+  // the orb does not survive it.
+  //
+  // Measured on hardware 2026-10-01: main reads 0.0321 (n=4, stdev 0.0033) and
+  // feat/anomaly-iii reads 0.0238 (n=4, stdev 0.0038) against this floor of
+  // 0.12. The earlier figures in this comment -- "0.068 to 0.081 on all three
+  // projects" -- predate both the iGPU passthrough and main's move to Khronos
+  // PBR Neutral tone mapping, and described a machine that no longer exists.
+  // They were quoted here as the justification for the floor, so they are
+  // replaced rather than kept for history.
   //
   // That is not a floor that needs lowering. Under playback the surface blows
   // out: a census of achromatic pixels (min(r,g,b) > 200) on this canvas runs
@@ -116,11 +149,16 @@ test("the orb surface carries local contrast at the shipped defaults", async ({ 
   // Re-measured with audio actually playing. The figures this floor was first
   // set from (0.233 desktop / 0.141 mobile) were taken on a resting orb, so
   // they described the mesh and the resting luminance curve and nothing the
-  // audio does. Playing material moves and is noisier: desktop means ~0.168
-  // with a per-sample spread near 0.04, and single frames dip below 0.10
-  // between beats, which is why this asserts on a mean over several captures
-  // and not on any one frame. 0.12 still sits clear of the 0.104 the broken
-  // build produces, with room for renderer variance.
+  // audio does. Playing material moves, which is why this asserts on a mean
+  // over several captures and not on any one frame.
+  //
+  // The "per-sample spread near 0.04" this comment used to claim does not hold
+  // at the levels actually measured: eight runs on hardware gave a stdev of
+  // 0.0033-0.0038, an order of magnitude tighter. That matters because the
+  // stale figure was large enough to hide a real difference as noise -- it
+  // nearly did exactly that when main (0.0321) was compared against
+  // feat/anomaly-iii (0.0238) and the non-overlapping ranges were almost
+  // dismissed. Measure the noise; do not quote it.
   expect(mean("relativeContrast"), "the orb surface reads as a uniform mass")
     .toBeGreaterThan(0.12);
 

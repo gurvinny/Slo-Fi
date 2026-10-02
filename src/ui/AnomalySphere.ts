@@ -315,7 +315,7 @@ ${GLSL_NOISE}
 // cameraPosition must be declared manually with RawShaderMaterial
 uniform vec3 cameraPosition;
 
-uniform float uBass;
+uniform float uKick;     // 0-1.4, kickVis: brightness follows the transient, not the bass mass
 uniform float uMid;
 uniform float uTreble;
 uniform float uTime;
@@ -350,7 +350,7 @@ void main() {
   float midBand  = 1.0 - abs(gradient * 2.0 - 1.0); // 0 at poles, 1 at equator
 
   // Bass → bottom hemisphere shifts from A (calm) toward D (excited)
-  vec3 colorBot = mix(uColorA, uColorD, clamp(uBass * 2.5, 0.0, 1.0));
+  vec3 colorBot = mix(uColorA, uColorD, clamp(uKick * 2.5, 0.0, 1.0));
   // Treble → top hemisphere shifts from B toward C
   vec3 colorTop = mix(uColorB, uColorC, clamp(uTreble * 2.2, 0.0, 1.0));
   // Mid → equatorial band flashes C on beats
@@ -373,7 +373,7 @@ void main() {
                      * ${ORB_DISP_SPAN.toFixed(3)};
 
   // Subtle iridescent shimmer — kept light so it doesn't hide the palette colors
-  float iridHue  = fract(nDotV * 0.40 + vDisp * 0.30 + uTime * 0.035 + uBass * 0.25);
+  float iridHue  = fract(nDotV * 0.40 + vDisp * 0.30 + uTime * 0.035 + uKick * 0.25);
   vec3 iridColor = hsv2rgb(vec3(iridHue, 0.60, 0.65));
   float iridMix  = 0.05 + uTreble * 0.08 + uShimmer * 0.10 + uReverb * 0.12;
   color = mix(color, iridColor, clamp(iridMix, 0.0, 0.28));
@@ -381,9 +381,9 @@ void main() {
   color *= dispBright;
 
   // Rim glow — dimmer base, reverb boosts it for a wet-echo shimmer
-  vec3 rimColor = mix(uColorA, uColorC, clamp(uBass * 2.0, 0.0, 1.0));
+  vec3 rimColor = mix(uColorA, uColorC, clamp(uKick * 2.0, 0.0, 1.0));
   rimColor = mix(rimColor, uColorB, 0.40 + uMid * 0.35);
-  color += fresnel * rimColor * (0.50 + uBass * 0.80 + uReverb * 0.30);
+  color += fresnel * rimColor * (0.50 + uKick * 0.80 + uReverb * 0.30);
 
   // Core glow
   float coreGlow = pow(nDotV, 6.0) * 0.20;
@@ -396,7 +396,7 @@ void main() {
     float vein = abs(fract(c1 * 3.0 + c2 * 0.4) - 0.5) * 2.0;
     vein = pow(1.0 - smoothstep(0.76, 1.0, vein), 4.0);
     vec3 crackCol = mix(uColorA, uColorC, 0.5) * 3.2;
-    color += crackCol * vein * uCrack * (0.5 + uBass * 0.9);
+    color += crackCol * vein * uCrack * (0.5 + uKick * 0.9);
   }
 
   // Crystallization tint — icy blue-white wash with hardened rim when paused
@@ -408,8 +408,8 @@ void main() {
 
   // Wireframe: lines should be nearly opaque so edges are crisp and neon-bright.
   // Solid: keep the translucent depth with fresnel/audio reactivity.
-  float alphaSolid = 0.40 + fresnel * 0.48 + uBass * 0.07 + uReverb * 0.06;
-  float alphaWire  = 0.82 + fresnel * 0.14 + uBass * 0.04;
+  float alphaSolid = 0.40 + fresnel * 0.48 + uKick * 0.07 + uReverb * 0.06;
+  float alphaWire  = 0.82 + fresnel * 0.14 + uKick * 0.04;
   float alpha = mix(alphaSolid, alphaWire, uWireframe);
   gl_FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
 }
@@ -960,6 +960,7 @@ export class AnomalySphere {
   private uniforms: {
     uTime:    IUniform<number>
     uBass:    IUniform<number>
+    uKick:    IUniform<number>
     uMid:     IUniform<number>
     uTreble:  IUniform<number>
     uReverb:  IUniform<number>
@@ -1110,6 +1111,7 @@ export class AnomalySphere {
     this.uniforms = {
       uTime:    { value: 0 },
       uBass:    { value: 0 },
+      uKick:    { value: 0 },
       uMid:     { value: 0 },
       uTreble:  { value: 0 },
       uReverb:  { value: this.reverb },
@@ -1605,6 +1607,7 @@ export class AnomalySphere {
     if (this._reducedMotion) {
       this.uniforms.uTime.value    = elapsed
       this.uniforms.uBass.value    = 0
+      this.uniforms.uKick.value    = 0
       this.uniforms.uMid.value     = 0
       this.uniforms.uTreble.value  = 0
       this.uniforms.uSubBass.value = 0
@@ -1832,7 +1835,17 @@ export class AnomalySphere {
     // carefully smoothed value only ever reached colour and particles. The
     // transients now have a channel of their own in uRipples, which is what
     // lets this one be calm.
+    //
+    // Calm is right for SHAPE and wrong for BRIGHTNESS, so the two stages no
+    // longer share a uniform. The fragment shader read uBass in seven brightness
+    // and colour terms, including the additive rim gain; fed bVis, which holds
+    // high, it lifted the whole surface. Measured on hardware with the real test
+    // beat: mean 0.64 against kickVis's ~0.2, meanV +36, local contrast
+    // 0.053 -> 0.031. uKick keeps the fragment stage on the transient, exactly as
+    // it was before the geometry moved. The TSL path below already mirrors
+    // kickVis into its uBass, and its shading never read bVis.
     this.uniforms.uBass.value    = bVis
+    this.uniforms.uKick.value    = kickVis
     this.uniforms.uMid.value    = mVis
     this.uniforms.uTreble.value = tVis
     this.uniforms.uReverb.value = this.reverb

@@ -17,6 +17,7 @@
 import { describe, it, expect } from 'vitest'
 import { VERTEX_SHADER, FRAGMENT_SHADER } from '../../src/ui/AnomalySphere'
 import { RIPPLE_CAPACITY, RIPPLE_STRIDE } from '../../src/audio/RippleBank'
+import { readFileSync } from 'node:fs'
 
 /** Occurrences of a bare identifier, so a declaration alone cannot satisfy a use. */
 function uses(src: string, name: string): number {
@@ -113,5 +114,40 @@ describe('orb vertex shader', () => {
 describe('orb fragment shader', () => {
   it('reads uShimmer rather than only declaring it', () => {
     expect(uses(FRAGMENT_SHADER, 'uShimmer')).toBeGreaterThan(1)
+  })
+
+  // Shape follows the slow signal, brightness follows the transient one.
+  //
+  // uBass carries bVis, the smoothed and auto-gained bass mass, so displacement
+  // stops jittering. It used to be one uniform shared by both stages, and the
+  // fragment shader reads it in seven brightness and colour terms -- including
+  // the additive rim gain. Measured on hardware with the real test beat, mean
+  // uBass rose from ~0.2 (kickVis) to 0.64 (bVis), meanV rose by ~36 and
+  // local contrast fell from 0.053 to 0.031. A calm bass that holds high lifts
+  // the whole surface, and nothing about the frame looks broken.
+  it('takes its brightness from the kick, never from the calm bass', () => {
+    expect(uses(FRAGMENT_SHADER, 'uKick')).toBeGreaterThan(1)
+    expect(uses(FRAGMENT_SHADER, 'uBass'), 'the fragment stage reads the sustained bass again').toBe(0)
+  })
+
+  it('leaves the calm bass driving the geometry', () => {
+    expect(uses(VERTEX_SHADER, 'uBass')).toBeGreaterThan(1)
+    expect(uses(VERTEX_SHADER, 'uKick'), 'the kick has leaked into displacement').toBe(0)
+  })
+})
+
+// AnomalySphere cannot be constructed without WebGL, so which signal feeds
+// which uniform is pinned from source text. A uniform read by the GLSL with no
+// JS entry reads as 0, and a swapped assignment compiles and renders.
+describe('orb uniform wiring', () => {
+  const src = readFileSync(new URL('../../src/ui/AnomalySphere.ts', import.meta.url), 'utf8')
+
+  it('feeds the fragment stage the kick and the vertex stage the bass mass', () => {
+    expect(src).toMatch(/this\.uniforms\.uKick\.value\s*=\s*kickVis\b/)
+    expect(src).toMatch(/this\.uniforms\.uBass\.value\s*=\s*bVis\b/)
+  })
+
+  it('gives uKick a value in the uniforms object, so the GLSL does not read 0', () => {
+    expect(src).toMatch(/\buKick:\s*\{\s*value:\s*0\s*\}/)
   })
 })

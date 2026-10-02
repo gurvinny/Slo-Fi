@@ -67,6 +67,39 @@ export const MUTATIONS = [
    '  float iridMix  = 0.05 + uTreble * 0.08 + uShimmer * 0.10 + uReverb * 0.12;',
    '  float iridMix  = 0.05 + uTreble * 0.08 + uReverb * 0.12;',
    'reads uShimmer rather than only declaring it'],
+
+  // The stage split. Each of these compiles (or, for the GLSL ones, would once
+  // the declaration followed) and renders a live orb whose surface is lifted
+  // or dead -- the regression measured at 0.053 -> 0.031 local contrast.
+  ['the rim gain reads the sustained bass again, lifting the whole surface',
+   'color += fresnel * rimColor * (0.50 + uKick * 0.80',
+   'color += fresnel * rimColor * (0.50 + uBass * 0.80',
+   'takes its brightness from the kick, never from the calm bass'],
+
+  ['the crack veins read the sustained bass again',
+   'vein * uCrack * (0.5 + uKick * 0.9)',
+   'vein * uCrack * (0.5 + uBass * 0.9)',
+   'takes its brightness from the kick, never from the calm bass'],
+
+  ['the kick leaks into displacement, bringing the jitter back',
+   'snoise(normal * 1.4 + t * 0.22) * uBass   * 0.40',
+   'snoise(normal * 1.4 + t * 0.22) * uKick   * 0.40',
+   'leaves the calm bass driving the geometry'],
+
+  ['the fragment stage is fed the calm bass through its own uniform',
+   'this.uniforms.uKick.value    = kickVis',
+   'this.uniforms.uKick.value    = bVis',
+   'feeds the fragment stage the kick and the vertex stage the bass mass'],
+
+  ['the geometry is fed the kick again (the reported jitter)',
+   'this.uniforms.uBass.value    = bVis',
+   'this.uniforms.uBass.value    = kickVis',
+   'feeds the fragment stage the kick and the vertex stage the bass mass'],
+
+  ['uKick has no JS entry, so the GLSL reads 0 and the surface stops reacting',
+   '      uKick:    { value: 0 },\n',
+   '',
+   'gives uKick a value in the uniforms object, so the GLSL does not read 0'],
 ]
 
 export const SURVIVORS = {}

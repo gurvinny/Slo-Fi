@@ -117,29 +117,60 @@ describe('the orb brightness channel', () => {
     expect(ORB_WIRE_BASE).toBeGreaterThan(ORB_SOLID_BASE)
   })
 
-  it('lets displacement decide what blooms', () => {
-    // Bloom should be a highlight displacement gates, not a wash that is always
-    // on. A fragment blooms when its linear luminance clears BLOOM_THRESHOLD,
-    // so the brightness curve and that threshold are one design decision
-    // expressed in two files -- which is why they are now one symbol each
-    // rather than four hand-copied literals.
+  it('keeps every shade of the surface itself below the bloom threshold', () => {
+    // #172. Bloom used to be the design's displacement gate: at a threshold of
+    // 0.22 an outward bulge HAD to bloom, and this test pinned that. Measured on
+    // hardware with real audio, that gate was the white-out. The bloom pass
+    // alone took relative local contrast from 0.144 (bloom off) to 0.052, and
+    // saturation from 0.49 to 0.30, because the halo of every bright vertex
+    // washed over the dark gaps between them. The shading curve already
+    // carries the relief; bloom on top of it only flattens it.
     //
-    // Honest scope: this pins the intended relation, and is NOT evidence of a
-    // white-out. Measurement on the built page found no achromatic pixels at
-    // any setting on either platform, so the wash originally blamed for the
-    // symptom does not occur; the real defect was contrast, not saturation.
+    // So the relation is now inverted: no surface brightness the displacement
+    // can produce reaches the threshold, on the brightest palette colour there
+    // is. Bloom is left to the effects that are MEANT to blaze.
     const lum = paletteLuminance()
-    const d = dispMax()
     expect(
-      bright(-d, ORB_WIRE_BASE) * lum.max,
-      'even a fully inward dent blooms, on the brightest palette',
+      bright(dispMax(), ORB_WIRE_BASE) * lum.max,
+      'a fully outward bulge blooms on the brightest palette, washing out the relief',
     ).toBeLessThan(BLOOM_THRESHOLD)
+  })
+
+  it('still lets the crack veins bloom', () => {
+    // The other half of the threshold decision: raising it must not switch the
+    // bloom pass off in effect. Crack veins are drawn at several times palette
+    // brightness precisely so they blaze, and they should still clear the
+    // threshold on most themes. The darkest ones (void, ember) peak below it;
+    // that is the accepted cost of a threshold the surface cannot reach.
+    //
+    // Read from the shader, not restated: a vein gain that drops quietly would
+    // otherwise pass here while the veins stopped glowing on screen.
+    const gain = FRAGMENT_SHADER.match(/crackCol = mix\(uColorA, uColorC, ([\d.]+)\) \* ([\d.]+);/)
+    const kick = FRAGMENT_SHADER.match(/crackCol \* vein \* uCrack \* \(([\d.]+) \+ uKick \* ([\d.]+)\)/)
+    expect(gain, 'the crack colour expression has moved or been renamed').not.toBeNull()
+    expect(kick, 'the crack intensity expression has moved or been renamed').not.toBeNull()
+    const peak = Number(gain![2]) * (Number(kick![1]) + Number(kick![2]))
+    const blooming = Object.values(THEME_PALETTES).filter(
+      (p) => mixLuminance(p[0], p[2], Number(gain![1])) * peak > BLOOM_THRESHOLD,
+    )
     expect(
-      bright(d, ORB_WIRE_BASE) * lum.median,
-      'even a fully outward bulge never blooms',
-    ).toBeGreaterThan(BLOOM_THRESHOLD)
+      blooming.length,
+      'crack veins no longer bloom on most themes',
+    ).toBeGreaterThanOrEqual(Math.ceil(Object.keys(THEME_PALETTES).length / 2))
   })
 })
+
+const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+  const a = s * Math.min(l, 1 - l)
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12
+    return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)))
+  }
+  return [f(0), f(8), f(4)]
+}
+const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+const linearRgb = ([h, s, l]: [number, number, number]) => hslToRgb(h, s, l).map(toLinear)
+const luminance = ([r, g, b]: number[]) => 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 /**
  * Linear (Rec.709) luminance of every palette colour the orb can be given.
@@ -150,23 +181,18 @@ describe('the orb brightness channel', () => {
  * the sRGB decode; the palettes are stored as HSL.
  */
 function paletteLuminance(): { max: number; median: number } {
-  const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
-    const a = s * Math.min(l, 1 - l)
-    const f = (n: number) => {
-      const k = (n + h * 12) % 12
-      return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)))
-    }
-    return [f(0), f(8), f(4)]
-  }
-  const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
   const all = Object.values(THEME_PALETTES)
     .flat()
-    .map(([h, s, l]) => {
-      const [r, g, b] = hslToRgb(h, s, l)
-      return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
-    })
+    .map((c) => luminance(linearRgb(c)))
     .sort((x, y) => x - y)
   return { max: all[all.length - 1], median: all[all.length >> 1] }
+}
+
+/** Luminance of GLSL `mix(a, b, t)` on two palette colours, in linear space as the shader mixes them. */
+function mixLuminance(a: [number, number, number], b: [number, number, number], t: number): number {
+  const la = linearRgb(a)
+  const lb = linearRgb(b)
+  return luminance(la.map((x, i) => x * (1 - t) + lb[i] * t))
 }
 
 describe('GLSL interpolation of the brightness constants', () => {

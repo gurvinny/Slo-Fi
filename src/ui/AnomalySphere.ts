@@ -56,10 +56,12 @@ import { bandEnergy as bandEnergyOf, freqToBin as freqToBinOf } from '../audio/s
 // are what matter and a literal cannot be checked against another literal.
 //
 // The one that binds: a fragment blooms when its linear luminance exceeds
-// BLOOM_THRESHOLD. Palette colours carry a linear luminance of roughly 0.30-0.42,
-// so the resting orb blooms whenever `base * ~0.35` clears the threshold. That is
-// the difference between bloom as a displacement-gated highlight and bloom as a
-// flat white wash over the whole silhouette.
+// BLOOM_THRESHOLD. The surface shading tops out at `bright(+dispMax) * lum`, about
+// 0.69 on the brightest palette colour, so a threshold above that means the
+// relief itself never blooms and only the effects drawn to blaze (crack veins,
+// lightning) do. It used to sit at 0.22, where every outward bulge bloomed by
+// design, and on hardware with real audio that bloom was the white-out (#172):
+// relative local contrast 0.144 with the pass off, 0.052 with it on.
 //
 // Interpolated into the GLSL with .toFixed(3): a bare integral JS number emits an
 // int literal, and `0.68 + 1 * 0.22` is a type error in GLSL ES.
@@ -108,8 +110,15 @@ export const ORB_DISP_GAIN = 1.9
 export const ORB_DISP_BIAS = 0.5
 /** How much brightness the clamped displacement term can add. */
 export const ORB_DISP_SPAN = 0.55
-/** UnrealBloomPass threshold — the luminance above which a fragment blooms. */
-export const BLOOM_THRESHOLD = 0.22
+/**
+ * UnrealBloomPass threshold: the luminance above which a fragment blooms.
+ *
+ * Swept on desktop-hardware-gl with the real beat fixture (n=4), relative local
+ * contrast read 0.043 / 0.065 / 0.099 / 0.119 / 0.142 at 0.22 / 0.45 / 0.60 /
+ * 0.80 / 1.00. Only 1.00 clears the 0.12 oracle, and it still reads 0.128 with
+ * lightning off, so the gain is the surface and not a flash.
+ */
+export const BLOOM_THRESHOLD = 1.00
 
 /**
  * Icosahedron subdivision per platform.

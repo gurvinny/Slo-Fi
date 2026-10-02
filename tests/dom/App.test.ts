@@ -144,6 +144,7 @@ type BuildOpts = {
 
 let app: App
 let draws: Ctx2DCall[]
+let resizeObservers: ReturnType<typeof stubResizeObserver>
 
 function build(opts: BuildOpts = {}): App {
   resetDom()
@@ -153,7 +154,7 @@ function build(opts: BuildOpts = {}): App {
   delete document.documentElement.dataset.theme
 
   stubMatchMedia()
-  stubResizeObserver()
+  resizeObservers = stubResizeObserver()
   draws = recordCanvas2D()
   installRaf()
 
@@ -163,9 +164,10 @@ function build(opts: BuildOpts = {}): App {
 
   mountFixture('body')
   stubDialog()
-  // jsdom reports an all-zero rect, and updateBottomBarHeight only publishes a
-  // height above zero -- without a box it looks like the feature is missing.
+  // jsdom reports an all-zero rect, and measureChrome only publishes a bound
+  // above zero -- without boxes it looks like the feature is missing.
   stubBoundingRect(q('.player-bottom'), { width: 390, height: 120 })
+  stubBoundingRect(q('.player-top'), { width: 390, height: 80, top: 46 })
   // _isMobile is a field initializer, so the UA has to be in place before new.
   stubUserAgent(opts.mobile ? IPHONE_UA : DESKTOP_UA)
 
@@ -397,7 +399,7 @@ describe('App — playlist rendering', () => {
     seedPlaylist(['a.mp3', 'b.mp3'], 0, new Map([[1, { duration: 185, key: 'A min', bpm: 90.4 }]]))
     const meta = items().map((li) => li.querySelector('.playlist-item-meta')?.textContent)
     expect(meta[0]).toBe('— · — · —')
-    expect(meta[1]).toBe('3:05 · A min · 90 BPM')
+    expect(meta[1]).toBe('03:05 · A min · 90 BPM')
   })
 
   it('marks only the current track with aria-current', () => {
@@ -456,7 +458,7 @@ describe('App — playlist editing', () => {
     seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'], 0, meta)
     click(items()[1].querySelector('.playlist-item-remove')!)
     const shown = items().map((li) => li.querySelector('.playlist-item-meta')?.textContent)
-    expect(shown).toEqual(['1:00 · C maj · 100 BPM', '2:00 · G min · 80 BPM'])
+    expect(shown).toEqual(['01:00 · C maj · 100 BPM', '02:00 · G min · 80 BPM'])
   })
 
   it('empties the list when the last track is removed', () => {
@@ -699,6 +701,27 @@ describe('App — panels', () => {
     .filter((b) => b.classList.contains('panel-trigger--active'))
     .map((b) => b.dataset.panel)
 
+  const rootVar = (name: string) => document.documentElement.style.getPropertyValue(name)
+
+  it('publishes the measured chrome as the panel bounds', () => {
+    build()
+    click(trigger('playlist'))
+    expect(rootVar('--chrome-top')).toBe('126px')
+    expect(rootVar('--bottombar-h')).toBe('120px')
+    expect(rootVar('--chrome-bottom')).toBe('120px')
+  })
+
+  it('re-measures when the chrome changes size, without a panel being opened', () => {
+    // A transport row that wraps, or a HUD that grows a line, resizes the
+    // chrome with no window resize and no panel toggle to catch it.
+    build()
+    expect(resizeObservers.observed).toEqual(expect.arrayContaining(
+      [q('.player-top'), q('.player-bottom'), q('.control-dock')]))
+    stubBoundingRect(q('.player-bottom'), { width: 390, height: 150 })
+    resizeObservers.trigger()
+    expect(rootVar('--bottombar-h')).toBe('150px')
+  })
+
   it('opens the panel its trigger names', () => {
     build()
     click(trigger('sound'))
@@ -768,6 +791,13 @@ describe('App — help modal', () => {
     expect(dialogCalls.open).toBe(1)
     click(el('helpCloseBtn'))
     expect(dialogCalls.close).toBe(1)
+  })
+
+  it('opens from the control dock Help button, the desktop route', () => {
+    // Desktop CSS hides #helpBtn, so the dock entry is the only visible trigger
+    // there. It is wired by [data-help], separately from #helpBtn.
+    click(q('.control-dock [data-help]'))
+    expect(dialogCalls.open).toBe(1)
   })
 
   it('closes when the backdrop area of the dialog is clicked', () => {

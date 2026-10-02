@@ -13,13 +13,9 @@ import { MobileController } from './MobileController'
 import { Toast } from './Toast'
 import { InstallController } from './InstallController'
 import { isMobileUserAgent } from './device'
+import { formatTime } from './time'
+import { measureChromeInsets, ChromeVars } from './chrome'
 import type { AudioParams, ReverbType } from '../types'
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
@@ -103,6 +99,9 @@ export class App {
   private _panels!: Record<'playlist' | 'sound' | 'visual' | 'export', HTMLElement>
   private _activePanel: 'playlist' | 'sound' | 'visual' | 'export' | null = null
   private _playerBottom = document.querySelector('.player-bottom') as HTMLElement
+  private _playerTop = document.querySelector('.player-top') as HTMLElement
+  private _controlDock = document.querySelector('.control-dock') as HTMLElement
+  private _chromeVars = new ChromeVars(document.documentElement)
 
   // Help modal refs
   private helpModal    = document.getElementById('help-modal') as HTMLDialogElement
@@ -192,7 +191,7 @@ export class App {
     this._mobile.onExternalStop  = () => {
       this.setPlayingState(false)
       this.waveform.setProgress(0)
-      this.currentTimeEl.textContent = '0:00'
+      this.currentTimeEl.textContent = formatTime(0)
       this.sphere?.stop()
       this.starOverlay.pause()
       this._mobile.stopSilenceLoop()
@@ -604,11 +603,15 @@ export class App {
     // Tap the dimmed backdrop to dismiss whatever is open
     this._drawerBackdrop.addEventListener('click', () => this.closePanel())
 
-    // Keep the mobile bottom-sheet offset matched to the actual bottom bar
-    // height (waveform + transport + nav + safe-area), so sheets sit flush on
-    // top of it with no gap. Recompute on resize / orientation change.
-    window.addEventListener('resize', () => this.updateBottomBarHeight())
-    this.updateBottomBarHeight()
+    // Bound the panels by the real chrome. The observer catches the chrome
+    // changing size (a wrapped transport row, the HUD growing a line); the
+    // resize listener catches the viewport moving under chrome that did not.
+    // Both are layout-driven, never per-frame.
+    const remeasure = () => this.measureChrome()
+    window.addEventListener('resize', remeasure)
+    const ro = new ResizeObserver(remeasure)
+    for (const el of [this._playerTop, this._playerBottom, this._controlDock]) if (el) ro.observe(el)
+    this.measureChrome()
 
     // Sound panel sub-tabs (Audio / Effects)
     this.soundDrawer.querySelectorAll<HTMLButtonElement>('.sound-tab').forEach((tab) => {
@@ -622,16 +625,17 @@ export class App {
     })
   }
 
-  // Publishes the live bottom-bar height as --bottombar-h for the mobile sheet
-  // CSS to anchor against (avoids a hard-coded magic offset that left a gap).
-  private updateBottomBarHeight(): void {
-    const h = this._playerBottom?.getBoundingClientRect().height ?? 0
-    if (h > 0) document.documentElement.style.setProperty('--bottombar-h', `${Math.round(h)}px`)
+  // Publishes the measured chrome as --chrome-top / --chrome-bottom (the panel
+  // bounds) and --bottombar-h (the mobile sheet and toast anchor).
+  private measureChrome(): void {
+    this._chromeVars.apply(measureChromeInsets(
+      this._playerTop, this._playerBottom, this._controlDock,
+      Object.values(this._panels), window.innerHeight))
   }
 
   private openPanel(name: 'playlist' | 'sound' | 'visual' | 'export'): void {
     if (this._activePanel && this._activePanel !== name) this.closePanel()
-    this.updateBottomBarHeight()
+    this.measureChrome()
     this._panels[name].classList.add('panel--visible')
     this._activePanel = name
     if (this._isMobile) this._drawerBackdrop.classList.add('backdrop--visible')
@@ -868,7 +872,7 @@ export class App {
       this.engine.stop()
       this.setPlayingState(false)
       this.waveform.setProgress(0)
-      this.currentTimeEl.textContent = '0:00'
+      this.currentTimeEl.textContent = formatTime(0)
       this.sphere?.stop()
       this.starOverlay.pause()
       this._mobile?.stopSilenceLoop()
@@ -1244,7 +1248,7 @@ export class App {
 
       this.trackMeta.textContent = `${formatTime(this.engine.duration)} · ${formatBytes(file.size)} · ${file.type || 'audio'}`
       this.durationEl.textContent = formatTime(this.engine.duration)
-      this.currentTimeEl.textContent = '0:00'
+      this.currentTimeEl.textContent = formatTime(0)
     } catch (uiErr) {
       console.error('UI setup error after audio load (non-fatal):', uiErr)
     } finally {

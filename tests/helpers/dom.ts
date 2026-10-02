@@ -278,7 +278,7 @@ export function stubFullscreen(opts: { denyRequest?: boolean } = {}): Fullscreen
   return state
 }
 
-export type ResizeObserverStub = { instances: number; trigger(): void }
+export type ResizeObserverStub = { instances: number; observed: Element[]; trigger(): void }
 
 /**
  * jsdom has no ResizeObserver, and EffectsController constructs one while
@@ -287,18 +287,21 @@ export type ResizeObserverStub = { instances: number; trigger(): void }
  *
  * The stub never observes anything on its own; `trigger()` fires every
  * registered callback, which is how the drawer-opens-at-zero-width path gets
- * exercised deliberately rather than by accident.
+ * exercised deliberately rather than by accident. Because it fires regardless,
+ * `observed` records what was actually handed to observe() -- without it a
+ * test cannot tell a watched element from one nobody subscribed to.
  */
 export function stubResizeObserver(): ResizeObserverStub {
   const callbacks: (() => void)[] = []
   const state: ResizeObserverStub = {
     instances: 0,
+    observed: [],
     trigger: () => { for (const cb of callbacks) cb() },
   }
   ;(window as unknown as Record<string, unknown>).ResizeObserver =
     class {
       constructor(cb: () => void) { state.instances++; callbacks.push(cb) }
-      observe() {}
+      observe(el: Element) { state.observed.push(el) }
       unobserve() {}
       disconnect() {}
     }

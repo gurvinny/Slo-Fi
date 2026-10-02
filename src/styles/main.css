@@ -743,7 +743,7 @@ body.is-playing #iconPause    { opacity: 1; }
   filter: brightness(1);
 }
 
-/* Transport row: time | buttons | right-side controls */
+/* Transport row: time readout | buttons | right-side controls */
 .transport-row {
   display: flex;
   align-items: center;
@@ -751,14 +751,19 @@ body.is-playing #iconPause    { opacity: 1; }
   gap: 12px;
 }
 
-.time-current,
-.time-total {
+/* One left-anchored "01:24 / 03:45" readout. Tabular numerals keep every digit
+   the same width, so the row never reflows as the elapsed time counts. */
+.time-readout {
   font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-dim);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  white-space: nowrap;
   flex-shrink: 0;
-  min-width: 34px;
 }
+
+.time-sep { opacity: 0.55; }
 
 .transport-right {
   display: flex;
@@ -1230,22 +1235,9 @@ body.is-paused .btn-play {
     height: 44px;
   }
 
-  /* Drawers: full-width at bottom of phones */
-  .controls-drawer,
-  .sound-drawer,
-  .settings-drawer {
-    right: 0;
-    left: 0;
-    width: auto;
-    border-radius: var(--radius) var(--radius) 0 0;
-    bottom: 175px;
-    height: calc(100dvh - 260px);
-    max-height: calc(100dvh - 260px);
-  }
-
   /* Two-row transport layout so Controls and Effects buttons are never hidden.
-     Row 1: current time + transport buttons.
-     Row 2: total time + fullscreen + settings + Controls + Effects. */
+     Row 1: time readout + transport buttons.
+     Row 2: fullscreen + settings + Controls + Effects. */
   .transport-row {
     flex-wrap: wrap;
     padding: 4px 10px 2px;
@@ -2075,7 +2067,6 @@ body.is-paused .site-footer {
 .controls-drawer {
   position: fixed;
   right: 20px;
-  bottom: 172px;
   width: 310px;
   z-index: 60;
   background:
@@ -2089,11 +2080,12 @@ body.is-paused .site-footer {
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 0 0 1px var(--accent-faint),
     0 20px 60px rgba(0, 0, 0, 0.65);
-  /* Definite height (not just max-height) is required for flex distribution:
-     flex children with flex-grow can only consume space from a definite height.
-     max-height alone is not "definite" in the CSS spec — the scroll body stays 0. */
-  height: calc(100dvh - 310px);
-  max-height: calc(100dvh - 310px);
+  /* Bounded by the measured chrome (src/ui/chrome.ts): below the top HUD and
+     above the bottom bar or the dock, whichever reaches higher. Fixed top and
+     bottom insets give the panel a definite height, which the flex scroll body
+     needs; the fallbacks only apply before the first measurement. */
+  top: calc(var(--chrome-top, 108px) + 12px);
+  bottom: calc(var(--chrome-bottom, 178px) + 12px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2103,7 +2095,6 @@ body.is-paused .site-footer {
 .sound-drawer {
   position: fixed;
   right: 20px;
-  bottom: 172px;
   width: 310px;
   z-index: 60;
   background:
@@ -2117,8 +2108,12 @@ body.is-paused .site-footer {
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 0 0 1px var(--accent-faint),
     0 20px 60px rgba(0, 0, 0, 0.65);
-  height: calc(100dvh - 310px);
-  max-height: calc(100dvh - 310px);
+  /* Bounded by the measured chrome (src/ui/chrome.ts): below the top HUD and
+     above the bottom bar or the dock, whichever reaches higher. Fixed top and
+     bottom insets give the panel a definite height, which the flex scroll body
+     needs; the fallbacks only apply before the first measurement. */
+  top: calc(var(--chrome-top, 108px) + 12px);
+  bottom: calc(var(--chrome-bottom, 178px) + 12px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2271,7 +2266,6 @@ body.is-paused .site-footer {
 .settings-drawer {
   position: fixed;
   left: 20px;
-  bottom: 172px;
   width: 290px;
   z-index: 60;
   background:
@@ -2285,8 +2279,12 @@ body.is-paused .site-footer {
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 0 0 1px rgba(0, 212, 170, 0.08),
     0 20px 60px rgba(0, 0, 0, 0.65);
-  height: calc(100dvh - 310px);
-  max-height: calc(100dvh - 310px);
+  /* Bounded by the measured chrome (src/ui/chrome.ts): below the top HUD and
+     above the bottom bar or the dock, whichever reaches higher. Fixed top and
+     bottom insets give the panel a definite height, which the flex scroll body
+     needs; the fallbacks only apply before the first measurement. */
+  top: calc(var(--chrome-top, 108px) + 12px);
+  bottom: calc(var(--chrome-bottom, 178px) + 12px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2761,17 +2759,6 @@ body.is-paused .site-footer {
   .player-bottom { padding-bottom: 0; }
 }
 
-/* ── Safe-area-aware drawer positioning on notched phones ───────────────── */
-/* The drawers sit above the transport bar. On notched phones that bar
-   itself gets extra bottom padding, so the drawers need to shift up too. */
-@media (max-width: 600px) {
-  .controls-drawer,
-  .sound-drawer,
-  .settings-drawer {
-    bottom: calc(175px + env(safe-area-inset-bottom));
-  }
-}
-
 /* ── Fullscreen button ──────────────────────────────────────────────────── */
 .btn-fullscreen {
   opacity: 0.75;
@@ -2982,18 +2969,6 @@ body.is-paused .site-footer {
 }
 .playlist-move-btn:hover:not(:disabled) { opacity: 0.85; }
 .playlist-move-btn:disabled { opacity: 0.15; cursor: default; }
-
-/* ── Help button: fixed top-right corner ────────────────────────────────── */
-.btn-help {
-  position: fixed;
-  top: calc(12px + env(safe-area-inset-top, 0px));
-  right: calc(12px + env(safe-area-inset-right, 0px));
-  z-index: 105;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1;
-  min-width: 36px;
-}
 
 /* ── Help modal ─────────────────────────────────────────────────────────── */
 #help-modal {
@@ -3483,16 +3458,6 @@ body.is-paused .site-footer {
   gap: 16px;
 }
 
-/* Time display — tabular numerals, cleaner */
-.time-current,
-.time-total {
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-  min-width: 38px;
-}
-
 /* Transport buttons — slightly more spaced */
 .transport {
   gap: 14px;
@@ -3586,8 +3551,6 @@ body.is-paused .site-footer {
   box-shadow:
     0 0 0 1px rgba(124, 77, 255, 0.05),
     0 28px 90px rgba(0, 0, 0, 0.80);
-  /* Updated bottom offset: waveform 120px + transport ~64px + gap */
-  bottom: 190px;
 }
 
 .settings-drawer {
@@ -3599,20 +3562,16 @@ body.is-paused .site-footer {
   box-shadow:
     0 0 0 1px rgba(0, 201, 160, 0.05),
     0 28px 90px rgba(0, 0, 0, 0.80);
-  bottom: 190px;
 }
 
 @media (max-width: 600px) {
   .controls-drawer,
   .sound-drawer,
   .settings-drawer {
-    bottom: calc(190px + env(safe-area-inset-bottom));
     border-radius: 14px 14px 0 0;
     right: 0;
     left: 0;
     width: auto;
-    height: calc(100dvh - 275px - env(safe-area-inset-bottom));
-    max-height: calc(100dvh - 275px - env(safe-area-inset-bottom));
   }
 }
 
@@ -3854,16 +3813,31 @@ body.is-paused .player-bottom {
   box-shadow: 0 0 0 1px rgba(124, 77, 255, 0.08);
 }
 
-/* ── Help button ─────────────────────────────────────────────────────────── */
+/* Sits after .btn-icon on purpose: the element is .btn.btn-icon.btn-help, so
+   at equal specificity the later rule wins the size and border. */
+/* ── Help button: fixed top-right corner, phones only ───────────────────── */
+/* Desktop opens Help from the control dock, so a second trigger there is a
+   duplicate. Phones have no dock and .bottom-nav carries no Help tab, so this
+   is their only visible route to it -- the ? shortcut needs a keyboard. */
 .btn-help {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  z-index: 105;
   width: 34px;
   height: 34px;
+  min-width: 36px;
   border-radius: 9px;
   font-size: 0.85rem;
   font-weight: 700;
+  line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(255, 255, 255, 0.025);
   box-shadow: none;
+}
+
+@media (min-width: 601px) {
+  .btn-help { display: none; }
 }
 
 /* ── Help modal ──────────────────────────────────────────────────────────── */
@@ -4283,16 +4257,15 @@ html:not(.has-splash) .landing-badge {
     background: rgba(255, 255, 255, 0.22);
   }
 
-  /* Sheets sit flush on top of the bottom bar (waveform + transport + nav).
-     --bottombar-h is measured live in JS (updateBottomBarHeight) and already
-     includes the safe-area inset, so no gap regardless of waveform height or
-     notch. Falls back to a sane estimate before the first measurement. */
+  /* Sheets sit flush on top of the bottom bar (waveform + transport + nav) and
+     stop just below the track HUD. Both bounds are measured live in JS
+     (src/ui/chrome.ts); the bar height already includes the safe-area inset,
+     so there is no gap regardless of waveform height or notch. */
   .controls-drawer,
   .sound-drawer,
   .settings-drawer {
-    bottom: var(--bottombar-h, 210px);
-    height: calc(100dvh - var(--bottombar-h, 210px) - 84px);
-    max-height: calc(100dvh - var(--bottombar-h, 210px) - 84px);
+    top: calc(var(--chrome-top, 169px) + 8px);
+    bottom: var(--chrome-bottom, 210px);
   }
 }
 

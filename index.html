@@ -449,9 +449,9 @@
         <!-- Player HUD — shown after file loads, children use fixed positioning -->
         <div id="player" class="player" aria-hidden="true" style="display:none;opacity:0">
 
-          <!-- Help button: fixed top-right, accessible from anywhere in the player.
-               On mobile it is the only persistent branding-adjacent control; on
-               desktop it also appears in the control dock. -->
+          <!-- Help button: fixed top-right, phones only. Phones have no control dock
+               and the bottom nav carries no Help tab, so this is their only visible
+               route to Help. Desktop uses the dock's Help button; CSS hides this one. -->
           <button id="helpBtn" class="btn btn-icon btn-help" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
 
           <!-- Mobile-only floating wordmark — replaces the hidden top header on phones -->
@@ -893,7 +893,11 @@
               <canvas id="waveform" class="waveform" role="slider" aria-label="Seek position" tabindex="0"></canvas>
             </div>
             <div class="transport-row">
-              <span class="time-current" id="currentTime">0:00</span>
+              <!-- One left-anchored readout: elapsed / total. #currentTime is also the
+                   e2e playback-progress oracle (tests/e2e/helpers.ts). -->
+              <span class="time-readout">
+                <span class="time-current" id="currentTime">00:00</span><span class="time-sep" aria-hidden="true"> / </span><span class="time-total" id="duration">00:00</span>
+              </span>
               <div class="transport">
                 <!-- prev/next are mobile-only (playlist navigation); hidden on desktop -->
                 <button id="prevBtn" class="btn btn-icon transport-skip" title="Previous track" aria-label="Previous track">
@@ -926,7 +930,6 @@
                 </button>
               </div>
               <div class="transport-right">
-                <span class="time-total" id="duration">0:00</span>
                 <!-- Fullscreen button: desktop only; mobile toggles fullscreen by tapping the orb -->
                 <button id="fullscreenBtn" class="btn btn-icon btn-fullscreen" aria-label="Enter fullscreen" title="Fullscreen (F)">
                   <svg id="iconFullscreenEnter" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">

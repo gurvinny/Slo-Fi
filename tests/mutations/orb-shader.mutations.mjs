@@ -96,6 +96,16 @@ export const MUTATIONS = [
    'this.uniforms.uBass.value    = kickVis',
    'feeds the fragment stage the kick and the vertex stage the bass mass'],
 
+  ['the uniform swell is shaded as relief again, lifting the whole surface',
+   '  vDisp = disp - swell * (1.0 - uCrystal * 0.90);',
+   '  vDisp = disp;',
+   'shades the relief, not the uniform breath'],
+
+  ['the swell is dropped from the geometry instead of from the shading',
+   'vec3 displaced = position + normal * disp;',
+   'vec3 displaced = position + normal * (disp - swell);',
+   'shades the relief, not the uniform breath'],
+
   ['uKick has no JS entry, so the GLSL reads 0 and the surface stops reacting',
    '      uKick:    { value: 0 },\n',
    '',

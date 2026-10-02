@@ -86,6 +86,20 @@ describe('orb vertex shader', () => {
     expect(total).toBeCloseTo(0.52, 5)
   })
 
+  it('shades the relief, not the uniform breath', () => {
+    // vDisp feeds dispBright in the fragment shader, so whatever reaches it is
+    // read as surface relief. The layer-1 swell is a uniform radial offset --
+    // the same at every vertex, so it carries no relief at all -- and shading it
+    // lifted every pixel and pushed noise peaks into the mass clamp. Measured on
+    // hardware with the real test beat: excluding it took local contrast from
+    // 0.0401 to 0.0481. The geometry still swells; only the shading ignores it.
+    const vdisp = /vDisp = ([^;]+);/.exec(VERTEX_SHADER)
+    expect(vdisp, 'the vDisp assignment has moved or been renamed').not.toBeNull()
+    expect(vdisp![1]).toMatch(/^disp - swell \* \(1\.0 - uCrystal \* 0\.90\)$/)
+    // And the swell must still move the vertices, or this is a geometry change.
+    expect(VERTEX_SHADER).toMatch(/vec3 displaced = position \+ normal \* disp;/)
+  })
+
   it('declares the ripple uniform at the size RippleBank packs', () => {
     // pack() writes RIPPLE_CAPACITY * RIPPLE_STRIDE floats = this many vec4s.
     // A shorter array in the GLSL would silently drop the tail ripples; a

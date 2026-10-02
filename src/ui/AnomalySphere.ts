@@ -292,7 +292,11 @@ void main() {
 
   // Crystal flattening: displacement irons toward a perfect sphere when paused.
   float disp = (mass + transient) * (1.0 - uCrystal * 0.90);
-  vDisp = disp;
+  // The fragment stage reads vDisp as relief. The swell is the same at every
+  // vertex, so it has none: shading it lifted the whole surface and cost local
+  // contrast (0.0481 without it against 0.0401 with it, real beat, hardware).
+  // The vertices still swell below; only the shading leaves it out.
+  vDisp = disp - swell * (1.0 - uCrystal * 0.90);
 
   vNormal   = normalize(normalMatrix * normal);
   vec3 displaced = position + normal * disp;

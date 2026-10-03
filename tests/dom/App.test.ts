@@ -143,6 +143,13 @@ type BuildOpts = {
 }
 
 let app: App
+
+// App adds listeners to window (resize, and the file drop since #164) and has
+// no teardown. window outlives every test in this file, so without this each
+// earlier App would keep answering events in every later test -- a stale
+// instance calling preventDefault() on a drag the live one is ignoring.
+let windowListeners: Array<[string, EventListenerOrEventListenerObject, boolean | AddEventListenerOptions | undefined]> = []
+const realAddWindowListener = window.addEventListener.bind(window)
 let draws: Ctx2DCall[]
 let resizeObservers: ReturnType<typeof stubResizeObserver>
 
@@ -171,7 +178,11 @@ function build(opts: BuildOpts = {}): App {
   // _isMobile is a field initializer, so the UA has to be in place before new.
   stubUserAgent(opts.mobile ? IPHONE_UA : DESKTOP_UA)
 
-  app = new App()
+  window.addEventListener = ((type: string, fn: EventListenerOrEventListenerObject, o?: boolean | AddEventListenerOptions) => {
+    windowListeners.push([type, fn, o])
+    realAddWindowListener(type, fn, o)
+  }) as typeof window.addEventListener
+  try { app = new App() } finally { window.addEventListener = realAddWindowListener }
   return app
 }
 
@@ -192,6 +203,8 @@ afterEach(() => {
   // a 15fps setInterval behind; the track menu parks capture listeners on
   // document, which survives every test in the file.
   inner(app).closeTrackMenu()
+  for (const [type, fn, o] of windowListeners) window.removeEventListener(type, fn, o)
+  windowListeners = []
   inner(app).starOverlay.destroy()
   removeBattery()
   vi.useRealTimers()
@@ -564,6 +577,270 @@ describe('App — drag to reorder', () => {
     items()[0].dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }))
     expect(names()).toEqual(['01. a', '02. b', '03. c'])
   })
+
+  it('marks the far edge of the target row when the track is moving down', () => {
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'])
+    const rows = items()
+    rows[0].dispatchEvent(new Event('dragstart', { bubbles: true }))
+    rows[2].dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }))
+    expect(rows[2].classList.contains('drag-over--after')).toBe(true)
+    rows[2].dispatchEvent(new Event('dragleave', { bubbles: true }))
+    rows[2].dispatchEvent(new Event('dragstart', { bubbles: true }))
+    rows[0].dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }))
+    expect(rows[0].classList.contains('drag-over')).toBe(true)
+    expect(rows[0].classList.contains('drag-over--after')).toBe(false)
+  })
+
+  it('sweeps the marker when the drag is cancelled without leaving the row', () => {
+    // Escape mid-drag fires dragend on the source and no dragleave anywhere,
+    // which is how the old marker got stuck.
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'])
+    const rows = items()
+    rows[0].dispatchEvent(new Event('dragstart', { bubbles: true }))
+    rows[2].dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }))
+    rows[0].dispatchEvent(new Event('dragend', { bubbles: true }))
+    expect(qa('.playlist-item.drag-over')).toHaveLength(0)
+  })
+
+  it('keeps the marker while the pointer crosses onto the row\'s own children', () => {
+    seedPlaylist(['a.mp3', 'b.mp3'])
+    const rows = items()
+    rows[0].dispatchEvent(new Event('dragstart', { bubbles: true }))
+    rows[1].dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }))
+    const leave = new Event('dragleave', { bubbles: true })
+    Object.defineProperty(leave, 'relatedTarget', { value: rows[1].querySelector('.playlist-item-name') })
+    rows[1].dispatchEvent(leave)
+    expect(rows[1].classList.contains('drag-over')).toBe(true)
+  })
+
+  it('carries analysed metadata with the track it belongs to', () => {
+    const meta = new Map<number, TrackMeta>([[0, { duration: 60, key: 'C maj', bpm: 100 }]])
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'], -1, meta)
+    drag(0, 2)
+    const shown = items().map((li) => li.querySelector('.playlist-item-meta')?.textContent)
+    expect(shown).toEqual(['— · — · —', '— · — · —', '01:00 · C maj · 100 BPM'])
+  })
+
+  it('keeps the search filter applied after a reorder', () => {
+    seedPlaylist(['drive a.mp3', 'sun.mp3', 'drive b.mp3', 'moon.mp3'])
+    const search = el<HTMLInputElement>('playlistSearch')
+    search.value = 'drive'
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+    // Both matches stay visible, so drag the second over the first.
+    drag(2, 0)
+    expect(names()).toEqual(['01. drive b', '02. drive a', '03. sun', '04. moon'])
+    expect(items().map((li) => li.style.display)).toEqual(['', '', 'none', 'none'])
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+describe('App — reorder without dragging', () => {
+  beforeEach(() => { build() })
+
+  const handles = () => qa<HTMLButtonElement>('.playlist-drag-handle')
+  const altKey = (target: HTMLElement, k: 'ArrowUp' | 'ArrowDown', alt = true) => {
+    const ev = new KeyboardEvent('keydown', { key: k, altKey: alt, bubbles: true, cancelable: true })
+    target.dispatchEvent(ev)
+    return ev
+  }
+
+  it('gives every row a focusable, named reorder handle', () => {
+    seedPlaylist(['a.mp3', 'b.mp3'])
+    const h = handles()
+    expect(h.map((b) => b.tagName)).toEqual(['BUTTON', 'BUTTON'])
+    expect(h.map((b) => b.type)).toEqual(['button', 'button'])
+    expect(h.map((b) => b.getAttribute('aria-label'))).toEqual(['Move a.mp3', 'Move b.mp3'])
+    expect(h[0].getAttribute('aria-hidden')).toBeNull()
+    expect(h[0].getAttribute('aria-keyshortcuts')).toBe('Alt+ArrowUp Alt+ArrowDown')
+  })
+
+  it('moves a track down with Alt+Down and keeps focus on it', () => {
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'])
+    const ev = altKey(handles()[0], 'ArrowDown')
+    expect(ev.defaultPrevented).toBe(true)
+    expect(names()).toEqual(['01. b', '02. a', '03. c'])
+    expect(document.activeElement).toBe(handles()[1])
+    expect(el('trackStatus').textContent).toBe('a.mp3 moved to position 2 of 3')
+  })
+
+  it('moves a track up with Alt+Up', () => {
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'])
+    altKey(handles()[2], 'ArrowUp')
+    expect(names()).toEqual(['01. a', '02. c', '03. b'])
+    expect(document.activeElement).toBe(handles()[1])
+  })
+
+  it('does nothing at the ends of the list or without Alt', () => {
+    seedPlaylist(['a.mp3', 'b.mp3'])
+    altKey(handles()[0], 'ArrowUp')
+    altKey(handles()[1], 'ArrowDown')
+    const plain = altKey(handles()[0], 'ArrowDown', false)
+    expect(plain.defaultPrevented).toBe(false)
+    expect(names()).toEqual(['01. a', '02. b'])
+  })
+
+  it('steps over rows the search hides, and the filter survives the move', () => {
+    seedPlaylist(['drive a.mp3', 'sun.mp3', 'moon.mp3', 'drive b.mp3'])
+    const search = el<HTMLInputElement>('playlistSearch')
+    search.value = 'drive'
+    search.dispatchEvent(new Event('input', { bubbles: true }))
+    altKey(handles()[0], 'ArrowDown')
+    // Moving one raw slot would swap with the hidden 'sun' and change nothing
+    // on screen; it has to pass the next VISIBLE track instead.
+    expect(names()).toEqual(['01. sun', '02. moon', '03. drive b', '04. drive a'])
+    expect(items().map((li) => li.style.display)).toEqual(['none', 'none', '', ''])
+    expect(document.activeElement).toBe(handles()[3])
+  })
+
+  it('does not start playback when the handle is pressed', () => {
+    seedPlaylist(['a.mp3', 'b.mp3'], 0)
+    const spy = vi.spyOn(inner(app) as unknown as { switchTrack(i: number, p?: boolean): Promise<void> }, 'switchTrack')
+      .mockResolvedValue(undefined)
+    click(handles()[1])
+    expect(spy).not.toHaveBeenCalled()
+    // The row itself still plays, or the spy above proves nothing.
+    click(items()[1])
+    expect(spy).toHaveBeenCalledWith(1, true)
+  })
+
+  it('does not open the long-press menu for a finger resting on the handle', () => {
+    seedPlaylist(['a.mp3', 'b.mp3'])
+    vi.useFakeTimers()
+    handles()[1].dispatchEvent(new Event('touchstart', { bubbles: true }))
+    vi.advanceTimersByTime(600)
+    expect(el('trackMenu').classList.contains('track-menu--visible')).toBe(false)
+    // The same press on the row body still opens it.
+    items()[1].querySelector('.playlist-item-name')!.dispatchEvent(new Event('touchstart', { bubbles: true }))
+    vi.advanceTimersByTime(600)
+    expect(el('trackMenu').classList.contains('track-menu--visible')).toBe(true)
+  })
+
+  // ── Touch: the handle runs its own pointer drag ──────────────────────────
+  const pointer = (type: string, target: HTMLElement, pointerType = 'touch', y = 0) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperties(ev, {
+      pointerType: { value: pointerType }, pointerId: { value: 7 },
+      clientX: { value: 10 }, clientY: { value: y },
+    })
+    target.dispatchEvent(ev)
+    return ev
+  }
+  /** Hit-test by y: row k occupies y in [k*40, k*40+40). */
+  const stubHitTest = () => {
+    ;(document as unknown as { elementFromPoint(x: number, y: number): Element | null }).elementFromPoint =
+      (_x, y) => items()[Math.floor(y / 40)]?.querySelector('.playlist-item-name') ?? null
+  }
+  afterEach(() => { delete (document as unknown as { elementFromPoint?: unknown }).elementFromPoint })
+
+  it('reorders by touch: drag the handle and lift over another row', () => {
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'])
+    stubHitTest()
+    const h = handles()[0]
+    pointer('pointerdown', h)
+    expect(items()[0].classList.contains('dragging')).toBe(true)
+    pointer('pointermove', h, 'touch', 90)
+    expect(items()[2].classList.contains('drag-over--after')).toBe(true)
+    pointer('pointerup', h, 'touch', 90)
+    expect(names()).toEqual(['01. b', '02. c', '03. a'])
+    expect(qa('.playlist-item.drag-over, .playlist-item.dragging')).toHaveLength(0)
+  })
+
+  it('abandons a touch reorder the browser cancels', () => {
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'])
+    stubHitTest()
+    const h = handles()[0]
+    pointer('pointerdown', h)
+    pointer('pointermove', h, 'touch', 90)
+    pointer('pointercancel', h, 'touch', 90)
+    expect(names()).toEqual(['01. a', '02. b', '03. c'])
+    expect(qa('.playlist-item.drag-over, .playlist-item.dragging')).toHaveLength(0)
+  })
+
+  it('leaves a mouse to the native drag on the row', () => {
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3'])
+    stubHitTest()
+    const h = handles()[0]
+    const down = pointer('pointerdown', h, 'mouse')
+    expect(down.defaultPrevented).toBe(false)
+    pointer('pointermove', h, 'mouse', 90)
+    pointer('pointerup', h, 'mouse', 90)
+    expect(names()).toEqual(['01. a', '02. b', '03. c'])
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+describe('App — dropping files in after the first load', () => {
+  beforeEach(() => { build() })
+
+  const fileDrag = (type: string, target: EventTarget, files: File[] = [], types = ['Files']) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(ev, 'dataTransfer', { value: { types, files, dropEffect: 'none' } })
+    target.dispatchEvent(ev)
+    return ev
+  }
+  const drawer = () => el('playlistDrawer')
+
+  it('adds audio dropped anywhere on the page to the end of the playlist', () => {
+    // A track is already loaded, so #dropzone is out of the picture.
+    seedPlaylist(['a.mp3'], 0)
+    const over = fileDrag('dragover', document.body)
+    expect(over.defaultPrevented).toBe(true) // or the browser navigates to the file
+    fileDrag('drop', document.body, [audioFile('b.mp3'), audioFile('c.mp3')])
+    expect(names()).toEqual(['01. a', '02. b', '03. c'])
+  })
+
+  it('accepts a file dropped straight onto a row without treating it as a reorder', () => {
+    seedPlaylist(['a.mp3', 'b.mp3'], 0)
+    fileDrag('dragover', items()[0])
+    expect(items()[0].classList.contains('drag-over')).toBe(false)
+    fileDrag('drop', items()[0], [audioFile('c.mp3')])
+    expect(names()).toEqual(['01. a', '02. b', '03. c'])
+  })
+
+  it('takes a drop on the landing dropzone exactly once', () => {
+    seedPlaylist([], -1)
+    inner(app).currentTrackIndex = 0 // keep switchTrack (and Web Audio) out of it
+    fileDrag('drop', el('dropzone'), [audioFile('a.mp3')])
+    expect(names()).toEqual(['01. a'])
+  })
+
+  it('rejects a drop with no audio in it and says why', () => {
+    seedPlaylist(['a.mp3'], 0)
+    fileDrag('drop', document.body, [new File(['x'], 'cover.png', { type: 'image/png' })])
+    expect(names()).toEqual(['01. a'])
+    expect(el('toast').classList.contains('toast--visible')).toBe(true)
+    expect(el('toast').textContent).toContain('not an audio file')
+  })
+
+  it('ignores the window drop while a row is being reordered', () => {
+    seedPlaylist(['a.mp3', 'b.mp3'], 0)
+    items()[0].dispatchEvent(new Event('dragstart', { bubbles: true }))
+    const over = fileDrag('dragover', document.body)
+    expect(over.defaultPrevented).toBe(false)
+    fileDrag('drop', document.body, [audioFile('c.mp3')])
+    expect(names()).toEqual(['01. a', '02. b'])
+  })
+
+  it('ignores a drag that carries no files', () => {
+    seedPlaylist(['a.mp3'], 0)
+    expect(fileDrag('dragover', document.body, [], ['text/plain']).defaultPrevented).toBe(false)
+  })
+
+  it('lights the playlist only while a file is over it, and clears on drop or leaving the window', () => {
+    seedPlaylist(['a.mp3'], 0)
+    fileDrag('dragover', el('playlistList'))
+    expect(drawer().classList.contains('drop-target')).toBe(true)
+    fileDrag('dragover', document.body)
+    expect(drawer().classList.contains('drop-target')).toBe(false)
+
+    fileDrag('dragover', el('playlistList'))
+    fileDrag('drop', el('playlistList'), [audioFile('b.mp3')])
+    expect(drawer().classList.contains('drop-target')).toBe(false)
+
+    fileDrag('dragover', el('playlistList'))
+    fileDrag('dragleave', document.body) // relatedTarget null: left the window
+    expect(drawer().classList.contains('drop-target')).toBe(false)
+  })
 })
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -614,6 +891,14 @@ describe('App — track context menu', () => {
     open(3)
     click(action('play-next'))
     expect(names()).toEqual(['01. a', '02. d', '03. b', '04. c'])
+  })
+
+  it('queues an earlier track directly after the current one, not one past it', () => {
+    // Lifting 'a' shifts the playing 'c' up a slot, so "next" is c's old slot.
+    seedPlaylist(['a.mp3', 'b.mp3', 'c.mp3', 'd.mp3'], 2)
+    open(0)
+    click(action('play-next'))
+    expect(names()).toEqual(['01. b', '02. c', '03. a', '04. d'])
   })
 
   it('removes a track from the menu', () => {

@@ -14,6 +14,10 @@ import { Toast } from './Toast'
 import { InstallController } from './InstallController'
 import { isMobileUserAgent } from './device'
 import { formatTime } from './time'
+import {
+  currentAfterMove, metaAfterMove, metaAfterRemove, playNextTarget,
+  keyboardMoveTarget, isFileDrag, audioFiles,
+} from './playlistOrder'
 import { measureChromeInsets, ChromeVars } from './chrome'
 import type { AudioParams, ReverbType } from '../types'
 
@@ -118,6 +122,7 @@ export class App {
   private playlistAddBtn          = document.getElementById('playlistAddBtn')!
   private playlistList            = document.getElementById('playlistList')!
   private playlistCount           = document.getElementById('playlistCount')!
+  private playlistSearch          = document.getElementById('playlistSearch') as HTMLInputElement | null
 
   // Playlist long-press context menu
   private _trackMenu       = document.getElementById('trackMenu')!
@@ -236,18 +241,53 @@ export class App {
       this.renderPlaylist()
     })
 
-    const search = document.getElementById('playlistSearch') as HTMLInputElement | null
-    search?.addEventListener('input', () => {
-      const q = search.value.toLowerCase()
-      this.playlistList.querySelectorAll<HTMLElement>('.playlist-item').forEach((li) => {
-        const name = li.querySelector('.playlist-item-name')?.textContent?.toLowerCase() ?? ''
-        li.style.display = !q || name.includes(q) ? '' : 'none'
-      })
+    this.playlistSearch?.addEventListener('input', () => this.applyPlaylistFilter())
+    this.wireFileDrop()
+  }
+
+  // Hide the rows the search box does not match. Called after every render as
+  // well as on input: renderPlaylist() rebuilds every row visible, so a reorder
+  // or removal while filtered would otherwise silently drop the filter while
+  // the box still shows the query.
+  private applyPlaylistFilter(): void {
+    const q = this.playlistSearch?.value.toLowerCase() ?? ''
+    this.playlistList.querySelectorAll<HTMLElement>('.playlist-item').forEach((li) => {
+      const name = li.querySelector('.playlist-item-name')?.textContent?.toLowerCase() ?? ''
+      li.style.display = !q || name.includes(q) ? '' : 'none'
+    })
+  }
+
+  // Files dropped anywhere in the app join the playlist. #dropzone used to be
+  // the only drop target, and it stops taking pointer events once a track
+  // loads, so after the first load a dropped file did nothing (or the browser
+  // navigated away to it). Its drop now bubbles here instead of being handled
+  // twice. A row being reordered carries no 'Files' type and is left alone.
+  private wireFileDrop(): void {
+    const clearTarget = () => this.playlistDrawer.classList.remove('drop-target')
+    window.addEventListener('dragover', (e) => {
+      if (this._dragIndex !== -1 || !isFileDrag(e.dataTransfer)) return
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+      this.playlistDrawer.classList.toggle('drop-target', this.playlistDrawer.contains(e.target as Node))
+    })
+    // relatedTarget is null only when the drag leaves the window altogether.
+    window.addEventListener('dragleave', (e) => { if (!e.relatedTarget) clearTarget() })
+    window.addEventListener('drop', (e) => {
+      clearTarget()
+      if (this._dragIndex !== -1 || !isFileDrag(e.dataTransfer)) return
+      e.preventDefault()
+      const files = e.dataTransfer?.files
+      if (!files || !files.length) return
+      if (!audioFiles(Array.from(files)).length) {
+        this._toast.show({ message: 'That is not an audio file.', duration: 3000 })
+        return
+      }
+      this.addFilesToPlaylist(Array.from(files))
     })
   }
 
   private addFilesToPlaylist(files: File[]): void {
-    const audio = files.filter(f => !f.type || f.type.startsWith('audio/'))
+    const audio = audioFiles(files)
     if (!audio.length) return
     this.playlist.push(...audio)
     this.renderPlaylist()
@@ -285,14 +325,7 @@ export class App {
 
   private removeTrack(index: number): void {
     this.playlist.splice(index, 1)
-    // Rebuild _trackMeta with shifted indices
-    const newMeta = new Map<number, { duration: number; key: string; bpm: number }>()
-    this._trackMeta.forEach((v, k) => {
-      if (k < index)       newMeta.set(k, v)
-      else if (k > index)  newMeta.set(k - 1, v)
-      // k === index is dropped
-    })
-    this._trackMeta = newMeta
+    this._trackMeta = metaAfterRemove(this._trackMeta, index)
 
     if (!this.playlist.length) {
       this.currentTrackIndex = -1
@@ -315,7 +348,7 @@ export class App {
     this.playlistCount.textContent = `${count} track${count !== 1 ? 's' : ''}`
     this.playlist.forEach((file, i) => {
       const li     = document.createElement('li')
-      const handle = document.createElement('span')
+      const handle = document.createElement('button')
       const info   = document.createElement('div')
       const name   = document.createElement('span')
       const meta   = document.createElement('span')
@@ -327,23 +360,57 @@ export class App {
       li.addEventListener('dragstart', (e) => {
         this._dragIndex = i
         li.classList.add('dragging')
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
         e.dataTransfer?.setData('text/plain', String(i))
       })
       li.addEventListener('dragend', () => {
         li.classList.remove('dragging')
+        // A drag cancelled with Escape, or dropped outside the list, fires no
+        // dragleave on the row it last crossed, so the marker is swept here.
+        this.clearDropMarkers()
         this._dragIndex = -1
       })
-      li.addEventListener('dragover', (e) => { e.preventDefault(); li.classList.add('drag-over') })
-      li.addEventListener('dragleave', () => li.classList.remove('drag-over'))
-      li.addEventListener('drop', (e) => {
+      // Rows only react to a row being reordered. A file dragged in from the
+      // OS falls through to the window-level handler in wireFileDrop().
+      li.addEventListener('dragover', (e) => {
+        if (this._dragIndex < 0) return
         e.preventDefault()
-        li.classList.remove('drag-over')
+        this.markDropRow(li, this._dragIndex, i)
+      })
+      li.addEventListener('dragleave', (e) => {
+        // Crossing onto the row's own name or button is not leaving it.
+        if (li.contains(e.relatedTarget as Node | null)) return
+        li.classList.remove('drag-over', 'drag-over--after')
+      })
+      li.addEventListener('drop', (e) => {
+        if (this._dragIndex < 0) return
+        e.preventDefault()
+        this.clearDropMarkers()
         this.reorderTrack(this._dragIndex, i)
       })
 
+      // A real button, so the reorder has a keyboard path (WCAG 2.5.7): Alt+Up
+      // and Alt+Down move the track, and focus follows it to the new row.
+      handle.type = 'button'
       handle.className = 'playlist-drag-handle'
       handle.textContent = '☰'
-      handle.setAttribute('aria-hidden', 'true')
+      handle.setAttribute('aria-label', `Move ${file.name}`)
+      handle.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown')
+      handle.title = 'Drag to reorder, or Alt+↑ / Alt+↓'
+      handle.addEventListener('click', (e) => e.stopPropagation())
+      handle.addEventListener('keydown', (e) => {
+        if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+        e.preventDefault()
+        e.stopPropagation()
+        this.moveTrackByKey(i, e.key === 'ArrowUp' ? -1 : 1)
+      })
+      // Touch and pen get no HTML5 drag events on most mobile browsers, so the
+      // handle runs its own pointer drag. A mouse uses the native one on the row.
+      handle.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse') return
+        e.preventDefault()
+        this.startPointerReorder(i, li, handle, e)
+      })
 
       const idx = String(i + 1).padStart(2, '0')
       name.className = 'playlist-item-name'
@@ -369,7 +436,9 @@ export class App {
       let lpTimer: number | null = null
       let lpFired = false
       const cancelLp = () => { if (lpTimer !== null) { clearTimeout(lpTimer); lpTimer = null } }
-      li.addEventListener('touchstart', () => {
+      li.addEventListener('touchstart', (e) => {
+        // A finger resting on the handle is starting a reorder, not a long-press.
+        if ((e.target as Element).closest?.('.playlist-drag-handle')) return
         lpFired = false
         lpTimer = window.setTimeout(() => {
           lpFired = true
@@ -388,6 +457,7 @@ export class App {
       li.append(handle, info, rmBtn)
       this.playlistList.appendChild(li)
     })
+    this.applyPlaylistFilter()
 
     // Sync mobile prev/next track buttons with playlist bounds
     ;(this.prevBtn as HTMLButtonElement).disabled = this.currentTrackIndex <= 0
@@ -396,24 +466,73 @@ export class App {
   }
 
   private reorderTrack(from: number, to: number): void {
-    if (from === to || from < 0 || to < 0 || to >= this.playlist.length) return
+    const n = this.playlist.length
+    if (from === to || from < 0 || to < 0 || from >= n || to >= n) return
     const [item] = this.playlist.splice(from, 1)
     this.playlist.splice(to, 0, item)
-    if (this.currentTrackIndex === from) {
-      this.currentTrackIndex = to
-    } else if (from < this.currentTrackIndex && to >= this.currentTrackIndex) {
-      this.currentTrackIndex--
-    } else if (from > this.currentTrackIndex && to <= this.currentTrackIndex) {
-      this.currentTrackIndex++
-    }
-    // Rebuild _trackMeta: apply the same splice to a meta array then re-index
-    const metaArr = Array.from({ length: this.playlist.length + 1 }, (_, k) =>
-      this._trackMeta.get(k) ?? null)
-    const [movedMeta] = metaArr.splice(from, 1)
-    metaArr.splice(to, 0, movedMeta)
-    this._trackMeta = new Map()
-    metaArr.forEach((v, k) => { if (v) this._trackMeta.set(k, v) })
+    this.currentTrackIndex = currentAfterMove(this.currentTrackIndex, from, to)
+    this._trackMeta = metaAfterMove(this._trackMeta, from, to)
     this.renderPlaylist()
+  }
+
+  /** Alt+Up / Alt+Down from a row's handle: move one visible slot, keep focus on the moved track. */
+  private moveTrackByKey(index: number, direction: -1 | 1): void {
+    const rows = Array.from(this.playlistList.querySelectorAll<HTMLElement>('.playlist-item'))
+    const to = keyboardMoveTarget(index, direction, rows.map((li) => li.style.display !== 'none'))
+    if (to < 0) return
+    const name = this.playlist[index].name
+    this.reorderTrack(index, to)
+    this.playlistList.querySelectorAll<HTMLButtonElement>('.playlist-drag-handle')[to]?.focus()
+    const status = document.getElementById('trackStatus')
+    if (status) status.textContent = `${name} moved to position ${to + 1} of ${this.playlist.length}`
+  }
+
+  /** Show where a dragged row will land: above the target, or below it when moving down. */
+  private markDropRow(row: HTMLElement, from: number, to: number): void {
+    if (from === to) return
+    row.classList.add('drag-over')
+    row.classList.toggle('drag-over--after', from < to)
+  }
+
+  private clearDropMarkers(): void {
+    this.playlistList.querySelectorAll('.drag-over').forEach((r) =>
+      r.classList.remove('drag-over', 'drag-over--after'))
+  }
+
+  // The pointer half of the reorder, for touch and pen. Pointer capture keeps
+  // every move on the handle however far the finger travels, so the row under
+  // the finger is found by hit-testing rather than by event target. Hidden
+  // (filtered) rows are never hit, so they can never be a destination.
+  private startPointerReorder(from: number, li: HTMLElement, handle: HTMLElement, down: PointerEvent): void {
+    handle.setPointerCapture?.(down.pointerId)
+    this._dragIndex = from
+    li.classList.add('dragging')
+    let over = -1
+    const rowAt = (x: number, y: number): number => {
+      const row = document.elementFromPoint?.(x, y)?.closest('.playlist-item')
+      return row ? Array.prototype.indexOf.call(this.playlistList.children, row) : -1
+    }
+    const move = (e: PointerEvent) => {
+      if (e.pointerId !== down.pointerId) return
+      const k = rowAt(e.clientX, e.clientY)
+      if (k === over) return
+      this.clearDropMarkers()
+      over = k
+      if (k >= 0) this.markDropRow(this.playlistList.children[k] as HTMLElement, from, k)
+    }
+    const end = (e: PointerEvent) => {
+      if (e.pointerId !== down.pointerId) return
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', end)
+      handle.removeEventListener('pointercancel', end)
+      li.classList.remove('dragging')
+      this.clearDropMarkers()
+      this._dragIndex = -1
+      if (e.type === 'pointerup' && over >= 0) this.reorderTrack(from, over)
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', end)
+    handle.addEventListener('pointercancel', end)
   }
 
   // ── Playlist long-press context menu ──────────────────────────────────────
@@ -425,11 +544,9 @@ export class App {
         if (i < 0 || i >= this.playlist.length) return
         switch (btn.dataset.action) {
           case 'play-now':  void this.switchTrack(i, true); break
-          case 'play-next': {
-            const base = this.currentTrackIndex < 0 ? 0 : this.currentTrackIndex
-            this.reorderTrack(i, Math.min(this.playlist.length - 1, base + 1))
+          case 'play-next':
+            this.reorderTrack(i, playNextTarget(i, this.currentTrackIndex, this.playlist.length))
             break
-          }
           case 'move-top':  this.reorderTrack(i, 0); break
           case 'remove':    this.removeTrack(i); break
         }
@@ -851,11 +968,10 @@ export class App {
     this.dropzone.addEventListener('dragleave', () => {
       this.dropzone.classList.remove('drag-over')
     })
-    this.dropzone.addEventListener('drop', (e) => {
-      e.preventDefault()
+    // The files themselves are taken by the window-level handler in
+    // wireFileDrop(), which this drop bubbles up to.
+    this.dropzone.addEventListener('drop', () => {
       this.dropzone.classList.remove('drag-over')
-      const files = e.dataTransfer?.files
-      if (files && files.length > 0) this.addFilesToPlaylist(Array.from(files))
     })
     this.fileInput.addEventListener('change', () => {
       const files = this.fileInput.files

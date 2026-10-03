@@ -118,6 +118,22 @@ describe('contrast floors', () => {
       expect(worstDeclared(selector)).toBeGreaterThanOrEqual(3)
     })
 
+  // The reorder handle inherits --text and is dimmed by opacity alone, so its
+  // real colour is a blend toward whatever surface it sits on. It became a
+  // focusable control in #164 and owes the component floor at rest.
+  it('renders the playlist reorder handle above the UI-component floor at rest', () => {
+    const block = CSS.match(/^\.playlist-drag-handle\s*\{([^}]*)\}/m)
+    if (!block) throw new Error('.playlist-drag-handle is not a top-level rule in main.css')
+    const alpha = Number(block[1]!.match(/(?:^|[;\s])opacity:\s*([\d.]+)/)?.[1])
+    expect(alpha).toBeGreaterThan(0)
+    const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+    const blend = (fg: string, bg: string) => '#' + rgb(fg)
+      .map((c, i) => Math.round(c * alpha + rgb(bg)[i]! * (1 - alpha)).toString(16).padStart(2, '0')).join('')
+    const worst = Math.min(...['color-bg', 'color-surface'].map((s) =>
+      contrast(blend(token('color-text'), token(s)), token(s))))
+    expect(worst).toBeGreaterThanOrEqual(3)
+  })
+
   // The mobile bottom nav carries a 10px text label under each icon, so it
   // owes the text floor, idle and active, in every theme.
   it.each(['.nav-tab', '.nav-tab.panel-trigger--active'])(

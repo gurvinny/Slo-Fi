@@ -48,6 +48,11 @@ export const MUTATIONS = [
    '  --accent-bright: #7b5cff;',
    '  --accent-bright: #7755ff;',
    'renders the bottom nav tab .nav-tab.panel-trigger--active as legible text in every theme'],
+
+  ['the reorder handle fades back to its decorative opacity',
+   '  opacity: 0.55;\n  min-width: 24px;',
+   '  opacity: 0.35;\n  min-width: 24px;',
+   'renders the playlist reorder handle above the UI-component floor at rest'],
 ]
 
 export const SURVIVORS = {}

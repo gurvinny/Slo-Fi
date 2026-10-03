@@ -1801,7 +1801,7 @@ body.is-paused .site-footer {
   --accent:        #5533ff;
   --accent-dim:    rgba(85, 51, 255, 0.18);
   --accent-glow:   rgba(85, 51, 255, 0.40);
-  --accent-bright: #7755ff;
+  --accent-bright: #7b5cff;
   --accent-subtle: rgba(85, 51, 255, 0.22);
   --accent-faint:  rgba(85, 51, 255, 0.10);
   --teal:          #7733dd;
@@ -4229,7 +4229,7 @@ html:not(.has-splash) .landing-badge {
     padding: 6px 0;
     background: none;
     border: 0;
-    color: var(--text-muted);
+    color: var(--text-dim);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: color 0.15s;

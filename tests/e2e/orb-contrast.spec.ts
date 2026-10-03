@@ -15,54 +15,29 @@
  * failures, so this measures contrast.
  */
 import { test, expect } from "@playwright/test";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { skipSplash, startPlayback, measureOrbContrast } from "./helpers";
 
 const ORB = "#anomaly canvas";
 
 /**
- * A 120bpm kick + sustained sub + hats.
+ * Real music, supplied by path through SLOFI_ORB_BEAT.
  *
- * 30 seconds, and the duration is load-bearing. This spec spends ~8s getting
- * to its first capture (settle, reactivity, four averaged samples), and the
- * orb irons flat toward uCrystal the moment playback stops -- so a 10s
- * fixture runs out mid-measurement and reads 0.073 against a floor of 0.12.
- * That was invisible while nothing pressed play and the clock never moved.
+ * This used to be a synthetic 120bpm kick + sub + hats WAV generated in the
+ * spec. A controlled signal is not a representative one: it drove the kick in
+ * a way no real track does and overstated the blow-out about 6x. Real music,
+ * with a full spectrum and an actual arrangement, is the condition the orb is
+ * judged in.
  *
- * The shared `makeWavFile` fixture is a 440Hz sine, which carries no bass at
- * all, so uBass stays near zero and none of the displacement path this spec
- * measures ever runs. A fixture that does not exercise the feature makes the
- * measurement meaningless while leaving the test green -- the same trap that
- * produced three earlier bugs here, one frequency band further up.
+ * The fixture is not committed: it is a full-length track, larger than the
+ * whole shipping bundle. Point the variable at any real, bass-carrying track
+ * of at least ~30 seconds; the spec plays about 8s before its first capture,
+ * spends several more on eight captures, and the orb irons flat the moment
+ * playback stops.
  */
-function makeBassWav(seconds = 30, rate = 44100): string {
-  const n = Math.floor(seconds * rate);
-  const buf = Buffer.alloc(44 + n * 2);
-  buf.write("RIFF", 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write("WAVE", 8);
-  buf.write("fmt ", 12); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20);
-  buf.writeUInt16LE(1, 22); buf.writeUInt32LE(rate, 24); buf.writeUInt32LE(rate * 2, 28);
-  buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
-  buf.write("data", 36); buf.writeUInt32LE(n * 2, 40);
-  const beat = 0.5;                       // 120bpm, as a DURATION not a frame count
-  for (let i = 0; i < n; i++) {
-    const t = i / rate;
-    const ph = (t % beat) / beat;
-    const kick = Math.sin(2 * Math.PI * (55 + 90 * Math.exp(-ph * beat * 40)) * t)
-      * Math.exp(-ph * beat * 18) * 0.75;
-    const sub = Math.sin(2 * Math.PI * 41 * t) * 0.32;
-    const hp = ((t + beat / 2) % beat) / beat;
-    const hat = (Math.random() * 2 - 1) * Math.exp(-hp * beat * 60) * 0.18;
-    const v = Math.max(-1, Math.min(1, kick + sub + hat));
-    buf.writeInt16LE(Math.round(v * 0x7000), 44 + i * 2);
-  }
-  const path = join(mkdtempSync(join(tmpdir(), "slofi-bass-")), "bass.wav");
-  writeFileSync(path, buf);
-  return path;
-}
+const BEAT = process.env.SLOFI_ORB_BEAT;
 
-// HARDWARE ONLY, measured 2026-10-01.
+// HARDWARE ONLY, measured 2026-10-01 on the old synthetic fixture.
 //
 // A single absolute floor cannot serve all three projects, because they do not
 // disagree by noise -- they disagree by a FACTOR OF FIVE on identical code:
@@ -89,37 +64,45 @@ test("the orb surface carries local contrast at the shipped defaults", async ({ 
   testInfo.project.name === "desktop-hardware-gl" ||
     test.skip(true, "software renderers read this metric ~5x high — see above");
 
-  // EXPECTED TO FAIL, and the failure is the point.
+  // No fixture is not a pass. CI has no GPU and no fixture, and already cannot
+  // measure this, so it skips there and says why. A local hardware run without
+  // the fixture fails instead: a skip would read as a green oracle.
+  if (!BEAT) {
+    test.skip(!!process.env.CI, "SLOFI_ORB_BEAT is not set; this oracle needs real music");
+    throw new Error("set SLOFI_ORB_BEAT to a real music file to run the orb contrast oracle");
+  }
+  expect(existsSync(BEAT), `SLOFI_ORB_BEAT does not exist: ${BEAT}`).toBe(true);
+
+  // This spec spent its first life as an expected failure, and the history
+  // is the reason the floor stays where it is.
   //
-  // This spec passed for exactly one reason: nothing in this suite had ever
-  // pressed play, so it measured a motionless, silent orb. With startPlayback
-  // in place it measures the condition the bug was actually reported in, and
-  // the orb does not survive it.
+  // It first passed only because nothing in this suite pressed play, so it
+  // measured a motionless orb. With playback in place the surface blew out:
+  // main read 0.0321 and feat/anomaly-iii 0.0238 on hardware (2026-10-01).
+  // #172 had two causes, and each one alone kept this under the floor:
   //
-  // Measured on hardware 2026-10-01: main reads 0.0321 (n=4, stdev 0.0033) and
-  // feat/anomaly-iii reads 0.0238 (n=4, stdev 0.0038) against this floor of
-  // 0.12. The earlier figures in this comment -- "0.068 to 0.081 on all three
-  // projects" -- predate both the iGPU passthrough and main's move to Khronos
-  // PBR Neutral tone mapping, and described a machine that no longer exists.
-  // They were quoted here as the justification for the floor, so they are
-  // replaced rather than kept for history.
+  //   1. The bloom threshold sat at 0.22, so every outward bulge bloomed and
+  //      the halos washed over the gaps between them.
+  //   2. The crack vein mask was inverted. It lit ~82% of the surface instead
+  //      of the lines, and on a hard hit the orb bloomed solid white
+  //      (single captures near 0.015).
   //
-  // That is not a floor that needs lowering. Under playback the surface blows
-  // out: a census of achromatic pixels (min(r,g,b) > 200) on this canvas runs
-  // to 9k-33k per frame while a track is running and falls to EXACTLY ZERO the
-  // moment it stops. Contrast collapses because the orb saturates, which is a
-  // real defect in what ships, not an artifact of the measurement.
+  // Measured 2026-10-02 on hardware, real music, four runs per row:
   //
-  // Marked fail() rather than skipped so it keeps running and keeps reporting.
-  // When the blow-out is fixed this will start PASSING, and Playwright will
-  // then fail the run for an unexpected pass -- which is the signal to delete
-  // this block. Do not green it by touching the threshold.
-  test.fail();
+  //   threshold 0.22, old mask           0.036-0.046
+  //   threshold 1.00, old mask           0.116-0.121   (2 of 4 runs pass)
+  //   threshold 1.00, lines-only mask    0.143-0.148
+  //     ... with lightning off           0.148-0.156
+  //
+  // The fixed build also passed 4/4 on two other real tracks (0.139-0.157).
+  // The lightning-off row is what makes the pass trustworthy: the surface
+  // clears the floor on its own, not on a flash. Do not lower the floor to
+  // green a regression.
   test.setTimeout(180_000);
   await skipSplash(page);
   await page.goto("/");
 
-  await page.setInputFiles("#fileInput", makeBassWav());
+  await page.setInputFiles("#fileInput", BEAT);
   await expect(page.locator(ORB)).toBeVisible({ timeout: 30_000 });
 
   // Loading a file is not playing it. Without this the analysers read silence,
@@ -136,10 +119,12 @@ test("the orb surface carries local contrast at the shipped defaults", async ({ 
   await page.waitForTimeout(1_500);
 
   // Averaged over several captures: the orb animates, and mesh.scale tracks the
-  // kick, so a single frame lands wherever the beat happens to be.
+  // kick, so a single frame lands wherever the beat happens to be. Eight, not
+  // four: a four-capture window could end just before a hard hit, and it did.
+  // The old mask passed 4 captures most of the time and failed every run at 8.
   const canvas = page.locator(ORB);
   const samples: Awaited<ReturnType<typeof measureOrbContrast>>[] = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 8; i++) {
     samples.push(await measureOrbContrast(canvas));
     await page.waitForTimeout(350);
   }
@@ -152,13 +137,10 @@ test("the orb surface carries local contrast at the shipped defaults", async ({ 
   // audio does. Playing material moves, which is why this asserts on a mean
   // over several captures and not on any one frame.
   //
-  // The "per-sample spread near 0.04" this comment used to claim does not hold
-  // at the levels actually measured: eight runs on hardware gave a stdev of
-  // 0.0033-0.0038, an order of magnitude tighter. That matters because the
-  // stale figure was large enough to hide a real difference as noise -- it
-  // nearly did exactly that when main (0.0321) was compared against
-  // feat/anomaly-iii (0.0238) and the non-overlapping ranges were almost
-  // dismissed. Measure the noise; do not quote it.
+  // Measure the noise; do not quote it. A stale "per-sample spread near 0.04"
+  // in this comment once nearly hid a real 0.011 difference between main and
+  // feat/anomaly-iii as noise. Eight-capture run means on the fixed build
+  // spread 0.143-0.148 on one track; single captures spread far wider.
   expect(mean("relativeContrast"), "the orb surface reads as a uniform mass")
     .toBeGreaterThan(0.12);
 

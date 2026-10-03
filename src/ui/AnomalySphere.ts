@@ -407,7 +407,10 @@ void main() {
     float c1   = snoise(vNormal * 5.5 + uTime * 0.04);
     float c2   = snoise(vNormal * 11.0 + uTime * 0.025);
     float vein = abs(fract(c1 * 3.0 + c2 * 0.4) - 0.5) * 2.0;
-    vein = pow(1.0 - smoothstep(0.76, 1.0, vein), 4.0);
+    // vein peaks at 1.0 ON a fracture line. This was 1.0 - smoothstep(0.76, ...),
+    // which lit everything EXCEPT the lines, ~82% of the surface, and bloomed
+    // into a white-out on hard hits (#172). Now only the lines light, ~2.5%.
+    vein = pow(smoothstep(0.90, 1.0, vein), 4.0);
     vec3 crackCol = mix(uColorA, uColorC, 0.5) * 3.2;
     color += crackCol * vein * uCrack * (0.5 + uKick * 0.9);
   }

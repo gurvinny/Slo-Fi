@@ -30,6 +30,17 @@ export const MUTATIONS = [
    'color += crackCol * vein * uCrack * (0.5 + uKick * 0.9);',
    'color += crackCol * vein * uCrack * (0.5 + uKick * 0.0);',
    'still lets the crack veins bloom'],
+
+  // #172's second path: the vein mask that lit the surface instead of the lines.
+  ['the vein mask is inverted again, lighting ~82% of the surface instead of the lines',
+   'vein = pow(smoothstep(0.90, 1.0, vein), 4.0);',
+   'vein = pow(1.0 - smoothstep(0.76, 1.0, vein), 4.0);',
+   'lights the crack lines, not the surface between them'],
+
+  ['the vein lines widen until they wash over the surface',
+   'vein = pow(smoothstep(0.90, 1.0, vein), 4.0);',
+   'vein = pow(smoothstep(0.30, 1.0, vein), 4.0);',
+   'lights the crack lines, not the surface between them'],
 ]
 
 export const SURVIVORS = {}

@@ -136,12 +136,42 @@ describe('the orb brightness channel', () => {
     ).toBeLessThan(BLOOM_THRESHOLD)
   })
 
+  it('lights the crack lines, not the surface between them', () => {
+    // #172's second path. `vein` peaks at 1.0 ON a fracture line, and the mask
+    // was `pow(1.0 - smoothstep(0.76, 1.0, vein), 4.0)`: the `1.0 -` inverted
+    // it, so every point EXCEPT the lines took the full crack colour, about 82%
+    // of the surface at several times palette brightness. On a hard hit that
+    // bloomed into a white-out: measured on hardware, the orb went solid
+    // cream-white, relative local contrast fell to ~0.015, and the lit share of
+    // the oracle's box matched the mask's coverage (0.82).
+    //
+    // Evaluated from the shader's own expression over the range `vein` spans,
+    // so a width change re-checks the coverage instead of passing silently.
+    const m = FRAGMENT_SHADER.match(/vein = pow\((1\.0 - )?smoothstep\(([\d.]+), ([\d.]+), vein\), ([\d.]+)\);/)
+    expect(m, 'the vein mask expression has moved or been renamed').not.toBeNull()
+    const [, invert, e0, e1, power] = m!
+    const smooth = (x: number) => {
+      const t = Math.min(Math.max((x - Number(e0)) / (Number(e1) - Number(e0)), 0), 1)
+      return t * t * (3 - 2 * t)
+    }
+    const mask = (v: number) => (invert ? 1 - smooth(v) : smooth(v)) ** Number(power)
+    expect(mask(1), 'a fracture line itself is not lit').toBeCloseTo(1, 5)
+    expect(mask(0), 'the surface between the lines is lit').toBeCloseTo(0, 5)
+    const N = 10_000
+    let lit = 0
+    for (let i = 0; i < N; i++) if (mask((i + 0.5) / N) > 0.5) lit++
+    expect(lit / N, 'the veins cover too much of the surface to read as cracks').toBeLessThanOrEqual(0.05)
+  })
+
   it('still lets the crack veins bloom', () => {
     // The other half of the threshold decision: raising it must not switch the
     // bloom pass off in effect. Crack veins are drawn at several times palette
     // brightness precisely so they blaze, and they should still clear the
     // threshold on most themes. The darkest ones (void, ember) peak below it;
     // that is the accepted cost of a threshold the surface cannot reach.
+    //
+    // This is safe only because the veins are THIN, which the test above pins.
+    // A blooming vein mask that covers the surface is the white-out itself.
     //
     // Read from the shader, not restated: a vein gain that drops quietly would
     // otherwise pass here while the veins stopped glowing on screen.

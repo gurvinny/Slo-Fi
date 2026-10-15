@@ -192,6 +192,10 @@ function seedPlaylist(names: string[], current = -1, meta?: Map<number, TrackMet
   i.playlist = names.map(audioFile)
   i.currentTrackIndex = current
   if (meta) i._trackMeta = meta
+  // loadFile() runs showPlayer() before a playlist can exist, so a seeded list
+  // has to sit in a laid-out player too. Left at the fixture's display:none,
+  // nothing inside can take focus (jsdom 30.1.2 enforces this, as browsers do).
+  el('player').style.display = 'block'
   i.renderPlaylist()
 }
 

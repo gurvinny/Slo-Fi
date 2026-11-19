@@ -88,11 +88,11 @@ All HTTP responses from the Cloudflare Pages deployment are governed by `public/
 
 | Version | Supported |
 |:---:|:---:|
-| 2.0.x | Yes — actively maintained |
-| 1.0.x | Yes — security patches only |
-| < 1.0 | No — please upgrade |
+| 3.0.x (beta, `main`) | Yes, actively maintained |
+| 2.x | No, please upgrade |
+| < 2.0 | No, please upgrade |
 
-Security patches are applied to the latest release only.
+Security patches land on `main` only and ship to [slofi.live](https://slofi.live) on merge. Older lines are archived and not backported.
 
 <br/>
 

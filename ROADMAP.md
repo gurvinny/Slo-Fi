@@ -8,7 +8,7 @@
 
 ### ✦ Where Slo-Fi has been and where it's going ✦
 
-[![Current](https://img.shields.io/badge/Current-v3.0.0--dev-F97316.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases)
+[![Current](https://img.shields.io/badge/Current-v3.0.0--beta.2-F97316.svg?style=flat-square&logo=semanticversioning&logoColor=white)](https://github.com/gurvinny/Slo-Fi/releases)
 [![Milestone](https://img.shields.io/badge/v3.0-Meridian-F97316.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/milestone/3)
 [![Next](https://img.shields.io/badge/v3.1-Afterglow-8B5CF6.svg?style=flat-square)](https://github.com/gurvinny/Slo-Fi/milestone/4)
 [![Open Issues](https://img.shields.io/github/issues/gurvinny/Slo-Fi?style=flat-square&color=F97316&label=Open%20Issues)](https://github.com/gurvinny/Slo-Fi/issues)
@@ -116,14 +116,14 @@ The table runs in release order. Track live state on the [v3.0 milestone](https:
 
 ### Release order
 
-**Release blockers:** #171 and #172. Meridian is not release-ready until both are closed.
+**Release blockers:** #171 and #172, both closed and shipped in `v3.0.0-beta.2`.
 
 | Order | Status | Issue | Feature | Description |
 |:---:|:---:|:---:|:---|:---|
-| 1 | 🔲 | [#163](https://github.com/gurvinny/Slo-Fi/issues/163) | **Flyout Bounds, Unified Timer, Help Cleanup** | Panels sized from measured chrome instead of hardcoded offsets, one `01:24 / 03:45` track timer, and the duplicate Help trigger removed. |
-| 2 | 🔲 | [#171](https://github.com/gurvinny/Slo-Fi/issues/171) | **Orb Signal Pipeline Wiring** | Drive the sphere from the layered `OrbSignal` pipeline and make every envelope frame-rate independent. *Release blocker.* |
-| 2 | 🔲 | [#172](https://github.com/gurvinny/Slo-Fi/issues/172) | **Two-Stage Bloom Budgets** | Give sustained and transient bloom separate reserved budgets so a dense passage cannot starve the transient. *Release blocker.* |
-| 3 | 🔲 | [#164](https://github.com/gurvinny/Slo-Fi/issues/164) | **Playlist Drop and Reorder** | Accept dropped files at any time, keyboard and touch reordering, and hardened drag state. |
+| 1 | ✅ | [#163](https://github.com/gurvinny/Slo-Fi/issues/163) | **Flyout Bounds, Unified Timer, Help Cleanup** | Panels sized from measured chrome instead of hardcoded offsets, one `01:24 / 03:45` track timer, and the duplicate Help trigger removed. |
+| 2 | ✅ | [#171](https://github.com/gurvinny/Slo-Fi/issues/171) | **Orb Signal Pipeline Wiring** | Drive the sphere from the layered `OrbSignal` pipeline and make every envelope frame-rate independent. *Release blocker, closed.* |
+| 2 | ✅ | [#172](https://github.com/gurvinny/Slo-Fi/issues/172) | **Two-Stage Bloom Budgets** | Give sustained and transient bloom separate reserved budgets so a dense passage cannot starve the transient. *Release blocker, closed.* |
+| 3 | ✅ | [#164](https://github.com/gurvinny/Slo-Fi/issues/164) | **Playlist Drop and Reorder** | Accept dropped files at any time, keyboard and touch reordering, and hardened drag state. |
 | 4 | 🔲 | [#165](https://github.com/gurvinny/Slo-Fi/issues/165) | **Tactile Button Deck** | Beveled frames, inset LEDs and debossed labels on the transport, composed with the existing audio-reactive play button. |
 | 4 | 🔲 | [#166](https://github.com/gurvinny/Slo-Fi/issues/166) | **Skip and Loop Icons** | A legible symmetric Skip 5s pair and explicit Loop Region bounds. |
 | 5 | 🔲 | [#167](https://github.com/gurvinny/Slo-Fi/issues/167) | **Lightning Overhaul** | Fractal branching, transient sync and pooled geometry for the orb's lightning. |

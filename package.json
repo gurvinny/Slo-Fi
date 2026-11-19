@@ -1,6 +1,6 @@
 {
   "name": "slo-fi",
-  "version": "3.0.0-beta.1",
+  "version": "3.0.0-beta.2",
   "description": "Professional-grade browser audio slow-down tool with convolution reverb",
   "type": "module",
   "engines": {

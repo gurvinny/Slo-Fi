@@ -22,7 +22,7 @@
     "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.67.0",
+    "@cloudflare/vite-plugin": "^1.70.1",
     "@playwright/test": "^1.65.1",
     "@types/pngjs": "^6.0.5",
     "@types/three": "^0.187.0",
